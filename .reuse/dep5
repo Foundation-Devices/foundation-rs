@@ -3,8 +3,6 @@ Upstream-Name: foundation-rs
 Upstream-Contact: Foundation Devices, Inc. <hello@foundationdevices.com>
 Source: https://foundationdevices.com
 
-# Sample paragraph, commented out:
-#
-# Files: src/*
-# Copyright: $YEAR $NAME <$CONTACT>
-# License: ...
+Files: .github/actions/rust-toolchain/action.yml
+Copyright: 2021 David Tolnay <dtolnay@gmail.com>
+License: MIT
