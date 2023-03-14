@@ -26,3 +26,9 @@ name = "solution_decode"
 path = "fuzz_targets/solution_decode.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "timestamp_decode"
+path = "fuzz_targets/timestamp_decode.rs"
+test = false
+doc = false
