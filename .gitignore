@@ -4,3 +4,8 @@
 # Rust
 Cargo.lock
 target/
+
+# cargo fuzz
+**/corpus/
+**/artifacts/
+**/coverage/

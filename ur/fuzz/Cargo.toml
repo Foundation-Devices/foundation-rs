@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "foundation-ur-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+foundation-ur = { workspace = true }
+libfuzzer-sys = { workspace = true }
+minicbor = { workspace = true }
+
+[[bin]]
+name = "model_decode"
+path = "fuzz_targets/model_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "solution_decode"
+path = "fuzz_targets/solution_decode.rs"
+test = false
+doc = false
