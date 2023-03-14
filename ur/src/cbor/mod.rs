@@ -4,5 +4,6 @@
 //! Standard CBOR encodable types.
 
 mod timestamp;
+pub mod uuid;
 
 pub use self::timestamp::Timestamp;

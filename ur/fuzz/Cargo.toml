@@ -32,3 +32,9 @@ name = "timestamp_decode"
 path = "fuzz_targets/timestamp_decode.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "uuid_decode"
+path = "fuzz_targets/uuid_decode.rs"
+test = false
+doc = false
