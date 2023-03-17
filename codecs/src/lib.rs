@@ -6,3 +6,8 @@
 //! Implementations of `no_std` friendly _codecs_.
 
 #![no_std]
+#![deny(missing_docs)]
+
+mod bech32;
+
+pub mod nostr;

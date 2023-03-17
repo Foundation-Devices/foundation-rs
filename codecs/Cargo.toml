@@ -3,9 +3,21 @@
 
 [package]
 name = "foundation-codecs"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["Foundation Devices, Inc. <hello@foundationdevices.com>"]
 description = "Foundation Devices no_std friendly codecs"
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/Foundation-Devices/foundation-rs"
 edition = "2021"
+
+[dependencies]
+bech32 = { workspace = true }
+heapless = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+foundation-test-vectors = { workspace = true, features = ["nostr"] }
+
+[[bench]]
+name = "bench"
+harness = false
