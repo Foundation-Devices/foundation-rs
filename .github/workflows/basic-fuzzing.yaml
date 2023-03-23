@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Basic Fuzzing
+on: [push]
+jobs:
+  fuzz:
+    name: Fuzz tests pass?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-toolchain
+        with:
+          toolchain: nightly
+      - run: cargo install cargo-fuzz
+      - run: ./contrib/fuzz.sh
