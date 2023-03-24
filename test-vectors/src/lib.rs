@@ -18,3 +18,22 @@ impl NIP19Vector {
             .expect("file should be valid JSON")
     }
 }
+
+#[cfg(feature = "seedqr")]
+#[derive(Debug, serde::Deserialize)]
+pub struct SeedQRVector {
+    pub name: String,
+    pub seed: bip39::Mnemonic,
+    pub as_digits: String,
+    pub as_compact_bits: String,
+    #[serde(with = "hex")]
+    pub as_compact_bytes: Vec<u8>,
+}
+
+#[cfg(feature = "seedqr")]
+impl SeedQRVector {
+    pub fn new() -> Vec<Self> {
+        serde_json::from_slice(include_bytes!("../data/seedqr.json"))
+            .expect("file should be valid JSON")
+    }
+}

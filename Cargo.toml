@@ -11,6 +11,7 @@ members = [
 
 [workspace.dependencies]
 bech32 = { version = "0.9", default-features = false }
+bip39 = { version = "2", default-features = false }
 criterion = { version = "0.4" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-ur = { path = "ur" }
