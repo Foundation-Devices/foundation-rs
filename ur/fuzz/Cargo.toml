@@ -28,6 +28,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "crypto_eckey_decode"
+path = "fuzz_targets/crypto_eckey_decode.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "crypto_hdkey_decode"
 path = "fuzz_targets/crypto_hdkey_decode.rs"
 test = false
