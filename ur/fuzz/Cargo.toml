@@ -16,6 +16,12 @@ libfuzzer-sys = { workspace = true }
 minicbor = { workspace = true }
 
 [[bin]]
+name = "crypto_seed_decode"
+path = "fuzz_targets/crypto_seed_decode.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "model_decode"
 path = "fuzz_targets/model_decode.rs"
 test = false

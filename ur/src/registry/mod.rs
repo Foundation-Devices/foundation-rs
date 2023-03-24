@@ -4,3 +4,6 @@
 //! UR registry.
 
 pub mod passport;
+mod crypto_seed;
+
+pub use self::crypto_seed::*;
