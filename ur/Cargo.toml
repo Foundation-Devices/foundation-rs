@@ -15,6 +15,7 @@ std = ["alloc"]
 alloc = []
 
 [dependencies]
+bitcoin = { workspace = true, optional = true, features = ["std"] }
 heapless = { workspace = true }
 hex = { workspace = true }
 minicbor = { workspace = true }
@@ -22,6 +23,7 @@ ur = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
+foundation-test-vectors = { workspace = true, features = ["blockchain-commons"] }
 minicbor = { workspace = true, features = ["alloc"] }
 
 [[test]]
