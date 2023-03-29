@@ -5,7 +5,9 @@
 
 pub mod passport;
 mod crypto_coininfo;
+mod crypto_keypath;
 mod crypto_seed;
 
 pub use self::crypto_coininfo::*;
+pub use self::crypto_keypath::*;
 pub use self::crypto_seed::*;
