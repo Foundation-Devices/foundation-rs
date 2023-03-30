@@ -23,3 +23,13 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 minicbor = { workspace = true, features = ["alloc"] }
+
+[[test]]
+name = "crypto_address"
+path = "tests/crypto_address.rs"
+required-features = ["bitcoin"]
+
+[[test]]
+name = "crypto_hdkey"
+path = "tests/crypto_hdkey.rs"
+required-features = ["bitcoin"]

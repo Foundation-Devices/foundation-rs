@@ -22,6 +22,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "crypto_hdkey_decode"
+path = "fuzz_targets/crypto_hdkey_decode.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "crypto_seed_decode"
 path = "fuzz_targets/crypto_seed_decode.rs"
 test = false
