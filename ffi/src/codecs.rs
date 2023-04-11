@@ -8,7 +8,6 @@ pub const NSEC_LEN: usize = 63;
 
 /// Encode a public key to a Nostr `npub`.
 #[export_name = "foundation_encode_npub"]
-#[no_mangle]
 pub extern "C" fn encode_npub(public_key: &[u8; 32], output: &mut [u8; NPUB_LEN]) {
     let npub = foundation_codecs::nostr::encode_npub(public_key);
     output[..npub.len()].copy_from_slice(npub.as_bytes());
@@ -16,7 +15,6 @@ pub extern "C" fn encode_npub(public_key: &[u8; 32], output: &mut [u8; NPUB_LEN]
 
 /// Encode a secret key to a Nostr `nsec`.
 #[export_name = "foundation_encode_nsec"]
-#[no_mangle]
 pub extern "C" fn encode_nsec(secret_key: &[u8; 32], output: &mut [u8; NSEC_LEN]) {
     let nsec = foundation_codecs::nostr::encode_nsec(secret_key);
     output[..nsec.len()].copy_from_slice(nsec.as_bytes());

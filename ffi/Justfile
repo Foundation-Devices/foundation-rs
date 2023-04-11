@@ -21,7 +21,7 @@ test:
 lint:
     cargo fmt --check
     cargo sort --check
-    clang-format --dry-run --Werror integration/*.cc
+    clang-format --dry-run --Werror integration/*.cpp
     cbindgen --config cbindgen.toml \
              --output include/foundation.h \
              --verify
@@ -30,6 +30,6 @@ lint:
 fmt:
     cargo fmt
     cargo sort
-    clang-format -i --Werror integration/*.cc
+    clang-format -i --Werror integration/*.cpp
     cbindgen --config cbindgen.toml \
              --output include/foundation.h

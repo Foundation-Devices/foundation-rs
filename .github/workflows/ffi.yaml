@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: sudo apt-get install -y clang-format
       - run: clang-format --version
-      - run: clang-format --dry-run --Werror ffi/integration/*.cc
+      - run: clang-format --dry-run --Werror ffi/integration/*.cpp
   integration-test-passes:
     name: Integration test passes?
     runs-on: ubuntu-latest

@@ -27,7 +27,7 @@ corrosion_import_crate(MANIFEST_PATH ../Cargo.toml)
 find_package(nlohmann_json 3.2.0 REQUIRED)
 
 enable_testing()
-add_executable(integration-codecs codecs.cc)
+add_executable(integration-codecs codecs.cpp)
 target_include_directories(integration-codecs PUBLIC ../include)
 target_link_libraries(
         integration-codecs
