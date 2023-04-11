@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Foreign Function Interface
+on: [push]
+jobs:
+  is-header-up-to-date:
+    name: Is header file up to date?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-toolchain
+        with:
+          toolchain: 1.65
+      - run: cargo install cbindgen@^0.24
+      - run: |
+          cbindgen --config ffi/cbindgen.toml \
+                   --output ffi/include/foundation.h \
+                   --verify \
+                   ffi/
+  is-integration-code-formatted:
+    name: Is integration code formatted?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo apt-get install -y clang-format
+      - run: clang-format --version
+      - run: clang-format --dry-run --Werror ffi/integration/*.cc
+  integration-test-passes:
+    name: Integration test passes?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-toolchain
+        with:
+          toolchain: 1.65
+      - run: sudo apt-get install -y cmake nlohmann-json3-dev
+      - run: |
+          cmake -S ffi/integration/ \
+                -B ffi/integration/cmake-build-debug \
+                -Werror=dev \
+                -Werror=deprecated
+      - run: cmake --build ffi/integration/cmake-build-debug
+      - run: ctest --test-dir ffi/integration/cmake-build-debug

@@ -9,3 +9,6 @@ target/
 **/corpus/
 **/artifacts/
 **/coverage/
+
+# CMake
+**/cmake-build-debug
