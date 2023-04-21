@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Example/Test Vector 1",
+    "as-cbor": "A202F50358208C05C4B4F3E88840A4F4B5F155CFD69473EA169F3D0431B7A6787A23777F08AA",
+    "as-ur": "ur:crypto-eckey/oeaoykaxhdcxlkahssqzwfvslofzoxwkrewngotktbmwjkwdcmnefsaaehrlolkskncnktlbaypkrphsmyid",
+    "ur": {
+      "crypto-eckey": {
+        "is-private": true,
+        "data": "8C05C4B4F3E88840A4F4B5F155CFD69473EA169F3D0431B7A6787A23777F08AA"
+      }
+    }
+  }
+]

@@ -7,6 +7,7 @@
 extern crate alloc;
 extern crate core;
 
+pub mod cbor;
 mod len;
 pub mod passport;
 pub mod registry;

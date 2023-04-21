@@ -16,6 +16,36 @@ libfuzzer-sys = { workspace = true }
 minicbor = { workspace = true }
 
 [[bin]]
+name = "crypto_address_decode"
+path = "fuzz_targets/crypto_address_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "crypto_coininfo_decode"
+path = "fuzz_targets/crypto_coininfo_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "crypto_eckey_decode"
+path = "fuzz_targets/crypto_eckey_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "crypto_hdkey_decode"
+path = "fuzz_targets/crypto_hdkey_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "crypto_seed_decode"
+path = "fuzz_targets/crypto_seed_decode.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "model_decode"
 path = "fuzz_targets/model_decode.rs"
 test = false
@@ -24,5 +54,17 @@ doc = false
 [[bin]]
 name = "solution_decode"
 path = "fuzz_targets/solution_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "timestamp_decode"
+path = "fuzz_targets/timestamp_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "uuid_decode"
+path = "fuzz_targets/uuid_decode.rs"
 test = false
 doc = false
