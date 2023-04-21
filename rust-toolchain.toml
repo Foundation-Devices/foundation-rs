@@ -1,14 +1,8 @@
 # SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Rust
-Cargo.lock
-target/
-
-# cargo fuzz
-**/corpus/
-**/artifacts/
-**/coverage/
-
-# CMake
-**/cmake-build-debug
+# Keep this in sync. with the CI.
+[toolchain]
+channel = "1.65"
+profile = "default"
+targets = ["thumbv7em-none-eabihf"]

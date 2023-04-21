@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Build and generate the header file.
+build:
+    cbindgen --config cbindgen.toml \
+             --output include/foundation.h
+    cargo build
+
+# Run all of the tests.
+test:
+    cargo test
+    cmake -S integration/ \
+          -B integration/cmake-build-debug \
+          -Werror=dev \
+          -Werror=deprecated
+    cmake --build integration/cmake-build-debug
+    ctest --test-dir integration/cmake-build-debug
+
+# Lint the crate for errors.
+lint:
+    cargo fmt --check
+    cargo sort --check
+    clang-format --dry-run --Werror integration/*.cpp
+    cbindgen --config cbindgen.toml \
+             --output include/foundation.h \
+             --verify
+
+# Format the code.
+fmt:
+    cargo fmt
+    cargo sort
+    clang-format -i --Werror integration/*.cpp
+    cbindgen --config cbindgen.toml \
+             --output include/foundation.h

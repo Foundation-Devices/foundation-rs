@@ -4,6 +4,7 @@
 [workspace]
 members = [
     "codecs",
+    "ffi",
     "test-vectors",
     "ur",
     "ur/fuzz",
@@ -13,6 +14,7 @@ members = [
 bech32 = { version = "0.9", default-features = false }
 bip39 = { version = "2", default-features = false }
 criterion = { version = "0.4" }
+foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-ur = { path = "ur" }
 heapless = { version = "0.8", git = "https://github.com/japaric/heapless", default-features = false }

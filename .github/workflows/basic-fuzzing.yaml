@@ -12,5 +12,6 @@ jobs:
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: nightly
+      - run: rustup override set nightly
       - run: cargo install cargo-fuzz
       - run: ./contrib/fuzz.sh
