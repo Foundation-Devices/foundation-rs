@@ -177,8 +177,7 @@ impl<T: Types> BaseDecoder<T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::Decoder;
-    ///
+    /// # use foundation_ur::Decoder;
     /// let decoder = Decoder::default();
     /// assert!(decoder.is_empty());
     /// ```

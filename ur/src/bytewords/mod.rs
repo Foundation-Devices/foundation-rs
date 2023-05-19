@@ -9,7 +9,7 @@
 //!
 //! # Standard style
 //! ```
-//! use ur::bytewords::{decode, encode, Style};
+//! # use foundation_ur::bytewords::{decode, encode, Style};
 //! let data = "Some bytes".as_bytes();
 //! let encoded = encode(data, Style::Standard);
 //! assert_eq!(
@@ -21,7 +21,7 @@
 //!
 //! # URI style
 //! ```
-//! use ur::bytewords::{decode, encode, Style};
+//! # use foundation_ur::bytewords::{decode, encode, Style};
 //! let data = "Some bytes".as_bytes();
 //! let encoded = encode(data, Style::Uri);
 //! assert_eq!(
@@ -33,7 +33,7 @@
 //!
 //! # Minimal style
 //! ```
-//! use ur::bytewords::{decode, encode, Style};
+//! # use foundation_ur::bytewords::{decode, encode, Style};
 //! let data = "Some binary data".as_bytes();
 //! let encoded = encode(data, Style::Minimal);
 //! assert_eq!(encoded, "gujljnihcxidinjthsjpkkcxiehsjyhsnsgdmkht");
@@ -158,7 +158,7 @@ impl std::error::Error for EncodeError {}
 /// # Examples
 ///
 /// ```
-/// use ur::bytewords::{decode, Style};
+/// # use foundation_ur::bytewords::{decode, Style};
 /// assert_eq!(
 ///     decode("able tied also webs lung", Style::Standard).unwrap(),
 ///     vec![0]
@@ -330,7 +330,7 @@ fn encoder<'a>(
 /// # Examples
 ///
 /// ```
-/// use ur::bytewords::{encode, Style};
+/// # use foundation_ur::bytewords::{encode, Style};
 /// assert_eq!(encode(&[0], Style::Standard), "able tied also webs lung");
 /// assert_eq!(encode(&[0], Style::Uri), "able-tied-also-webs-lung");
 /// // Notice how the minimal encoding consists of the start and end letters of the bytewords
@@ -409,8 +409,7 @@ pub fn encode_to_slice(data: &[u8], result: &mut [u8], style: Style) -> Result<u
 /// Printing bytewords to stdout:
 ///
 /// ```
-/// use ur::bytewords::{Bytewords, Style};
-///
+/// # use foundation_ur::bytewords::{Bytewords, Style};
 /// let data = b"bytewords encodable message :)";
 /// println!("{}", Bytewords(data, Style::Minimal));
 /// ```

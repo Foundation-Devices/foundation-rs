@@ -248,10 +248,7 @@ pub fn to_string(ur_type: &str, message: &[u8]) -> alloc::string::String {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::bytewords;
-    use crate::registry::crypto_request::{Body, CryptoRequest, RequestSeed};
     use std::num::IntErrorKind;
-    use uuid::Uuid;
 
     pub fn make_message_ur(length: usize, seed: &str) -> Vec<u8> {
         let message = crate::xoshiro::test_utils::make_message(seed, length);
@@ -270,38 +267,6 @@ pub mod tests {
             ur_type: "bytes",
             message: "hdeymejtswhhylkepmykhhtsytsnoyoyaxaedsuttydmmhhpktpmsrjtgwdpfnsboxgwlbaawzuefywkdplrsrjynbvygabwjldapfcsdwkbrkch",
         }));
-    }
-
-    #[test]
-    fn test_ur_encoder_decoder_bc_crypto_request() {
-        // https://github.com/BlockchainCommons/crypto-commons/blob/67ea252f4a7f295bb347cb046796d5b445b3ad3c/Docs/ur-99-request-response.md#the-seed-request
-
-        const UUID: &str = "020C223A86F7464693FC650EF3CAC047";
-        const SEED_DIGEST: &str =
-            "E824467CAFFEAF3BBC3E0CA095E660A9BAD80DDB6A919433A37161908B9A3986";
-        const EXPECTED: &str = "ur:crypto-request/oeadtpdagdaobncpftlnylfgfgmuztihbawfsgrtflaotaadwkoyadtaaohdhdcxvsdkfgkepezepefrrffmbnnbmdvahnptrdtpbtuyimmemweootjshsmhlunyeslnameyhsdi";
-
-        let transaction_id = Uuid::from_slice(&hex::decode(UUID).unwrap()).unwrap();
-
-        let mut seed_digest = [0u8; 32];
-        seed_digest.copy_from_slice(&hex::decode(SEED_DIGEST).unwrap());
-
-        let crypto_request = CryptoRequest {
-            transaction_id,
-            body: Body::RequestSeed(RequestSeed { seed_digest }),
-            description: None,
-        };
-
-        let data = minicbor::to_vec(crypto_request).unwrap();
-        let ur = UR::new("crypto-request", &data).to_string();
-        assert_eq!(ur, EXPECTED);
-
-        // Decoding should yield the same data
-        let parsed_ur = UR::parse(&ur).unwrap();
-        assert!(parsed_ur.is_single_part());
-
-        let decoded = bytewords::decode(parsed_ur.as_bytewords().unwrap(), Style::Minimal).unwrap();
-        assert_eq!(decoded, data);
     }
 
     #[test]

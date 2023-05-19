@@ -24,7 +24,7 @@ pub const fn div_ceil(a: usize, b: usize) -> usize {
 /// # Examples
 ///
 /// ```
-/// use ur::fountain::fragment_length;
+/// # use foundation_ur::fountain::fragment_length;
 ///
 /// const MESSAGE_LENGTH: usize = 100;
 /// const MAX_FRAGMENT_LENGTH: usize = 27;

@@ -149,8 +149,7 @@ impl<T: Types> BaseDecoder<T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::fountain::{Decoder, Encoder};
-    ///
+    /// # use foundation_ur::fountain::{Decoder, Encoder};
     /// let mut decoder = Decoder::default();
     /// let mut encoder = Encoder::new();
     /// encoder.start("data".as_bytes(), 3);
@@ -251,8 +250,7 @@ impl<T: Types> BaseDecoder<T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::fountain::Decoder;
-    ///
+    /// # use foundation_ur::fountain::Decoder;
     /// let decoder = Decoder::default();
     /// assert!(decoder.is_empty());
     /// ```

@@ -70,8 +70,7 @@ impl<'a, 'b, T: fountain::encoder::Types> BaseEncoder<'a, 'b, T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::Encoder;
-    ///
+    /// # use foundation_ur::Encoder;
     /// let mut encoder = Encoder::new();
     /// encoder.start("bytes", "data".as_bytes(), 5);
     ///
@@ -89,8 +88,7 @@ impl<'a, 'b, T: fountain::encoder::Types> BaseEncoder<'a, 'b, T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::Encoder;
-    ///
+    /// # use foundation_ur::Encoder;
     /// let mut encoder = Encoder::new();
     /// encoder.start("bytes", "data".as_bytes(), 3);
     /// assert_eq!(encoder.sequence_count(), 2);

@@ -85,8 +85,7 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::fountain::Encoder;
-    ///
+    /// # use foundation_ur::fountain::Encoder;
     /// let mut encoder = Encoder::new();
     /// encoder.start("binary data".as_bytes(), 4);
     /// ```
@@ -95,8 +94,7 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     /// fragment size:
     ///
     /// ```
-    /// use ur::fountain::Encoder;
-    ///
+    /// # use foundation_ur::fountain::Encoder;
     /// let mut encoder = Encoder::new();
     /// encoder.start("data".as_bytes(), 3);
     /// let part = encoder.next_part();
@@ -125,7 +123,7 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::fountain::Encoder;
+    /// # use foundation_ur::fountain::Encoder;
     /// let mut encoder = Encoder::new();
     /// encoder.start("data".as_bytes(), 3);
     ///
@@ -144,8 +142,7 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::fountain::Encoder;
-    ///
+    /// # use foundation_ur::fountain::Encoder;
     /// let mut encoder = Encoder::new();
     /// encoder.start("data".as_bytes(), 3);
     /// assert_eq!(encoder.sequence_count(), 2);
@@ -165,8 +162,7 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// use ur::fountain::Encoder;
-    ///
+    /// # use foundation_ur::fountain::Encoder;
     /// let message = "data".as_bytes().repeat(10);
     /// let mut encoder = Encoder::new();
     /// encoder.start(&message, 3);

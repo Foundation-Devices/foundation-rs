@@ -7,7 +7,7 @@
 //!
 //! The encoding scheme is optimized for transport in URIs and QR codes.
 //!
-//! The [encoder](ur::BaseEncoder) allows a byte payload to be transmitted in
+//! The [encoder](BaseEncoder) allows a byte payload to be transmitted in
 //! multiple stages, respecting maximum size requirements. Under the hood, a
 //! [`fountain`] encoder is used to create an unbounded stream of URIs, subsets
 //! of which can be recombined at the receiving side into the payload.
@@ -15,18 +15,20 @@
 //! For example:
 //!
 //! ```
+//! # use foundation_ur::{Decoder, Encoder};
+//!
 //! const MAX_FRAGMENT_LENGTH: usize = 5;
 //!
 //! let data = "Ten chars!".repeat(10);
 //!
-//! let mut encoder = ur::Encoder::new();
+//! let mut encoder = Encoder::new();
 //! encoder.start("bytes", data.as_bytes(), MAX_FRAGMENT_LENGTH);
 //! assert_eq!(
 //!     encoder.next_part().to_string(),
 //!     "ur:bytes/1-20/lpadbbcsiecyvdidatkpfeghihjtcxiabdfevlms"
 //! );
 //!
-//! let mut decoder = ur::Decoder::default();
+//! let mut decoder = Decoder::default();
 //! while !decoder.is_complete() {
 //!     let sequence = encoder.current_sequence();
 //!     let part = encoder.next_part();

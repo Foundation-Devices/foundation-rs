@@ -13,8 +13,7 @@
 //! were combined into the part.
 //!
 //! ```
-//! use ur::fountain::{Encoder, Decoder};
-//!
+//! # use foundation_ur::fountain::{Encoder, Decoder};
 //! let xor = |a: &[u8], b: &[u8]| {
 //!     a.iter()
 //!         .zip(b.iter())
@@ -66,12 +65,11 @@
 //! The index selection is biased towards combining fewer segments.
 //!
 //! ```
-//! use std::collections::BTreeSet;
-//! use ur::fountain::chooser;
-//!
+//! # use std::collections::BTreeSet;
+//! # use foundation_ur::fountain::{Encoder, chooser};
 //! let data = String::from("Fifty chars").repeat(5);
 //! let max_length = 5;
-//! let mut encoder = ur::fountain::Encoder::new();
+//! let mut encoder = Encoder::new();
 //! encoder.start(data.as_bytes(), max_length);
 //! // 40% of the emitted parts represent original message segments
 //! assert_eq!(
@@ -87,7 +85,7 @@
 //!         .sum::<usize>(),
 //!     39
 //! );
-//! let mut encoder = ur::fountain::Encoder::new();
+//! let mut encoder = Encoder::new();
 //! encoder.start(data.as_bytes(), max_length);
 //! // On average, 3.33 segments (out of ten total) are combined into a part
 //! assert_eq!(
