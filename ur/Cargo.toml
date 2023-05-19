@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-FileCopyrightText: © 2020 Dominik Spicher <dominikspicher@gmail.com>
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "foundation-ur"
+authors = [
+    "Dominik Spicher <dominikspicher@gmail.com>",
+    "Foundation Devices, Inc. <hello@foundationdevices.com>",
+]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = ["minicbor/alloc"]
+
+[dependencies]
+bitcoin_hashes = { workspace = true }
+crc = { workspace = true }
+heapless = { workspace = true }
+hex = { workspace = true }
+itertools = { workspace = true }
+minicbor = { workspace = true }
+phf = { workspace = true }
+rand_xoshiro = { workspace = true }

@@ -6,6 +6,7 @@ members = [
     "codecs",
     "ffi",
     "test-vectors",
+    "ur",
     "urtypes",
     "urtypes/fuzz",
 ]
@@ -14,14 +15,19 @@ members = [
 bech32 = { version = "0.9", default-features = false }
 bip39 = { version = "2", default-features = false }
 bitcoin = { version = "0.30", default-features = false }
+bitcoin_hashes = { version = "0.11", default-features = false }
+crc = "3"
 criterion = { version = "0.4" }
 foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-urtypes = { path = "urtypes" }
 heapless = { version = "0.8", git = "https://github.com/japaric/heapless", default-features = false }
 hex = "0.4.2"
+itertools = "0.10"
 libfuzzer-sys = "0.4"
 minicbor = { version = "0.19.1", features = ["derive"] }
+phf = { version = "0.11", features = ["macros"], default-features = false }
+rand_xoshiro = "0.6"
 serde = { version = "1.0.156", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", default-features = false }
