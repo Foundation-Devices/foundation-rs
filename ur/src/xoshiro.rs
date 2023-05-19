@@ -71,7 +71,6 @@ impl From<[u8; 32]> for Xoshiro256 {
 #[cfg(test)]
 pub mod test_utils {
     use super::*;
-    use crate::CRC32;
 
     impl super::Xoshiro256 {
         #[allow(clippy::cast_possible_truncation)]
@@ -83,10 +82,6 @@ pub mod test_utils {
             (0..n).map(|_| self.next_byte()).collect()
         }
 
-        #[must_use]
-        pub fn from_crc(bytes: &[u8]) -> Self {
-            Self::from(&CRC32.checksum(bytes).to_be_bytes()[..])
-        }
     }
 
     #[must_use]
@@ -118,22 +113,6 @@ mod tests {
 
     #[test]
     fn test_rng_2() {
-        const EXPECTED: &[u64] = &[
-            88, 44, 94, 74, 0, 99, 7, 77, 68, 35, 47, 78, 19, 21, 50, 15, 42, 36, 91, 11, 85, 39,
-            64, 22, 57, 11, 25, 12, 1, 91, 17, 75, 29, 47, 88, 11, 68, 58, 27, 65, 21, 54, 47, 54,
-            73, 83, 23, 58, 75, 27, 26, 15, 60, 36, 30, 21, 55, 57, 77, 76, 75, 47, 53, 76, 9, 91,
-            14, 69, 3, 95, 11, 73, 20, 99, 68, 61, 3, 98, 36, 98, 56, 65, 14, 80, 74, 57, 63, 68,
-            51, 56, 24, 39, 53, 80, 57, 51, 81, 3, 1, 30,
-        ];
-
-        let mut rng = Xoshiro256::from_crc(b"Wolf");
-        for &e in EXPECTED {
-            assert_eq!(rng.next() % 100, e);
-        }
-    }
-
-    #[test]
-    fn test_rng_3() {
         const EXPECTED: &[u64] = &[
             6, 5, 8, 4, 10, 5, 7, 10, 4, 9, 10, 9, 7, 7, 1, 1, 2, 9, 9, 2, 6, 4, 5, 7, 8, 5, 4, 2,
             3, 8, 7, 4, 5, 1, 10, 9, 3, 10, 2, 6, 8, 5, 7, 9, 3, 1, 5, 2, 7, 1, 4, 4, 4, 4, 9, 4,
