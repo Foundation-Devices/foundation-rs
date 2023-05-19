@@ -7,9 +7,9 @@
 //! The [`Writer`] structure allows `minicbor` to encode CBOR directly as bytewords
 //! by writing it into a [`formatter`](fmt::Formatter) without any allocations.
 
-use crate::bytewords::constants::MINIMALS;
-use crate::CRC32;
 use core::fmt;
+
+use crate::{bytewords::constants::MINIMALS, CRC32};
 
 /// `minicbor` bytewords writer.
 pub struct Writer<W> {

@@ -1,6 +1,7 @@
 //! Encoder.
 
 use crate::{fountain, ur::UR};
+
 use core::str;
 
 /// An encoder.

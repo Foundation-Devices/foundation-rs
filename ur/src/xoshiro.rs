@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use bitcoin_hashes::Hash;
-use rand_xoshiro::rand_core::RngCore;
-use rand_xoshiro::rand_core::SeedableRng;
-use rand_xoshiro::Xoshiro256StarStar;
+use rand_xoshiro::{rand_core::RngCore, rand_core::SeedableRng, Xoshiro256StarStar};
 
 #[allow(clippy::module_name_repetitions)]
 pub struct Xoshiro256 {

@@ -44,12 +44,13 @@ pub mod minicbor;
 
 mod constants;
 
+use core::fmt;
+
 use crate::{
     bytewords::constants::{MINIMALS, MINIMAL_IDXS, WORDS, WORD_IDXS},
     CRC32,
 };
 
-use core::fmt;
 use itertools::Either;
 
 /// The three different `bytewords` encoding styles.

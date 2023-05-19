@@ -6,14 +6,14 @@
 
 use core::fmt;
 
-use crate::fountain::part::MessageDescription;
 use crate::{
+    fountain::part::MessageDescription,
     collections::{Deque, Set, Vec},
     fountain::{
         chooser,
         chooser::BaseFragmentChooser,
         part::{IndexedPart, Part},
-    },
+    }
 };
 
 /// A [`decoder`](BaseDecoder) that uses [`alloc`] collection types.
