@@ -219,7 +219,9 @@ impl fmt::Display for ParseURError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseURError::InvalidScheme => write!(f, "Invalid Uniform Resource scheme"),
-            ParseURError::TypeUnspecified => write!(f, "No type was specified for the Uniform Resource"),
+            ParseURError::TypeUnspecified => {
+                write!(f, "No type was specified for the Uniform Resource")
+            }
             ParseURError::InvalidCharacters => {
                 write!(f, "Uniform Resource type contains invalid characters")
             }
