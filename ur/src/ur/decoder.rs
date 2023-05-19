@@ -51,9 +51,9 @@ impl<
     >
 {
     /// Construct a new [`HeaplessDecoder`].
-    pub const fn new_heapless() -> Self {
+    pub const fn new() -> Self {
         Self {
-            fountain: fountain::decoder::HeaplessDecoder::new_heapless(),
+            fountain: fountain::decoder::HeaplessDecoder::new(),
             fragment: heapless::Vec::new(),
             ur_type: heapless::Vec::new(),
         }

@@ -42,13 +42,13 @@ impl<'a, const MAX_FRAGMENT_LEN: usize, const MAX_SEQUENCE_COUNT: usize>
     HeaplessEncoder<'a, MAX_FRAGMENT_LEN, MAX_SEQUENCE_COUNT>
 {
     /// Constructs a new [`HeaplessEncoder`].
-    pub const fn new_heapless() -> Self {
+    pub const fn new() -> Self {
         Self {
             message: None,
             fragment_length: 0,
             checksum: 0,
             current_sequence: 0,
-            chooser: chooser::HeaplessFragmentChooser::new_heapless(),
+            chooser: chooser::HeaplessFragmentChooser::new(),
             data: heapless::Vec::new(),
             indexes: heapless::IndexSet::new(),
         }

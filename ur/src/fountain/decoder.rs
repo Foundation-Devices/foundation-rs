@@ -47,13 +47,13 @@ impl<
     >
 {
     /// Constructs a new [`HeaplessDecoder`].
-    pub const fn new_heapless() -> Self {
+    pub const fn new() -> Self {
         Self {
             message: heapless::Vec::new(),
             mixed_parts: heapless::Vec::new(),
             received: heapless::IndexSet::new(),
             queue: heapless::Deque::new(),
-            fragment_chooser: chooser::HeaplessFragmentChooser::new_heapless(),
+            fragment_chooser: chooser::HeaplessFragmentChooser::new(),
             message_description: None,
         }
     }
@@ -540,7 +540,7 @@ pub mod tests {
             MAX_FRAGMENT_LEN,
             MAX_SEQUENCE_COUNT,
             MAX_SEQUENCE_COUNT,
-        > = HeaplessDecoder::new_heapless();
+        > = HeaplessDecoder::new();
         let mut decoder = Decoder::default();
 
         test(&mut heapless_decoder);
@@ -611,7 +611,7 @@ pub mod tests {
             assert!(!decoder.is_part_consistent(&part));
         }
 
-        let mut heapless_decoder: HeaplessDecoder<8, 8, 8, 8, 8> = HeaplessDecoder::new_heapless();
+        let mut heapless_decoder: HeaplessDecoder<8, 8, 8, 8, 8> = HeaplessDecoder::new();
         let mut decoder = Decoder::default();
 
         test(&mut heapless_decoder);
@@ -649,7 +649,7 @@ pub mod tests {
         }
 
         let mut heapless_decoder: HeaplessDecoder<100, 8, 5, 8, 8> =
-            HeaplessDecoder::new_heapless();
+            HeaplessDecoder::new();
         let mut decoder = Decoder::default();
 
         test(&mut heapless_decoder);

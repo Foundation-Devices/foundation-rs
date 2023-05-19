@@ -31,9 +31,9 @@ pub type HeaplessFragmentChooser<const COUNT: usize> = BaseFragmentChooser<Heapl
 
 impl<const COUNT: usize> HeaplessFragmentChooser<COUNT> {
     /// Construct a new [`HeaplessFragmentChooser`].
-    pub const fn new_heapless() -> Self {
+    pub const fn new() -> Self {
         Self {
-            sampler: sampler::HeaplessWeighted::new_heapless(),
+            sampler: sampler::HeaplessWeighted::new(),
             indexes: heapless::Vec::new(),
             shuffled: heapless::Vec::new(),
         }

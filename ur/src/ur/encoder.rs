@@ -29,9 +29,9 @@ impl<'a, 'b, const MAX_FRAGMENT_LEN: usize, const MAX_SEQUENCE_COUNT: usize>
     HeaplessEncoder<'a, 'b, MAX_FRAGMENT_LEN, MAX_SEQUENCE_COUNT>
 {
     /// Construct a new [`HeaplessEncoder`].
-    pub const fn new_heapless() -> Self {
+    pub const fn new() -> Self {
         Self {
-            fountain: fountain::encoder::HeaplessEncoder::new_heapless(),
+            fountain: fountain::encoder::HeaplessEncoder::new(),
             ur_type: None,
         }
     }
@@ -156,7 +156,7 @@ pub mod tests {
             }
         }
 
-        let mut heapless_encoder: HeaplessEncoder<'_, '_, 30, 16> = HeaplessEncoder::new_heapless();
+        let mut heapless_encoder: HeaplessEncoder<'_, '_, 30, 16> = HeaplessEncoder::new();
         let mut encoder = Encoder::new();
 
         test(&mut heapless_encoder, &ur);

@@ -33,7 +33,7 @@ pub type HeaplessWeighted<const N: usize> = BaseWeighted<Heapless<N>>;
 
 impl<const N: usize> HeaplessWeighted<N> {
     /// Construct a new [`HeaplessWeighted`].
-    pub const fn new_heapless() -> Self {
+    pub const fn new() -> Self {
         Self {
             aliases: heapless::Vec::new(),
             probs: heapless::Vec::new(),
@@ -223,7 +223,7 @@ mod tests {
             }
         }
 
-        let mut heapless_weighted: HeaplessWeighted<WEIGHTS_LEN> = HeaplessWeighted::new_heapless();
+        let mut heapless_weighted: HeaplessWeighted<WEIGHTS_LEN> = HeaplessWeighted::new();
         let mut weighted = Weighted::new();
 
         test(&mut heapless_weighted);
