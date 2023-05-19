@@ -22,9 +22,9 @@ heapless = { version = "0.8", git = "https://github.com/japaric/heapless", defau
 hex = "0.4.2"
 libfuzzer-sys = "0.4"
 minicbor = { version = "0.19.1", features = ["derive"] }
-uuid = { version = "1", default-features = false }
 serde = { version = "1.0.156", features = ["derive"] }
 serde_json = "1"
+uuid = { version = "1", default-features = false }
 
 [profile.release]
 debug = 1
