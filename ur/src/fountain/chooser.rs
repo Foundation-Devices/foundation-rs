@@ -152,6 +152,7 @@ impl<const COUNT: usize> Types for Heapless<COUNT> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "alloc")]
 pub mod tests {
     use super::*;
     use crate::fountain::sampler::Weighted;

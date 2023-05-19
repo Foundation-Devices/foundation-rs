@@ -188,7 +188,6 @@ impl<const COUNT: usize> Types for Heapless<COUNT> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::iter;
 
     const WEIGHTS_LEN: usize = 4;
     const WEIGHTS: [f64; WEIGHTS_LEN] = [1.0, 2.0, 4.0, 8.0];
@@ -212,22 +211,26 @@ mod tests {
         1, 3, 3, 0, 3, 2, 3, 3, 1, 3, 3, 3, 3, 3, 3, 3, 0, 3, 3, 2,
     ];
 
-    #[test]
-    fn test_sampler() {
-        fn test<T: Types>(sampler: &mut BaseWeighted<T>) {
-            let mut xoshiro = crate::xoshiro::Xoshiro256::from("Wolf");
-            sampler.set(WEIGHTS.iter().copied());
+    fn test_sampler<T: Types>(sampler: &mut BaseWeighted<T>) {
+        let mut xoshiro = crate::xoshiro::Xoshiro256::from("Wolf");
+        sampler.set(WEIGHTS.iter().copied());
 
-            for &e in EXPECTED_SAMPLES {
-                assert_eq!(sampler.next(&mut xoshiro), e);
-            }
+        for &e in EXPECTED_SAMPLES {
+            assert_eq!(sampler.next(&mut xoshiro), e);
         }
+    }
 
-        let mut heapless_weighted: HeaplessWeighted<WEIGHTS_LEN> = HeaplessWeighted::new();
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test() {
         let mut weighted = Weighted::new();
+        test_sampler(&mut weighted);
+    }
 
-        test(&mut heapless_weighted);
-        test(&mut weighted);
+    #[test]
+    fn test_heapless() {
+        let mut weighted: HeaplessWeighted<WEIGHTS_LEN> = HeaplessWeighted::new();
+        test_sampler(&mut weighted);
     }
 
     #[test]
@@ -240,12 +243,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "negative probability encountered")]
     fn test_negative_weight() {
-        Weighted::default().set([2.0, -1.0].into_iter());
+        HeaplessWeighted::<WEIGHTS_LEN>::default().set([2.0, -1.0].into_iter());
     }
 
     #[test]
     #[should_panic(expected = "probabilities don't sum to a positive value")]
     fn test_zero_weights() {
-        Weighted::default().set(iter::once(0.0));
+        HeaplessWeighted::<WEIGHTS_LEN>::default().set(core::iter::once(0.0));
     }
 }

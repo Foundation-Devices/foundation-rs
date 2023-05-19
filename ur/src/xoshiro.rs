@@ -67,10 +67,11 @@ impl From<[u8; 32]> for Xoshiro256 {
 }
 
 #[cfg(test)]
+#[cfg(feature = "alloc")]
 pub mod test_utils {
     use super::*;
 
-    impl super::Xoshiro256 {
+    impl Xoshiro256 {
         #[allow(clippy::cast_possible_truncation)]
         fn next_byte(&mut self) -> u8 {
             self.next_int(0, 255) as u8
@@ -79,7 +80,6 @@ pub mod test_utils {
         pub fn next_bytes(&mut self, n: usize) -> Vec<u8> {
             (0..n).map(|_| self.next_byte()).collect()
         }
-
     }
 
     #[must_use]

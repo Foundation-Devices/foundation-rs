@@ -81,25 +81,6 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     /// - The maximum fragment length is zero.
     /// - The maximum fragment length is large than what `T::Data` can
     /// hold.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foundation_ur::fountain::Encoder;
-    /// let mut encoder = Encoder::new();
-    /// encoder.start("binary data".as_bytes(), 4);
-    /// ```
-    ///
-    /// **Note:* the effective fragment size will not always equal the maximum
-    /// fragment size:
-    ///
-    /// ```
-    /// # use foundation_ur::fountain::Encoder;
-    /// let mut encoder = Encoder::new();
-    /// encoder.start("data".as_bytes(), 3);
-    /// let part = encoder.next_part();
-    /// assert_eq!(part.data.len(), 2);
-    /// ```
     pub fn start(&mut self, message: &'a [u8], max_fragment_length: usize) {
         assert!(!message.is_empty(), "message must not be empty");
         assert_ne!(
@@ -119,18 +100,6 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     }
 
     /// Returns the current count of how many parts have been emitted.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foundation_ur::fountain::Encoder;
-    /// let mut encoder = Encoder::new();
-    /// encoder.start("data".as_bytes(), 3);
-    ///
-    /// assert_eq!(encoder.current_sequence(), 0);
-    /// encoder.next_part();
-    /// assert_eq!(encoder.current_sequence(), 1);
-    /// ```
     #[must_use]
     #[inline]
     pub fn current_sequence(&self) -> u32 {
@@ -138,15 +107,6 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     }
 
     /// Returns the number of segments the original message has been split up into.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foundation_ur::fountain::Encoder;
-    /// let mut encoder = Encoder::new();
-    /// encoder.start("data".as_bytes(), 3);
-    /// assert_eq!(encoder.sequence_count(), 2);
-    /// ```
     #[must_use]
     pub fn sequence_count(&self) -> u32 {
         div_ceil(self.message.unwrap().len(), self.fragment_length)
@@ -158,21 +118,6 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     /// The fountain encoding is defined as doing this before combining segments
     /// with each other. Thus, this is equivalent to checking whether
     /// [`current_sequence`] >= [`fragment_count`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foundation_ur::fountain::Encoder;
-    /// let message = "data".as_bytes().repeat(10);
-    /// let mut encoder = Encoder::new();
-    /// encoder.start(&message, 3);
-    ///
-    /// while !encoder.is_complete() {
-    ///     assert!(encoder.current_sequence() < encoder.sequence_count());
-    ///     encoder.next_part();
-    /// }
-    /// assert_eq!(encoder.current_sequence(), encoder.sequence_count());
-    /// ```
     ///
     /// [`fragment_count`]: BaseEncoder::sequence_count
     /// [`current_sequence`]: BaseEncoder::current_sequence
@@ -259,6 +204,7 @@ impl<const MAX_FRAGMENT_LEN: usize, const MAX_SEQUENCE_COUNT: usize> Types
 }
 
 #[cfg(test)]
+#[cfg(feature = "alloc")]
 pub mod tests {
     use super::*;
     use crate::xoshiro::test_utils::make_message;

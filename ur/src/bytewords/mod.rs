@@ -2,47 +2,14 @@
 // SPDX-FileCopyrightText: © 2020 Dominik Spicher <dominikspicher@gmail.com>
 // SPDX-License-Identifier: MIT
 
-//! Encode and decode byte payloads according to the [`bytewords`](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-012-bytewords.md) scheme.
+//! # Bytewords
 //!
-//! The [`bytewords`](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-012-bytewords.md) encoding
-//! scheme defines three styles how byte payloads can be encoded.
+//! Encode and decode byte payloads according to the [bytewords] scheme.
 //!
-//! # Standard style
-//! ```
-//! # use foundation_ur::bytewords::{decode, encode, Style};
-//! let data = "Some bytes".as_bytes();
-//! let encoded = encode(data, Style::Standard);
-//! assert_eq!(
-//!     encoded,
-//!     "guru jowl join inch crux iced kick jury inch junk taxi aqua kite limp"
-//! );
-//! assert_eq!(data, decode(&encoded, Style::Standard).unwrap());
-//! ```
-//!
-//! # URI style
-//! ```
-//! # use foundation_ur::bytewords::{decode, encode, Style};
-//! let data = "Some bytes".as_bytes();
-//! let encoded = encode(data, Style::Uri);
-//! assert_eq!(
-//!     encoded,
-//!     "guru-jowl-join-inch-crux-iced-kick-jury-inch-junk-taxi-aqua-kite-limp"
-//! );
-//! assert_eq!(data, decode(&encoded, Style::Uri).unwrap());
-//! ```
-//!
-//! # Minimal style
-//! ```
-//! # use foundation_ur::bytewords::{decode, encode, Style};
-//! let data = "Some binary data".as_bytes();
-//! let encoded = encode(data, Style::Minimal);
-//! assert_eq!(encoded, "gujljnihcxidinjthsjpkkcxiehsjyhsnsgdmkht");
-//! assert_eq!(data, decode(&encoded, Style::Minimal).unwrap());
-//! ```
+//! [bytewords]: https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-012-bytewords.md.
 
 pub mod minicbor;
-
-mod constants;
+pub mod constants;
 
 use core::fmt;
 
@@ -444,6 +411,7 @@ impl<'a> fmt::Display for Bytewords<'a> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "alloc")]
 mod tests {
     use super::*;
 
@@ -557,11 +525,11 @@ mod tests {
                        fizz holy city puff";
 
         let encoded_minimal = "yktsbbswwnwmfefrttsnonbgmtnnjyltvwtybwne\
-                               bydawswtzcbdjnrsdawzdsksurdtnsrywzzemusf\
-                               fwottppersfdptencxfnmhvatdldroskcljshdba\
-                               ntctpadmadjksnfevymtfpwmftmhfpwtlpfejsyl\
-                               fhecwzonnbmhcybtgwwelpflgmfezeonledtgocs\
-                               fzhycypf";
+                                    bydawswtzcbdjnrsdawzdsksurdtnsrywzzemusf\
+                                    fwottppersfdptencxfnmhvatdldroskcljshdba\
+                                    ntctpadmadjksnfevymtfpwmftmhfpwtlpfejsyl\
+                                    fhecwzonnbmhcybtgwwelpflgmfezeonledtgocs\
+                                    fzhycypf";
 
         assert_eq!(decode(encoded, Style::Standard).unwrap(), input.to_vec());
         assert_eq!(

@@ -2,8 +2,13 @@
 // SPDX-FileCopyrightText: © 2020 Dominik Spicher <dominikspicher@gmail.com>
 // SPDX-License-Identifier: MIT
 
+//! Byte-words look-up tables.
+//!
+//! Uses compile-time hashmaps to speed up the look-up of byte-words indexes.
+
 use phf::phf_map;
 
+/// Four letter words. Index to word table.
 #[rustfmt::skip]
 pub static WORDS: [&str; 256] = [
     "able", "acid", "also", "apex", "aqua", "arch", "atom", "aunt",
@@ -40,6 +45,7 @@ pub static WORDS: [&str; 256] = [
     "yoga", "yurt", "zaps", "zero", "zest", "zinc", "zone", "zoom",
 ];
 
+/// Four letter words. Word to index table.
 pub static WORD_IDXS: phf::Map<&'static str, u8> = phf_map! {
     "able" => 0,
     "acid" => 1,
@@ -299,6 +305,7 @@ pub static WORD_IDXS: phf::Map<&'static str, u8> = phf_map! {
     "zoom" => 255,
 };
 
+/// Two letter byte words. Index to word table.
 #[rustfmt::skip]
 pub static MINIMALS: [&str; 256] = [
     "ae", "ad", "ao", "ax", "aa", "ah", "am", "at",
@@ -335,6 +342,7 @@ pub static MINIMALS: [&str; 256] = [
     "ya", "yt", "zs", "zo", "zt", "zc", "ze", "zm",
 ];
 
+/// Two letter byte words. Word to index table.
 pub static MINIMAL_IDXS: phf::Map<&'static str, u8> = phf_map! {
     "ae" => 0,
     "ad" => 1,
@@ -593,3 +601,42 @@ pub static MINIMAL_IDXS: phf::Map<&'static str, u8> = phf_map! {
     "ze" => 254,
     "zm" => 255,
 };
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[test]
+    fn test_length() {
+        assert_eq!(WORDS.len(), usize::from(u8::MAX) + 1);
+        assert_eq!(MINIMALS.len(), usize::from(u8::MAX) + 1);
+        assert_eq!(WORDS.len(), WORD_IDXS.len());
+        assert_eq!(MINIMALS.len(), MINIMAL_IDXS.len());
+    }
+
+    #[test]
+    fn test_minimals() {
+        for (&word, &minimal) in WORDS.iter().zip(MINIMALS.iter()) {
+            let word = word.as_bytes();
+            let expected_minimal = [word[0], word[3]];
+            assert_eq!(minimal.as_bytes(), &expected_minimal);
+        }
+    }
+
+    #[test]
+    fn test_values_map() {
+        for (i, &word) in WORDS.iter().enumerate() {
+            assert_eq!(
+                WORD_IDXS.get(word).copied().unwrap(),
+                u8::try_from(i).expect("table length should be equal to u8::MAX")
+            );
+        }
+
+        for (i, &minimal) in MINIMALS.iter().enumerate() {
+            assert_eq!(
+                MINIMAL_IDXS.get(minimal).copied().unwrap(),
+                u8::try_from(i).expect("table length should be equal to u8::MAX")
+            );
+        }
+    }
+}

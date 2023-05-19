@@ -177,8 +177,8 @@ impl<T: Types> BaseDecoder<T> {
     /// # Examples
     ///
     /// ```
-    /// # use foundation_ur::Decoder;
-    /// let decoder = Decoder::default();
+    /// # use foundation_ur::fountain::HeaplessDecoder;
+    /// let decoder: HeaplessDecoder<8, 8, 8, 8, 8> = HeaplessDecoder::new();
     /// assert!(decoder.is_empty());
     /// ```
     #[must_use]

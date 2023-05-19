@@ -42,7 +42,7 @@ pub const fn fragment_length(message_length: usize, max_fragment_length: usize) 
 }
 
 pub fn xor_into(v1: &mut [u8], v2: &[u8]) {
-    debug_assert_eq!(v1.len(), v2.len());
+    assert_eq!(v1.len(), v2.len());
 
     for (x1, &x2) in v1.iter_mut().zip(v2.iter()) {
         *x1 ^= x2;
@@ -52,6 +52,12 @@ pub fn xor_into(v1: &mut [u8], v2: &[u8]) {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+    #[should_panic]
+    #[test]
+    fn test_div_ceil_divide_by_zero() {
+        let _ = div_ceil(1, 0);
+    }
 
     #[test]
     fn test_fragment_length() {
@@ -65,20 +71,30 @@ pub mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn test_fragment_length_greater_than_zero() {
+        let _ = fragment_length(10, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_xor_into_different_len() {
+        let mut a = [0; 10];
+        let b = [0; 9];
+        xor_into(&mut a, &b);
+    }
+
+    #[test]
     fn test_xor_into() {
-        let mut rng = crate::xoshiro::Xoshiro256::from("Wolf");
+        const A: [u8; 10] = [0x91, 0x6e, 0xc6, 0x5c, 0xf7, 0x7c, 0xad, 0xf5, 0x5c, 0xd7];
+        const B: [u8; 10] = [0xf9, 0xcd, 0xa1, 0xa1, 0x03, 0x00, 0x26, 0xdd, 0xd4, 0x2e];
+        const C: [u8; 10] = [0x68, 0xa3, 0x67, 0xfd, 0xf4, 0x7c, 0x8b, 0x28, 0x88, 0xf9];
 
-        let data1 = rng.next_bytes(10);
-        assert_eq!(hex::encode(&data1), "916ec65cf77cadf55cd7");
+        let mut a = A.clone();
+        xor_into(&mut a, &B);
+        assert_eq!(a, C);
 
-        let data2 = rng.next_bytes(10);
-        assert_eq!(hex::encode(&data2), "f9cda1a1030026ddd42e");
-
-        let mut data3 = data1.clone();
-        xor_into(&mut data3, &data2);
-        assert_eq!(hex::encode(&data3), "68a367fdf47c8b2888f9");
-
-        xor_into(&mut data3, &data1);
-        assert_eq!(hex::encode(data3), hex::encode(data2));
+        xor_into(&mut a, &A);
+        assert_eq!(a, B);
     }
 }

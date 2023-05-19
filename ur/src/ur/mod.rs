@@ -250,14 +250,16 @@ pub fn to_string(ur_type: &str, message: &[u8]) -> alloc::string::String {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::num::IntErrorKind;
+    use core::num::IntErrorKind;
 
+    #[cfg(feature = "alloc")]
     pub fn make_message_ur(length: usize, seed: &str) -> Vec<u8> {
         let message = crate::xoshiro::test_utils::make_message(seed, length);
         minicbor::to_vec(minicbor::bytes::ByteVec::from(message)).unwrap()
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn test_single_part_ur() {
         const EXPECTED: &str = "ur:bytes/hdeymejtswhhylkepmykhhtsytsnoyoyaxaedsuttydmmhhpktpmsrjtgwdpfnsboxgwlbaawzuefywkdplrsrjynbvygabwjldapfcsdwkbrkch";
 
@@ -272,6 +274,7 @@ pub mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn test_ur_roundtrip() {
         let ur = make_message_ur(32767, "Wolf");
         let mut encoder = Encoder::new();

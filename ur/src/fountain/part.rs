@@ -279,6 +279,7 @@ pub mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn test_part_cbor_roundtrip() {
         const PART: Part = Part {
             sequence: 12,

@@ -141,34 +141,11 @@ impl<T: Types> BaseDecoder<T> {
     }
 
     /// Checks whether a [`Part`] is receivable by the decoder.
+    ///
     /// This can fail if other parts were previously received whose
     /// metadata (such as number of segments) is inconsistent with the
     /// present [`Part`]. Note that a fresh decoder will always return
     /// false here.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foundation_ur::fountain::{Decoder, Encoder};
-    /// let mut decoder = Decoder::default();
-    /// let mut encoder = Encoder::new();
-    /// encoder.start("data".as_bytes(), 3);
-    /// let part = encoder.next_part();
-    ///
-    /// // a fresh decoder always returns false
-    /// assert!(!decoder.is_part_consistent(&part));
-    ///
-    /// // parts with the same metadata validate successfully
-    /// decoder.receive(&part).unwrap();
-    /// let part = encoder.next_part();
-    /// assert!(decoder.is_part_consistent(&part));
-    ///
-    /// // parts with the different metadata don't validate
-    /// let mut encoder = Encoder::new();
-    /// encoder.start("more data".as_bytes(), 3);
-    /// let part = encoder.next_part();
-    /// assert!(!decoder.is_part_consistent(&part));
-    /// ```
     #[must_use]
     pub fn is_part_consistent(&self, part: &Part) -> bool {
         match self.message_description {
@@ -246,14 +223,6 @@ impl<T: Types> BaseDecoder<T> {
     ///
     /// Once a part is successfully [received](Self::receive) this method will
     /// return `false`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use foundation_ur::fountain::Decoder;
-    /// let decoder = Decoder::default();
-    /// assert!(decoder.is_empty());
-    /// ```
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.message.is_empty()
@@ -504,6 +473,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 #[cfg(test)]
+#[cfg(feature = "alloc")]
 pub mod tests {
     use super::*;
     use crate::fountain::fragment_length;

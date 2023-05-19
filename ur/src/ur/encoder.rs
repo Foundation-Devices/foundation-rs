@@ -71,8 +71,8 @@ impl<'a, 'b, T: fountain::encoder::Types> BaseEncoder<'a, 'b, T> {
     /// # Examples
     ///
     /// ```
-    /// # use foundation_ur::Encoder;
-    /// let mut encoder = Encoder::new();
+    /// # use foundation_ur::HeaplessEncoder;
+    /// # let mut encoder: HeaplessEncoder<8, 8> = HeaplessEncoder::new();
     /// encoder.start("bytes", "data".as_bytes(), 5);
     ///
     /// assert_eq!(encoder.current_sequence(), 0);
@@ -89,8 +89,8 @@ impl<'a, 'b, T: fountain::encoder::Types> BaseEncoder<'a, 'b, T> {
     /// # Examples
     ///
     /// ```
-    /// # use foundation_ur::Encoder;
-    /// let mut encoder = Encoder::new();
+    /// # use foundation_ur::HeaplessEncoder;
+    /// # let mut encoder: HeaplessEncoder<8, 8> = HeaplessEncoder::new();
     /// encoder.start("bytes", "data".as_bytes(), 3);
     /// assert_eq!(encoder.sequence_count(), 2);
     /// ```
@@ -113,6 +113,7 @@ impl<'a, 'b, T: fountain::encoder::Types> BaseEncoder<'a, 'b, T> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "alloc")]
 pub mod tests {
     use super::*;
     use crate::ur::tests::make_message_ur;

@@ -15,20 +15,19 @@
 //! For example:
 //!
 //! ```
-//! # use foundation_ur::{Decoder, Encoder};
-//!
+//! # use foundation_ur::{HeaplessDecoder, HeaplessEncoder};
+//! # let mut encoder: HeaplessEncoder<32, 32> = HeaplessEncoder::new();
+//! # let mut decoder: HeaplessDecoder<100, 32, 32, 32, 32, 32> = HeaplessDecoder::new();
 //! const MAX_FRAGMENT_LENGTH: usize = 5;
 //!
 //! let data = "Ten chars!".repeat(10);
 //!
-//! let mut encoder = Encoder::new();
 //! encoder.start("bytes", data.as_bytes(), MAX_FRAGMENT_LENGTH);
 //! assert_eq!(
 //!     encoder.next_part().to_string(),
 //!     "ur:bytes/1-20/lpadbbcsiecyvdidatkpfeghihjtcxiabdfevlms"
 //! );
 //!
-//! let mut decoder = Decoder::default();
 //! while !decoder.is_complete() {
 //!     let sequence = encoder.current_sequence();
 //!     let part = encoder.next_part();
