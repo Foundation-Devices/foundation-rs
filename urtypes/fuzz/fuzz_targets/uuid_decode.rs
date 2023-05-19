@@ -3,9 +3,11 @@
 
 #![no_main]
 
-use foundation_ur::registry::CryptoSeed;
+use foundation_urtypes::cbor::uuid;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    minicbor::decode::<'_, CryptoSeed>(data).ok();
+    let mut decoder = minicbor::Decoder::new(data);
+
+    uuid::decode(&mut decoder, &mut ()).ok();
 });

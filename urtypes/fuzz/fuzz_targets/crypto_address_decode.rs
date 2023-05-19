@@ -3,9 +3,9 @@
 
 #![no_main]
 
-use foundation_ur::registry::CryptoCoinInfo;
+use foundation_urtypes::registry::CryptoAddress;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    minicbor::decode::<'_, CryptoCoinInfo>(data).ok();
+    minicbor::decode::<'_, CryptoAddress>(data).ok();
 });

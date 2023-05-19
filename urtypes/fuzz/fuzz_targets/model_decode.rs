@@ -3,11 +3,9 @@
 
 #![no_main]
 
-use foundation_ur::cbor::uuid;
+use foundation_urtypes::passport::Model;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    let mut decoder = minicbor::Decoder::new(data);
-
-    uuid::decode(&mut decoder, &mut ()).ok();
+    minicbor::decode::<'_, Model>(data).ok();
 });

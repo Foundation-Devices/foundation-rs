@@ -6,8 +6,8 @@ members = [
     "codecs",
     "ffi",
     "test-vectors",
-    "ur",
-    "ur/fuzz",
+    "urtypes",
+    "urtypes/fuzz",
 ]
 
 [workspace.dependencies]
@@ -17,7 +17,7 @@ bitcoin = { version = "0.30", default-features = false }
 criterion = { version = "0.4" }
 foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
-foundation-ur = { path = "ur" }
+foundation-urtypes = { path = "urtypes" }
 heapless = { version = "0.8", git = "https://github.com/japaric/heapless", default-features = false }
 hex = "0.4.2"
 libfuzzer-sys = "0.4"

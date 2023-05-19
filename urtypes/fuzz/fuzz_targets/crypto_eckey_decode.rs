@@ -3,9 +3,9 @@
 
 #![no_main]
 
-use foundation_ur::supply_chain_validation::Solution;
+use foundation_urtypes::registry::CryptoECKey;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    minicbor::decode::<'_, Solution>(data).ok();
+    minicbor::decode::<'_, CryptoECKey>(data).ok();
 });
