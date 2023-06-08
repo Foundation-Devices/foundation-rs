@@ -8,9 +8,6 @@ extern crate alloc;
 extern crate core;
 
 pub mod cbor;
-mod len;
 pub mod passport;
 pub mod registry;
 pub mod supply_chain_validation;
-
-pub use self::len::max_fragment_len;

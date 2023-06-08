@@ -13,7 +13,7 @@
 //!
 //! #[derive(Decode, Encode)]
 //! pub struct MyStructure {
-//!     #[cbor(n(0), with = "foundation_ur::cbor::uuid")]
+//!     #[cbor(n(0), with = "foundation_urtypes::cbor::uuid")]
 //!     pub id: Uuid,
 //! }
 //! ```

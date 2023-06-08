@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use ur::fountain::part::Part;
+use crate::fountain::part::Part;
 
 /// Calculates the maximum fragment length in bytes that can fit in
 /// `max_characters`, for example, it could be the maximum number of
