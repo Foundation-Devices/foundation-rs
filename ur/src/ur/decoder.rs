@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+// SPDX-FileCopyrightText: © 2020 Dominik Spicher <dominikspicher@gmail.com>
+// SPDX-License-Identifier: MIT
+
 //! Decoder.
 
 use crate::{
