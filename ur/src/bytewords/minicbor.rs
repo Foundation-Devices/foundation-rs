@@ -72,7 +72,7 @@ pub mod tests {
     ];
 
     const OUTPUT_LEN: usize = (INPUT_LEN + 4) * 2;
-    const OUTPUT: [u8; OUTPUT_LEN]= *b"yktsbbswwnwmfefrttsnonbgmtnnjyltvwtybwne\
+    const OUTPUT: [u8; OUTPUT_LEN] = *b"yktsbbswwnwmfefrttsnonbgmtnnjyltvwtybwne\
                                        bydawswtzcbdjnrsdawzdsksurdtnsrywzzemusf\
                                        fwottppersfdptencxfnmhvatdldroskcljshdba\
                                        ntctpadmadjksnfevymtfpwmftmhfpwtlpfejsyl\

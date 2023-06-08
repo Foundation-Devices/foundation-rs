@@ -8,8 +8,8 @@
 //!
 //! [bytewords]: https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-012-bytewords.md.
 
-pub mod minicbor;
 pub mod constants;
+pub mod minicbor;
 
 use core::fmt;
 

@@ -7,13 +7,13 @@
 use core::fmt;
 
 use crate::{
-    fountain::part::MessageDescription,
     collections::{Deque, Set, Vec},
+    fountain::part::MessageDescription,
     fountain::{
         chooser,
         chooser::BaseFragmentChooser,
         part::{IndexedPart, Part},
-    }
+    },
 };
 
 /// A [`decoder`](BaseDecoder) that uses [`alloc`] collection types.
@@ -618,8 +618,7 @@ pub mod tests {
             assert!(!decoder.is_part_consistent(&part));
         }
 
-        let mut heapless_decoder: HeaplessDecoder<100, 8, 5, 8, 8> =
-            HeaplessDecoder::new();
+        let mut heapless_decoder: HeaplessDecoder<100, 8, 5, 8, 8> = HeaplessDecoder::new();
         let mut decoder = Decoder::default();
 
         test(&mut heapless_decoder);
