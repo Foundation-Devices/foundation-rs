@@ -8,7 +8,7 @@ use core::{fmt, ops::DerefMut};
 
 use crate::{
     bytewords,
-    collections::{Set, Vec},
+    collections::Set,
     fountain::{chooser, chooser::BaseFragmentChooser, util::xor_into},
 };
 
@@ -84,25 +84,6 @@ impl<'a> Part<'a> {
             self.sequence_count,
             self.checksum,
         )
-    }
-
-    /// Convert this [`Part`] into an [`IndexedPart`].
-    ///
-    /// **Note:** this is a costly operating that can take a lot of memory in
-    /// the stack or the heap depending on the
-    /// [fragment chooser types](chooser::Types) used.
-    pub fn into_indexed_part<C, D, I>(self) -> IndexedPart<D, I>
-    where
-        C: chooser::Types,
-        D: Vec<u8>,
-        I: Set<usize>,
-    {
-        let mut data = D::default();
-        if data.try_extend_from_slice(self.data).is_err() {
-            panic!("not enough capacity to store IndexedPart data");
-        }
-
-        IndexedPart::new(data, self.indexes::<C, I>())
     }
 
     /// Returns the maximum length that an encoded `Part` can have excluding
