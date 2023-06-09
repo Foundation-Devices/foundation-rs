@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use foundation_test_vectors::{CryptoAddressVector, URVector, UR};
-use foundation_ur::registry::{CoinType, CryptoAddress, CryptoCoinInfo};
+use foundation_urtypes::registry::{CoinType, CryptoAddress, CryptoCoinInfo};
 
 #[test]
 fn test_roundtrip() {
