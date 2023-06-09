@@ -64,12 +64,12 @@ pub mod bytewords;
 pub mod collections;
 pub mod fountain;
 
-mod ur;
 mod len;
+mod ur;
 mod xoshiro;
 
-pub use self::ur::*;
 pub use self::len::*;
+pub use self::ur::*;
 
 const CRC32: crc::Crc<u32> = crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 
