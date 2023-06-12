@@ -3,6 +3,7 @@
 
 [workspace]
 members = [
+    "arena",
     "codecs",
     "ffi",
     "test-vectors",
