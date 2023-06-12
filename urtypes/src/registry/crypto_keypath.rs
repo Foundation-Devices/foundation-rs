@@ -7,7 +7,7 @@ use minicbor::{data::Type, decode::Error, encode::Write, Decode, Decoder, Encode
 
 /// Metadata for the complete or partial derivation path of a key.
 #[doc(alias("crypto-keypath"))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CryptoKeypath<'a> {
     /// Path component.
     pub components: PathComponents<'a>,
@@ -207,6 +207,22 @@ impl<'a, C> Encode<C> for PathComponents<'a> {
         }
 
         Ok(())
+    }
+}
+
+impl<'a> PartialEq for PathComponents<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        for (lhs, rhs) in self.iter().zip(other.iter()) {
+            if lhs != rhs {
+                return false;
+            }
+        }
+
+        true
     }
 }
 

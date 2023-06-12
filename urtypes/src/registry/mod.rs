@@ -8,6 +8,7 @@ mod crypto_coininfo;
 mod crypto_eckey;
 mod crypto_hdkey;
 mod crypto_keypath;
+mod crypto_output;
 mod crypto_seed;
 mod passport;
 
@@ -16,5 +17,6 @@ pub use self::crypto_coininfo::*;
 pub use self::crypto_eckey::*;
 pub use self::crypto_hdkey::*;
 pub use self::crypto_keypath::*;
+pub use self::crypto_output::*;
 pub use self::crypto_seed::*;
 pub use self::passport::*;

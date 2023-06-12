@@ -16,6 +16,7 @@ alloc = []
 
 [dependencies]
 bitcoin = { workspace = true, optional = true, features = ["std"] }
+foundation-arena = { workspace = true }
 heapless = { workspace = true }
 hex = { workspace = true }
 minicbor = { workspace = true }

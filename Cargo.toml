@@ -19,6 +19,7 @@ bitcoin = { version = "0.30", default-features = false }
 bitcoin_hashes = { version = "0.12", default-features = false }
 crc = "3"
 criterion = { version = "0.4" }
+foundation-arena = { path = "arena" }
 foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-urtypes = { path = "urtypes" }
