@@ -157,7 +157,7 @@ impl From<CoinType> for u32 {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     // Basic test. No independent test vectors available.

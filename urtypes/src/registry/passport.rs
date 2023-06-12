@@ -267,7 +267,7 @@ impl<'a, C> Encode<C> for PassportResponse<'a> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     #[test]

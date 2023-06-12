@@ -89,7 +89,7 @@ impl<'a, C> Encode<C> for CryptoECKey<'a> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     use foundation_test_vectors::{URVector, UR};
