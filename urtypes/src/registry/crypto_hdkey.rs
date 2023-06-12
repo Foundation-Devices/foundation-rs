@@ -12,7 +12,7 @@ use crate::registry::{CryptoCoinInfo, CryptoKeypath};
 
 /// HD Key.
 #[doc(alias("hd-key"))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CryptoHDKey<'a> {
     /// Master key.
     MasterKey(MasterKey),
@@ -126,7 +126,7 @@ impl<'a, C> Encode<C> for CryptoHDKey<'a> {
 
 /// A master key.
 #[doc(alias("master-key"))]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MasterKey {
     /// Key date bytes.
     pub key_data: [u8; 32],
@@ -203,7 +203,7 @@ impl<C> Encode<C> for MasterKey {
 
 /// A derived key.
 #[doc(alias("derived-key"))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DerivedKey<'a> {
     /// `true` if key is private, `false` if public.
     pub is_private: bool,

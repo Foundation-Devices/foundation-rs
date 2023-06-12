@@ -7,7 +7,7 @@ use minicbor::{data::Type, decode::Error, encode::Write, Decode, Decoder, Encode
 
 /// Metadata for the complete or partial derivation path of a key.
 #[doc(alias("crypto-keypath"))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CryptoKeypath<'a> {
     /// Path component.
     pub components: PathComponents<'a>,
