@@ -20,6 +20,11 @@ pub enum CryptoHDKey<'a> {
     DerivedKey(DerivedKey<'a>),
 }
 
+impl<'a> CryptoHDKey<'a> {
+    /// The CBOR tag used when [`CryptoHDKey`] is embedded in other CBOR types.
+    pub const TAG: Tag = Tag::Unassigned(303);
+}
+
 #[cfg(feature = "bitcoin")]
 impl<'a> TryFrom<&'a bitcoin::bip32::ExtendedPrivKey> for CryptoHDKey<'a> {
     type Error = InterpretExtendedKeyError;
