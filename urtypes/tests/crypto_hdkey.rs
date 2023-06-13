@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use foundation_test_vectors::{CryptoHDKeyVector, URVector, UR};
-use foundation_ur::registry::{CryptoHDKey, CryptoKeypath};
+use foundation_urtypes::registry::{CryptoHDKey, CryptoKeypath};
 
 #[test]
 fn test_roundtrip() {

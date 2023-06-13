@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "foundation-urtypes"
+version = "0.1.0"
+edition = "2021"
+homepage = "https://github.com/Foundation-Devices/foundation-rs"
+description = "Uniform Resources"
+license = "GPL-3.0-or-later"
+
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = []
+
+[dependencies]
+bitcoin = { workspace = true, optional = true, features = ["std"] }
+heapless = { workspace = true }
+hex = { workspace = true }
+minicbor = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+foundation-test-vectors = { workspace = true, features = ["blockchain-commons"] }
+minicbor = { workspace = true, features = ["alloc"] }
+
+[[test]]
+name = "crypto_address"
+path = "tests/crypto_address.rs"
+required-features = ["bitcoin"]
+
+[[test]]
+name = "crypto_hdkey"
+path = "tests/crypto_hdkey.rs"
+required-features = ["bitcoin"]

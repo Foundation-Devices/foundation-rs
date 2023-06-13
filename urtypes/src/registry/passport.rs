@@ -87,8 +87,8 @@ impl<'b, C> Decode<'b, C> for PassportRequest {
                 //  sends "stable" indexes.
                 d.u32()?;
                 match d.probe().tag()? {
-                    ur::registry::uuid::TAG => {
-                        transaction_id = Some(ur::registry::uuid::decode(d, ctx)?);
+                    crate::cbor::uuid::TAG => {
+                        transaction_id = Some(crate::cbor::uuid::decode(d, ctx)?);
                     }
                     Challenge::TAG => {
                         d.tag()?;
@@ -140,7 +140,7 @@ impl<C> Encode<C> for PassportRequest {
         e.map(len)?;
 
         e.u8(1)?;
-        ur::registry::uuid::encode(&self.transaction_id, e, ctx)?;
+        crate::cbor::uuid::encode(&self.transaction_id, e, ctx)?;
 
         if let Some(ref scv_challenge) = self.scv_challenge {
             e.u8(2)?.tag(Challenge::TAG)?;
@@ -190,8 +190,8 @@ impl<'b, C> Decode<'b, C> for PassportResponse<'b> {
                 //  sends "stable" indexes.
                 d.u32()?;
                 match d.probe().tag()? {
-                    ur::registry::uuid::TAG => {
-                        transaction_id = Some(ur::registry::uuid::decode(d, ctx)?);
+                    crate::cbor::uuid::TAG => {
+                        transaction_id = Some(crate::cbor::uuid::decode(d, ctx)?);
                     }
                     Solution::TAG => {
                         d.tag()?;
@@ -244,7 +244,7 @@ impl<'a, C> Encode<C> for PassportResponse<'a> {
         e.map(len)?;
 
         e.u8(1)?;
-        ur::registry::uuid::encode(&self.transaction_id, e, ctx)?;
+        crate::cbor::uuid::encode(&self.transaction_id, e, ctx)?;
 
         if let Some(ref scv_solution) = self.scv_solution {
             e.u8(2)?.tag(Solution::TAG)?;

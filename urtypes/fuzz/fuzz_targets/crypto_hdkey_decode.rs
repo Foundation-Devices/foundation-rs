@@ -3,9 +3,9 @@
 
 #![no_main]
 
-use foundation_ur::passport::Model;
+use foundation_urtypes::registry::CryptoHDKey;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    minicbor::decode::<'_, Model>(data).ok();
+    minicbor::decode::<'_, CryptoHDKey>(data).ok();
 });

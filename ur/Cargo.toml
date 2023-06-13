@@ -1,37 +1,28 @@
 # SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: © 2020 Dominik Spicher <dominikspicher@gmail.com>
+# SPDX-License-Identifier: MIT
 
 [package]
 name = "foundation-ur"
+authors = [
+    "Dominik Spicher <dominikspicher@gmail.com>",
+    "Foundation Devices, Inc. <hello@foundationdevices.com>",
+]
 version = "0.1.0"
 edition = "2021"
-homepage = "https://github.com/Foundation-Devices/foundation-rs"
-description = "Uniform Resources"
-license = "GPL-3.0-or-later"
+license = "MIT"
 
 [features]
 default = ["std"]
 std = ["alloc"]
-alloc = []
+alloc = ["minicbor/alloc"]
 
 [dependencies]
-bitcoin = { workspace = true, optional = true, features = ["std"] }
+bitcoin_hashes = { workspace = true }
+crc = { workspace = true }
 heapless = { workspace = true }
 hex = { workspace = true }
+itertools = { workspace = true }
 minicbor = { workspace = true }
-ur = { workspace = true }
-uuid = { workspace = true }
-
-[dev-dependencies]
-foundation-test-vectors = { workspace = true, features = ["blockchain-commons"] }
-minicbor = { workspace = true, features = ["alloc"] }
-
-[[test]]
-name = "crypto_address"
-path = "tests/crypto_address.rs"
-required-features = ["bitcoin"]
-
-[[test]]
-name = "crypto_hdkey"
-path = "tests/crypto_hdkey.rs"
-required-features = ["bitcoin"]
+phf = { workspace = true }
+rand_xoshiro = { workspace = true }
