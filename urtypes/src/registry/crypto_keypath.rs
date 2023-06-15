@@ -7,7 +7,7 @@ use minicbor::{data::Type, decode::Error, encode::Write, Decode, Decoder, Encode
 
 /// Metadata for the complete or partial derivation path of a key.
 #[doc(alias("crypto-keypath"))]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CryptoKeypath<'a> {
     /// Path component.
     pub components: PathComponents<'a>,
@@ -165,11 +165,11 @@ impl<'b, C> Decode<'b, C> for PathComponents<'b> {
 
         // Iterate over the path components in order to verify the data and
         // to consume the bytes of the passed decoder.
-        let mut len = 0;
+        let mut len: usize = 0;
         loop {
             match array_len {
                 Some(n) if n == 0 => break,
-                Some(n) => array_len = Some(n - 1),
+                Some(n) => array_len = Some(n.saturating_sub(1)),
                 None => {
                     if d.datatype()? == Type::Break {
                         break;
@@ -179,7 +179,10 @@ impl<'b, C> Decode<'b, C> for PathComponents<'b> {
 
             // Consume the path component in order to advance the decoder.
             PathComponent::decode(d, ctx)?;
-            len += 1;
+            match len.overflowing_add(1) {
+                (new_len, false) => len = new_len,
+                (_, true) => return Err(Error::message("too many elements")),
+            }
         }
 
         Ok(Self {
@@ -204,6 +207,22 @@ impl<'a, C> Encode<C> for PathComponents<'a> {
         }
 
         Ok(())
+    }
+}
+
+impl<'a> PartialEq for PathComponents<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        for (lhs, rhs) in self.iter().zip(other.iter()) {
+            if lhs != rhs {
+                return false;
+            }
+        }
+
+        true
     }
 }
 

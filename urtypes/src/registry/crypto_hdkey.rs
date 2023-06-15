@@ -12,12 +12,17 @@ use crate::registry::{CryptoCoinInfo, CryptoKeypath};
 
 /// HD Key.
 #[doc(alias("hd-key"))]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CryptoHDKey<'a> {
     /// Master key.
     MasterKey(MasterKey),
     /// Derived key.
     DerivedKey(DerivedKey<'a>),
+}
+
+impl<'a> CryptoHDKey<'a> {
+    /// The CBOR tag used when [`CryptoHDKey`] is embedded in other CBOR types.
+    pub const TAG: Tag = Tag::Unassigned(303);
 }
 
 #[cfg(feature = "bitcoin")]
@@ -126,7 +131,7 @@ impl<'a, C> Encode<C> for CryptoHDKey<'a> {
 
 /// A master key.
 #[doc(alias("master-key"))]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MasterKey {
     /// Key date bytes.
     pub key_data: [u8; 32],
@@ -203,7 +208,7 @@ impl<C> Encode<C> for MasterKey {
 
 /// A derived key.
 #[doc(alias("derived-key"))]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DerivedKey<'a> {
     /// `true` if key is private, `false` if public.
     pub is_private: bool,

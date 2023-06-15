@@ -5,7 +5,9 @@
 //!
 //! See [BCR-2020-009](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-009-address.md).
 
-use minicbor::{data::Type, decode::Error, encode::Write, Decode, Decoder, Encode, Encoder};
+use minicbor::{
+    data::Tag, data::Type, decode::Error, encode::Write, Decode, Decoder, Encode, Encoder,
+};
 
 use crate::registry::CryptoCoinInfo;
 
@@ -18,6 +20,12 @@ pub struct CryptoAddress<'a> {
     pub kind: Option<AddressKind>,
     /// The address data.
     pub data: &'a [u8],
+}
+
+impl<'a> CryptoAddress<'a> {
+    /// The CBOR tag used when [`CryptoAddress`] is embedded in other CBOR
+    /// types.
+    pub const TAG: Tag = Tag::Unassigned(307);
 }
 
 #[cfg(feature = "bitcoin")]

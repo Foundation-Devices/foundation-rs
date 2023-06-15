@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use minicbor::data::Type;
-use minicbor::decode::Error;
-use minicbor::encode::Write;
-use minicbor::{Decode, Decoder, Encode, Encoder};
+use minicbor::{
+    data::{Tag, Type},
+    decode::Error,
+    encode::Write,
+    Decode, Decoder, Encode, Encoder,
+};
 
 /// Elliptic Curve (EC) key.
 #[doc(alias("crypto-eckey"))]
@@ -19,6 +21,9 @@ pub struct CryptoECKey<'a> {
 }
 
 impl<'a> CryptoECKey<'a> {
+    /// The CBOR tag used when [`CryptoECKey`] is embedded in other CBOR types.
+    pub const TAG: Tag = Tag::Unassigned(306);
+
     /// `secp256k1` curve type.
     pub const SECP256K1: u64 = 0;
 }
@@ -84,7 +89,7 @@ impl<'a, C> Encode<C> for CryptoECKey<'a> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     use foundation_test_vectors::{URVector, UR};

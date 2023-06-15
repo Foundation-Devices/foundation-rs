@@ -11,6 +11,7 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
+foundation-arena = { workspace = true }
 foundation-urtypes = { workspace = true }
 libfuzzer-sys = { workspace = true }
 minicbor = { workspace = true }
@@ -36,6 +37,12 @@ doc = false
 [[bin]]
 name = "crypto_hdkey_decode"
 path = "fuzz_targets/crypto_hdkey_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "crypto_output_decode"
+path = "fuzz_targets/crypto_output_decode.rs"
 test = false
 doc = false
 
