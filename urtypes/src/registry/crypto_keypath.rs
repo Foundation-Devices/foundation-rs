@@ -226,6 +226,22 @@ impl<'a> PartialEq for PathComponents<'a> {
     }
 }
 
+impl<'a> From<&'a [u32]> for PathComponents<'a> {
+    fn from(path: &'a [u32]) -> Self {
+        Self {
+            storage: PathStorage::RawDerivationPath(path),
+        }
+    }
+}
+
+impl<'a, const N: usize> From<&'a [u32; N]> for PathComponents<'a> {
+    fn from(path: &'a [u32; N]) -> Self {
+        Self {
+            storage: PathStorage::RawDerivationPath(path),
+        }
+    }
+}
+
 /// Iterator over the path components of a [`PathComponents`].
 pub struct PathComponentsIter<'a> {
     storage: PathStorage<'a>,
