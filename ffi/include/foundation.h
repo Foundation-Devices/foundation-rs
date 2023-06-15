@@ -18,6 +18,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#if defined(__clang__)
+#define FOUNDATION_NONNULL __attribute__((nonnull))
+#else
+#define FOUNDATION_NONNULL
+#endif
+
 /**
  * Encoded length of a `npub` in bytes.
  */
@@ -35,14 +41,14 @@ extern "C" {
 /**
  * Encode a public key to a Nostr `npub`.
  */
-void foundation_encode_npub(const uint8_t (*public_key)[32],
-                            uint8_t (*output)[FOUNDATION_NPUB_LEN]);
+void foundation_encode_npub(const uint8_t (*FOUNDATION_NONNULL public_key)[32],
+                            uint8_t (*FOUNDATION_NONNULL output)[FOUNDATION_NPUB_LEN]);
 
 /**
  * Encode a secret key to a Nostr `nsec`.
  */
-void foundation_encode_nsec(const uint8_t (*secret_key)[32],
-                            uint8_t (*output)[FOUNDATION_NSEC_LEN]);
+void foundation_encode_nsec(const uint8_t (*FOUNDATION_NONNULL secret_key)[32],
+                            uint8_t (*FOUNDATION_NONNULL output)[FOUNDATION_NSEC_LEN]);
 
 #ifdef __cplusplus
 } // extern "C"

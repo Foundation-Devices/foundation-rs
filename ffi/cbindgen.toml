@@ -18,6 +18,13 @@ autogen_warning = """
 include_version = false
 usize_is_size_t = true
 cpp_compat = true
+after_includes = """
+
+#if defined(__clang__)
+#define FOUNDATION_NONNULL __attribute__((nonnull))
+#else
+#define FOUNDATION_NONNULL
+#endif"""
 line_length = 80
 documentation_style = "doxy"
 style = "type"
@@ -25,3 +32,6 @@ style = "type"
 [export]
 prefix = "FOUNDATION_"
 item_types = ["constants", "functions"]
+
+[ptr]
+non_null_attribute = "FOUNDATION_NONNULL"
