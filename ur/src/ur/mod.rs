@@ -219,6 +219,9 @@ pub enum ParseURError {
     ParseInt(ParseIntError),
 }
 
+#[cfg(feature = "std")]
+impl std::error::Error for ParseURError {}
+
 impl fmt::Display for ParseURError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
