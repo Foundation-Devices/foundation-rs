@@ -11,6 +11,7 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
+arbitrary = { workspace = true }
 foundation-arena = { workspace = true }
 foundation-urtypes = { workspace = true }
 libfuzzer-sys = { workspace = true }
@@ -73,5 +74,11 @@ doc = false
 [[bin]]
 name = "uuid_decode"
 path = "fuzz_targets/uuid_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "value_from_ur"
+path = "fuzz_targets/value_from_ur.rs"
 test = false
 doc = false

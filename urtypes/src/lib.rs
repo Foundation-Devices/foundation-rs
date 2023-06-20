@@ -11,3 +11,4 @@ pub mod cbor;
 pub mod passport;
 pub mod registry;
 pub mod supply_chain_validation;
+pub mod value;
