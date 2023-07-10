@@ -55,6 +55,8 @@ impl<'a> Value<'a> {
             "crypto-psbt" => Self::CryptoPsbt(&*minicbor::decode::<&ByteSlice>(payload)?),
             "crypto-request" => Self::PassportRequest(minicbor::decode(payload)?),
             "crypto-response" => Self::PassportResponse(minicbor::decode(payload)?),
+            "x-passport-request" => Self::PassportRequest(minicbor::decode(payload)?),
+            "x-passport-response" => Self::PassportResponse(minicbor::decode(payload)?),
             _ => return Err(Error::UnknownType),
         };
 
