@@ -57,7 +57,7 @@ impl<'a> Value<'a> {
             "crypto-response" => Self::PassportResponse(minicbor::decode(payload)?),
             "x-passport-request" => Self::PassportRequest(minicbor::decode(payload)?),
             "x-passport-response" => Self::PassportResponse(minicbor::decode(payload)?),
-            _ => return Err(Error::UnknownType),
+            _ => return Err(Error::UnsupportedResource),
         };
 
         Ok(value)
@@ -94,8 +94,8 @@ impl<'a, C> Encode<C> for Value<'a> {
 /// Errors that can occur when parsing a value.
 #[derive(Debug)]
 pub enum Error {
-    /// Unknown Uniform Resource type.
-    UnknownType,
+    /// Unsupported Uniform Resource type.
+    UnsupportedResource,
     /// Failed to decode CBOR payload.
     InvalidCbor(minicbor::decode::Error),
 }
@@ -103,7 +103,7 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::UnknownType => write!(f, "unknown Uniform Resource type"),
+            Self::UnsupportedResource => write!(f, "unsupported Uniform Resource type"),
             Self::InvalidCbor(_) => write!(f, "failed to decode CBOR payload"),
         }
     }
