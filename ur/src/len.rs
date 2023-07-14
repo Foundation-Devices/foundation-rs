@@ -24,9 +24,9 @@ use crate::fountain::part::Part;
 /// # use foundation_ur::max_fragment_len;
 /// let max_sequence_number = 1000;
 /// let max_characters = 500;
-/// let fragment_len = max_fragment_len("crypto-coininfo", max_sequence_number, max_characters);
+/// let fragment_len = max_fragment_len("crypto-coin-info", max_sequence_number, max_characters);
 ///
-/// assert_eq!(fragment_len, 192);
+/// assert_eq!(fragment_len, 190);
 /// ```
 pub const fn max_fragment_len(
     max_ur_type: &str,
@@ -35,6 +35,7 @@ pub const fn max_fragment_len(
 ) -> usize {
     let mut non_payload_characters = 0;
 
+    non_payload_characters += "ur:".len();
     non_payload_characters += max_ur_type.len();
     non_payload_characters += "/".len();
     non_payload_characters += digit_count(u32::MAX as usize);

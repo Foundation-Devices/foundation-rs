@@ -11,8 +11,8 @@ license = "GPL-3.0-or-later"
 
 [features]
 default = ["std"]
-std = ["alloc"]
-alloc = []
+std = ["alloc", "minicbor/std"]
+alloc = ["minicbor/alloc"]
 
 [dependencies]
 bitcoin = { workspace = true, optional = true, features = ["std"] }

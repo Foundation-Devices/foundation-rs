@@ -13,6 +13,7 @@ members = [
 ]
 
 [workspace.dependencies]
+arbitrary = { version = "1", features = ["derive"] }
 bech32 = { version = "0.9", default-features = false }
 bip39 = { version = "2", default-features = false }
 bitcoin = { version = "0.30", default-features = false }
@@ -24,8 +25,8 @@ foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-urtypes = { path = "urtypes" }
 heapless = { version = "0.8", git = "https://github.com/japaric/heapless", default-features = false }
-hex = "0.4.2"
-itertools = "0.10"
+hex = { version = "0.4.2", default-features = false }
+itertools = { version = "0.10", default-features = false }
 libfuzzer-sys = "0.4"
 minicbor = { version = "0.19.1", features = ["derive"] }
 phf = { version = "0.11", features = ["macros"], default-features = false }
