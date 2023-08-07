@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "foundation-psbt-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+foundation-psbt = { workspace = true }
+libfuzzer-sys = { workspace = true }
+nom = { workspace = true }
+
+[[bin]]
+name = "compact_size"
+path = "fuzz_targets/compact_size.rs"
+test = false
+doc = false
