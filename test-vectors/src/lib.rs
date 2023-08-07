@@ -38,6 +38,9 @@ impl SeedQRVector {
     }
 }
 
+#[cfg(feature = "bip32")]
+pub mod bip32;
+
 #[cfg(feature = "blockchain-commons")]
 mod blockchain_commons {
     use serde::Deserialize;
