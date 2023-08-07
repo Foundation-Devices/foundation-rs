@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "foundation-bip32-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+foundation-bip32 = { workspace = true }
+libfuzzer-sys = { workspace = true }
+nom = { workspace = true, features = ["std"] }
+
+[[bin]]
+name = "derivation_path_le"
+path = "fuzz_targets/derivation_path_le.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "xpub"
+path = "fuzz_targets/xpub.rs"
+test = false
+doc = false
