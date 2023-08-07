@@ -41,6 +41,12 @@ pub struct InvalidTestVector {
 #[derive(Debug, serde::Deserialize)]
 pub struct ExtendedKey(#[serde(with = "base58")] pub Vec<u8>);
 
+impl ExtendedKey {
+    pub fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
 mod base58 {
     use bs58::decode::DecodeTarget;
     use std::fmt::Formatter;

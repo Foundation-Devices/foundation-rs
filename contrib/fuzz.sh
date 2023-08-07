@@ -23,6 +23,6 @@ for MANIFEST_PATH in ${MANIFEST_PATHS}; do
   TARGETS=$(cd "$MANIFEST_DIR" && cargo fuzz list)
   for TARGET in ${TARGETS}; do
     echo "Fuzzing $TARGET"
-    (cd "$MANIFEST_DIR" && cargo fuzz run "$TARGET" -- -max_len="$MAX_LEN" -timeout="$TIMEOUT" -max_total_time="$MAX_TOTAL_TIME")
+    (cd "$MANIFEST_DIR" && cargo fuzz run "$TARGET" --no-cfg-fuzzing -- -max_len="$MAX_LEN" -timeout="$TIMEOUT" -max_total_time="$MAX_TOTAL_TIME")
   done
 done

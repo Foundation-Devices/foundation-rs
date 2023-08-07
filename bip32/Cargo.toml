@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "foundation-bip32"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitcoin_hashes = { workspace = true }
+nom = { workspace = true }
+secp256k1 = { workspace = true }
+
+[features]
+default = ["std"]
+std = []
+
+[dev-dependencies]
+secp256k1 = { workspace = true, features= ["std"] }
+foundation-test-vectors = { workspace = true, features = ["bip32"] }

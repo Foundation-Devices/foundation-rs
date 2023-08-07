@@ -5,6 +5,8 @@
 resolver = "2"
 members = [
     "arena",
+    "bip32",
+    "bip32/fuzz",
     "codecs",
     "nom-embedded-storage",
     "ffi",
