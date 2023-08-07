@@ -9,6 +9,8 @@ members = [
     "bip32/fuzz",
     "codecs",
     "ffi",
+    "psbt",
+    "psbt/fuzz",
     "test-vectors",
     "ur",
     "urtypes",
@@ -21,15 +23,19 @@ bech32 = { version = "0.9", default-features = false }
 bip39 = { version = "2", default-features = false }
 bitcoin = { version = "0.30", default-features = false }
 bitcoin_hashes = { version = "0.13", default-features = false }
+bitflags = { version = "2", default-features = false }
 bs58 = "0.5"
 crc = "3"
 criterion = { version = "0.4" }
 either = { version = "1", default-features = false }
+embedded-io = "0.6"
 heapless = { version = "0.8", default-features = false }
 hex = { version = "0.4.2", default-features = false }
 itertools = { version = "0.10", default-features = false }
 libfuzzer-sys = "0.4"
 minicbor = { version = "0.19.1", features = ["derive"] }
+num-derive = "0.4"
+num-traits = { version = "0.2", default-features = false }
 nom = { version = "7", default-features = false }
 phf = { version = "0.11", features = ["macros"], default-features = false }
 rand_xoshiro = "0.6"
@@ -42,6 +48,7 @@ uuid = { version = "1", default-features = false }
 foundation-arena = { path = "arena" }
 foundation-bip32 = { path = "bip32" }
 foundation-codecs = { path = "codecs" }
+foundation-psbt = { path = "psbt" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-urtypes = { path = "urtypes" }
 
