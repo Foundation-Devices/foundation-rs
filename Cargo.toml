@@ -36,6 +36,7 @@ uuid = { version = "1", default-features = false }
 
 # The crates in this workspace.
 foundation-arena = { path = "arena" }
+foundation-bip32 = { path = "bip32" }
 foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-urtypes = { path = "urtypes" }
