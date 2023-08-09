@@ -14,7 +14,8 @@ pub const fn bech32_len(hrp: &str, len: usize) -> usize {
 /// It doesn't take into account the Human-Readable-Part, the separator and the
 /// checksum.
 ///
-/// So, it calculates the length of converting a [u8] to [`bech32::`].
+/// So, it calculates the length of converting a [`u8`] slice to a
+/// [`bech32::u5`] slice.
 pub const fn base32_len(len: usize) -> usize {
     let bits = len * 8;
     if bits % 5 == 0 {
