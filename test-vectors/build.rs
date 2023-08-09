@@ -9,6 +9,7 @@ fn main() {
     println!("cargo:rerun-if-changed=data/bcr-2020-009.json");
     println!("cargo:rerun-if-changed=data/bip-0032.json");
     println!("cargo:rerun-if-changed=data/bip-0174.json");
+    println!("cargo:rerun-if-changed=data/bitcoin-transactions.json");
     println!("cargo:rerun-if-changed=data/nip-19.json");
     println!("cargo:rerun-if-changed=data/seedqr.json");
 }
