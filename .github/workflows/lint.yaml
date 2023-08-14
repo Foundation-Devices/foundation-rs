@@ -20,7 +20,12 @@ jobs:
         with:
           toolchain: 1.66
       - run: cargo check
-      - run: cargo check --no-default-features
+      # The foundation-ffi crate won't compile for x86_64 targets because it
+      # requires a nightly Rust compiler for defining a global allocator and
+      # the exception handler.
+      #
+      # So, disable it for now.
+      - run: cargo check --no-default-features --workspace --exclude foundation-ffi
       - run: cargo check --all-features
 
   is-the-code-formatted:
