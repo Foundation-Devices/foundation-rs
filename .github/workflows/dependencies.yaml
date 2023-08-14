@@ -49,5 +49,5 @@ jobs:
       # than the one pinned here we can remove this hack.
       #
       # This is not needed for stable versions.
-      - run: cargo update proc-macro2 --precise 1.0.66 -Z minimal-versions
+      - run: cargo update -p proc-macro2 --precise 1.0.66 -Z minimal-versions
       - run: cargo check -Z minimal-versions
