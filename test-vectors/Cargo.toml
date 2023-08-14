@@ -13,6 +13,7 @@ edition = "2021"
 [features]
 default = ["std"]
 std = ["hex/std"]
+bip32 = ["bs58", "hex/serde"]
 nostr = ["hex/serde"]
 seedqr = ["bip39/serde", "hex/serde"]
 blockchain-commons = ["bitcoin/serde", "hex/serde"]
@@ -20,6 +21,7 @@ blockchain-commons = ["bitcoin/serde", "hex/serde"]
 [dependencies]
 bip39 = { workspace = true, optional = true }
 bitcoin = { workspace = true, optional = true, features = ["std"] }
+bs58 = { workspace = true, optional = true }
 hex = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
