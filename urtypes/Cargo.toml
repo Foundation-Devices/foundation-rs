@@ -11,11 +11,11 @@ license = "GPL-3.0-or-later"
 
 [features]
 default = ["std"]
-std = ["alloc", "minicbor/std"]
+std = ["alloc", "bitcoin/std", "minicbor/std"]
 alloc = ["minicbor/alloc"]
 
 [dependencies]
-bitcoin = { workspace = true, optional = true, features = ["std"] }
+bitcoin = { workspace = true, optional = true }
 foundation-arena = { workspace = true }
 heapless = { workspace = true }
 hex = { workspace = true }
