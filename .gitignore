@@ -15,3 +15,6 @@ target/
 
 # Firmware files.
 *.bin
+
+# PSBT files used for testing locally.
+*.psbt
