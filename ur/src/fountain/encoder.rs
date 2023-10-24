@@ -93,12 +93,10 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
         self.checksum = CRC32.checksum(message);
         self.current_sequence = 0;
 
-        println!("{self.fragment_length}, {message.len()}, {max_fragment_len}, {self.data.len()}");
-
         self.data.clear();
         self.data
             .try_resize(self.fragment_length, 0)
-            .expect("not enough capacity for part data");
+            .expect(&format!("fragment_len: {}, message.len(): {}, max_fragment_len: {}", self.fragment_len, message.len(), max_fragment_len));
     }
 
     /// Returns the current count of how many parts have been emitted.
