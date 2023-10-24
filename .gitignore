@@ -12,3 +12,6 @@ target/
 
 # CMake
 **/cmake-build-debug
+
+# PSBT files used for testing locally.
+*.psbt
