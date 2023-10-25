@@ -82,6 +82,8 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
     /// - The maximum fragment length is large than what `T::Data` can
     /// hold.
     pub fn start(&mut self, message: &'a [u8], max_fragment_length: usize) {
+        use std::fmt;
+
         assert!(!message.is_empty(), "message must not be empty");
         assert_ne!(
             max_fragment_length, 0,
@@ -94,9 +96,10 @@ impl<'a, T: Types> BaseEncoder<'a, T> {
         self.current_sequence = 0;
 
         self.data.clear();
+        let error_message = format!("fragment_length: {}\nmessage.len(): {}\nmax_fragment_length: {}", self.fragment_length, message.len(), max_fragment_length);
         self.data
             .try_resize(self.fragment_length, 0)
-            .expect(&format!("fragment_len: {}, message.len(): {}, max_fragment_len: {}", self.fragment_len, message.len(), max_fragment_len));
+            .expect(&error_message);
     }
 
     /// Returns the current count of how many parts have been emitted.
