@@ -26,7 +26,7 @@ foundation-arena = { path = "arena" }
 foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-urtypes = { path = "urtypes" }
-heapless = { version = "0.8", git = "https://github.com/japaric/heapless", default-features = false }
+heapless = { version = "0.8", default-features = false }
 hex = { version = "0.4.2", default-features = false }
 itertools = { version = "0.10", default-features = false }
 libfuzzer-sys = "0.4"
