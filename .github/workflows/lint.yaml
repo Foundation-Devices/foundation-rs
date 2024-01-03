@@ -8,14 +8,14 @@ jobs:
     name: Is REUSE compliant?
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: fsfe/reuse-action@v1
 
   is-the-code-compilable:
     name: Is the code compilable?
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: 1.66
@@ -33,7 +33,7 @@ jobs:
     needs: [is-the-code-compilable]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: 1.66
@@ -45,7 +45,7 @@ jobs:
     needs: [is-the-code-compilable]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: 1.66

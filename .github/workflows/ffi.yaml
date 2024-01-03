@@ -8,7 +8,7 @@ jobs:
     name: Is header file up to date?
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: 1.66
@@ -22,7 +22,7 @@ jobs:
     name: Is integration code formatted?
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: sudo apt-get install -y clang-format
       - run: clang-format --version
       - run: clang-format --dry-run --Werror ffi/integration/*.cpp
@@ -30,7 +30,7 @@ jobs:
     name: Integration test passes?
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: 1.66

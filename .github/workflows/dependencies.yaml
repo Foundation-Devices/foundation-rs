@@ -12,7 +12,7 @@ jobs:
     name: Pass security audit?
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: 1.66
@@ -24,7 +24,7 @@ jobs:
     needs: [pass-security-audit]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: 1.66
@@ -36,7 +36,7 @@ jobs:
     needs: [pass-security-audit]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
           toolchain: nightly
