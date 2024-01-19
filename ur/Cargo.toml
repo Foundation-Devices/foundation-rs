@@ -21,8 +21,10 @@ alloc = ["minicbor/alloc"]
 bitcoin_hashes = { workspace = true }
 crc = { workspace = true }
 heapless = { workspace = true }
-hex = { workspace = true }
 itertools = { workspace = true }
 minicbor = { workspace = true }
 phf = { workspace = true }
 rand_xoshiro = { workspace = true }
+
+[dev-dependencies]
+hex = { workspace = true, features = ["alloc"] }
