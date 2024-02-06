@@ -255,7 +255,7 @@ pub fn to_string(ur_type: &str, message: &[u8]) -> alloc::string::String {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
     use core::num::IntErrorKind;
 

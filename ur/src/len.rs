@@ -65,7 +65,7 @@ const fn digit_count(mut v: usize) -> usize {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     #[test]
