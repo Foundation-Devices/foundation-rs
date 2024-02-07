@@ -62,7 +62,7 @@ runs:
     - run: |
         : install rustup if needed
         if ! command -v rustup &>/dev/null; then
-          curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" | sh -s -- --default-toolchain none -y
+          curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail "https://sh.rustup.rs" | sh -s -- --default-toolchain none -y
           echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> $GITHUB_PATH
         fi
       if: runner.os != 'Windows'
@@ -99,14 +99,23 @@ runs:
 
     - run: |
         : enable Cargo sparse registry
-        # except on 1.66 and 1.67, on which it is unstable
+        # implemented in 1.66, stabilized in 1.68, made default in 1.70
         if [ -z "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL+set}" -o -f "${{runner.temp}}"/.implicit_cargo_registries_crates_io_protocol ]; then
-          touch "${{runner.temp}}"/.implicit_cargo_registries_crates_io_protocol || true
-          if rustc +${{steps.parse.outputs.toolchain}} --version --verbose | (! grep -q '^release: 1\.6[67]\.'); then
+          if rustc +${{steps.parse.outputs.toolchain}} --version --verbose | grep -q '^release: 1\.6[89]\.'; then
+            touch "${{runner.temp}}"/.implicit_cargo_registries_crates_io_protocol || true
             echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse >> $GITHUB_ENV
-          else
+          elif rustc +${{steps.parse.outputs.toolchain}} --version --verbose | grep -q '^release: 1\.6[67]\.'; then
+            touch "${{runner.temp}}"/.implicit_cargo_registries_crates_io_protocol || true
             echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git >> $GITHUB_ENV
           fi
+        fi
+      shell: bash
+
+    - run: |
+        : work around spurious network errors in curl 8.0
+        # https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation
+        if rustc +${{steps.parse.outputs.toolchain}} --version --verbose | grep -q '^release: 1\.7[01]\.'; then
+          echo CARGO_HTTP_MULTIPLEXING=false >> $GITHUB_ENV
         fi
       shell: bash
 
