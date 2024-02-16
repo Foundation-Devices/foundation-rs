@@ -4,6 +4,9 @@
 [package]
 name = "foundation-arena"
 version = "0.1.0"
+homepage.workspace = true
+description = "Heapless arena allocator"
 edition = "2021"
+license = "GPL-3.0-or-later"
 
 [dependencies]
