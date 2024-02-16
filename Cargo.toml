@@ -13,6 +13,9 @@ members = [
     "urtypes/fuzz",
 ]
 
+[workspace.package]
+homepage = "https://github.com/Foundation-Devices/foundation-rs"
+
 [workspace.dependencies]
 arbitrary = { version = "1", features = ["derive"] }
 bech32 = { version = "0.9", default-features = false }

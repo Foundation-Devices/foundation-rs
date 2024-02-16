@@ -8,6 +8,12 @@ authors = [
     "Dominik Spicher <dominikspicher@gmail.com>",
     "Foundation Devices, Inc. <hello@foundationdevices.com>",
 ]
+description = """
+Implementation of Blockchain Common's Uniform Resources (UR) standard,
+with static memory allocation for embedded devices while also allowing
+to use dynamic memory allocation for platforms with more resources.
+"""
+homepage.workspace = true
 version = "0.1.0"
 edition = "2021"
 license = "MIT"

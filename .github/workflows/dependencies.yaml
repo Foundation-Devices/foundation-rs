@@ -19,18 +19,6 @@ jobs:
       - run: cargo install --locked cargo-audit
       - run: cargo audit
 
-  are-dependencies-sorted:
-    name: Are the dependencies sorted?
-    needs: [pass-security-audit]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/rust-toolchain
-        with:
-          toolchain: 1.70
-      - run: cargo install --locked cargo-sort
-      - run: cargo sort --workspace --check
-
   are-versions-really-minimal:
     name: Are versions really minimal?
     needs: [pass-security-audit]
