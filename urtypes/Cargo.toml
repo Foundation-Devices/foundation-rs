@@ -5,8 +5,13 @@
 name = "foundation-urtypes"
 version = "0.1.0"
 edition = "2021"
-homepage = "https://github.com/Foundation-Devices/foundation-rs"
-description = "Uniform Resources"
+homepage.workspace = true
+description = """
+Uniform Resource (UR) types.
+
+This crate provides a collection of Uniform Resources types that can
+serialized and deserialized.
+"""
 license = "GPL-3.0-or-later"
 
 [features]
