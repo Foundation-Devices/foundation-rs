@@ -105,11 +105,11 @@ mod blockchain_commons {
     #[serde(rename_all = "kebab-case")]
     pub enum CryptoHDKeyVector {
         Xpub {
-            key: bitcoin::bip32::ExtendedPubKey,
+            key: bitcoin::bip32::Xpub,
             origin: Option<bitcoin::bip32::DerivationPath>,
         },
         Xprv {
-            key: bitcoin::bip32::ExtendedPrivKey,
+            key: bitcoin::bip32::Xpriv,
         },
     }
 

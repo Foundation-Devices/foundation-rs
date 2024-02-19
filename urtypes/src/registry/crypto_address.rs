@@ -47,8 +47,8 @@ impl<'a> TryFrom<&'a bitcoin::Address<bitcoin::address::NetworkUnchecked>> for C
     fn try_from(
         address: &'a bitcoin::Address<bitcoin::address::NetworkUnchecked>,
     ) -> Result<Self, Self::Error> {
-        let kind = AddressKind::try_from(&address.payload).ok();
-        let data = data_from_payload(&address.payload)?;
+        let kind = AddressKind::try_from(address.payload()).ok();
+        let data = data_from_payload(address.payload())?;
 
         Ok(Self {
             info: None,
@@ -66,14 +66,14 @@ impl<'a> TryFrom<&'a bitcoin::Address<bitcoin::address::NetworkChecked>> for Cry
         use crate::registry::CoinType;
         use bitcoin::Network;
 
-        let network = match address.network {
+        let network = match address.network() {
             Network::Bitcoin => CryptoCoinInfo::NETWORK_MAINNET,
             Network::Testnet => CryptoCoinInfo::NETWORK_BTC_TESTNET,
             _ => return Err(InterpretAddressError::UnsupportedNetwork),
         };
         let info = CryptoCoinInfo::new(CoinType::BTC, network);
-        let kind = AddressKind::try_from(&address.payload).ok();
-        let data = data_from_payload(&address.payload)?;
+        let kind = AddressKind::try_from(address.payload()).ok();
+        let data = data_from_payload(address.payload())?;
 
         Ok(Self {
             info: Some(info),
@@ -212,7 +212,7 @@ impl TryFrom<&bitcoin::address::Payload> for AddressKind {
     type Error = UnknownAddressType;
 
     fn try_from(value: &bitcoin::address::Payload) -> Result<Self, Self::Error> {
-        use bitcoin::address::{Payload, WitnessVersion};
+        use bitcoin::{address::Payload, blockdata::script::witness_version::WitnessVersion};
 
         let kind = match value {
             Payload::PubkeyHash(_) => AddressKind::P2PKH,
