@@ -26,10 +26,10 @@ impl<'a> CryptoHDKey<'a> {
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> TryFrom<&'a bitcoin::bip32::ExtendedPrivKey> for CryptoHDKey<'a> {
+impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for CryptoHDKey<'a> {
     type Error = InterpretExtendedKeyError;
 
-    fn try_from(xprv: &'a bitcoin::bip32::ExtendedPrivKey) -> Result<Self, Self::Error> {
+    fn try_from(xprv: &'a bitcoin::bip32::Xpriv) -> Result<Self, Self::Error> {
         use crate::registry::CoinType;
 
         if xprv.depth == 0 {
@@ -67,10 +67,10 @@ impl<'a> TryFrom<&'a bitcoin::bip32::ExtendedPrivKey> for CryptoHDKey<'a> {
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> TryFrom<&'a bitcoin::bip32::ExtendedPubKey> for CryptoHDKey<'a> {
+impl<'a> TryFrom<&'a bitcoin::bip32::Xpub> for CryptoHDKey<'a> {
     type Error = InterpretExtendedKeyError;
 
-    fn try_from(xpub: &'a bitcoin::bip32::ExtendedPubKey) -> Result<Self, Self::Error> {
+    fn try_from(xpub: &'a bitcoin::bip32::Xpub) -> Result<Self, Self::Error> {
         use crate::registry::CoinType;
 
         Ok(Self::DerivedKey(DerivedKey {

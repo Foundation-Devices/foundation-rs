@@ -20,7 +20,7 @@ homepage = "https://github.com/Foundation-Devices/foundation-rs"
 arbitrary = { version = "1", features = ["derive"] }
 bech32 = { version = "0.9", default-features = false }
 bip39 = { version = "2", default-features = false }
-bitcoin = { version = "0.30", default-features = false }
+bitcoin = { version = "0.31", default-features = false }
 bitcoin_hashes = { version = "0.13", default-features = false }
 bs58 = "0.5"
 crc = "3"
