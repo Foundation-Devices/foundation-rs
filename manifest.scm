@@ -18,4 +18,4 @@
 
     ;; Nice to have utilities.
     "hal"
-    "vim")) ;; For xxd command.
+    "xxd"))
