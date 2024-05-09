@@ -408,7 +408,7 @@ pub fn verify_signature<C: Verification>(
     secp: &Secp256k1<C>,
     header: &Header,
     firmware_hash: &sha256d::Hash,
-    user_public_key: Option<PublicKey>,
+    user_public_key: Option<&PublicKey>,
 ) -> Result<(), VerifySignatureError> {
     assert!(header.verify().is_ok());
 
@@ -424,7 +424,7 @@ pub fn verify_signature<C: Verification>(
             public_key
                 .verify(secp, &message, &header.signature.signature1)
                 .map_err(|error| VerifySignatureError::InvalidUserSignature {
-                    public_key,
+                    public_key: public_key.clone(),
                     signature: header.signature.signature1.clone(),
                     error,
                 })

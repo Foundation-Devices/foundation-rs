@@ -12,3 +12,6 @@ target/
 
 # CMake
 **/cmake-build-debug
+
+# Firmware files.
+*.bin
