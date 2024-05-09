@@ -11,6 +11,7 @@
     "guile"
     "jq"
     "make"
+    "nlohmann-json"
     "reuse"
     "rust"
     "rust:cargo"
