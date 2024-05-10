@@ -29,15 +29,6 @@ jobs:
         with:
           toolchain: nightly
       - run: rustup override set nightly
-      # proc-macro2 is broken in recent nightly versions of Rust as it
-      # automagically enables some nightly features that don't exist on recent
-      # nightly compilers.
-      #
-      # Once our dependencies update the proc-macro2 version used to be higher
-      # than the one pinned here we can remove this hack.
-      #
-      # This is not needed for stable versions.
-      - run: cargo update -p proc-macro2 --precise 1.0.66 -Z minimal-versions
       # hex-conservative uses wrong minimal versions.
       - run: cargo update -p arrayvec --precise 0.7.4 -Z minimal-versions
       - run: cargo check -Z minimal-versions
