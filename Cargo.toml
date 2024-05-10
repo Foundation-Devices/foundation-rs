@@ -31,7 +31,7 @@ heapless = { version = "0.8", default-features = false }
 hex = { version = "0.4.2", default-features = false }
 itertools = { version = "0.10", default-features = false }
 libfuzzer-sys = "0.4"
-minicbor = { version = "0.20", features = ["derive"] }
+minicbor = { version = "0.24", features = ["derive"] }
 nom = { version = "7", default-features = false }
 phf = { version = "0.11", features = ["macros"], default-features = false }
 rand_xoshiro = "0.6"

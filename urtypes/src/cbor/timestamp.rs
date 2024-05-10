@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use minicbor::{
-    data::{Int, Tag, Type},
+    data::{IanaTag, Int, Tag, Type},
     decode::Error,
     encode::Write,
     Decode, Decoder, Encode, Encoder,
@@ -22,7 +22,7 @@ pub enum Timestamp {
 #[rustfmt::skip]
 impl<'b, C> Decode<'b, C> for Timestamp {
     fn decode(d: &mut Decoder<'b>, _ctx: &mut C) -> Result<Self, Error> {
-        if d.tag()? != Tag::Timestamp {
+        if d.tag()? != Tag::from(IanaTag::Timestamp) {
             return Err(Error::message("invalid timestamp tag"));
         }
 
@@ -45,7 +45,7 @@ impl<C> Encode<C> for Timestamp {
         e: &mut Encoder<W>,
         _ctx: &mut C,
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.tag(Tag::Timestamp)?;
+        e.tag(IanaTag::Timestamp)?;
 
         match self {
             Timestamp::Int(x) => e.int(*x)?,

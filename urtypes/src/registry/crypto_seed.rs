@@ -31,7 +31,7 @@ pub mod digest {
     use minicbor::{Decoder, Encoder};
 
     /// Tag representing a `crypto-seed-digest`.
-    pub const TAG: Tag = Tag::Unassigned(600);
+    pub const TAG: Tag = Tag::new(600);
 
     /// Encode a `crypto-seed-digest`.
     #[doc(alias("crypto-seed-digest"))]
