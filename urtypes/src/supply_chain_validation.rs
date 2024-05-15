@@ -45,7 +45,7 @@ pub struct Challenge {
 
 impl Challenge {
     /// Tag for embedding [`Challenge`] in other types.
-    pub const TAG: Tag = Tag::Unassigned(710);
+    pub const TAG: Tag = Tag::new(710);
 }
 
 impl<'b, C> Decode<'b, C> for Challenge {
@@ -134,5 +134,5 @@ pub struct Solution<'a> {
 
 impl<'a> Solution<'a> {
     /// Tag for embedding [`Solution`] in other types.
-    pub const TAG: Tag = Tag::Unassigned(711);
+    pub const TAG: Tag = Tag::new(711);
 }

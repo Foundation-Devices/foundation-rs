@@ -54,11 +54,11 @@ use minicbor::{
 use uuid::Uuid;
 
 /// Passport model request tag.
-const PASSPORT_MODEL_REQUEST_TAG: Tag = Tag::Unassigned(720);
+const PASSPORT_MODEL_REQUEST_TAG: Tag = Tag::new(720);
 /// Passport firmware version request tag.
-const PASSPORT_FIRMWARE_VERSION_REQUEST_TAG: Tag = Tag::Unassigned(770);
+const PASSPORT_FIRMWARE_VERSION_REQUEST_TAG: Tag = Tag::new(770);
 /// Passport firmware version response tag.
-const PASSPORT_FIRMWARE_VERSION_RESPONSE_TAG: Tag = Tag::Unassigned(771);
+const PASSPORT_FIRMWARE_VERSION_RESPONSE_TAG: Tag = Tag::new(771);
 
 /// Passport custom `crypto-request`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

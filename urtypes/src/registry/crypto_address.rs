@@ -25,7 +25,7 @@ pub struct CryptoAddress<'a> {
 impl<'a> CryptoAddress<'a> {
     /// The CBOR tag used when [`CryptoAddress`] is embedded in other CBOR
     /// types.
-    pub const TAG: Tag = Tag::Unassigned(307);
+    pub const TAG: Tag = Tag::new(307);
 }
 
 #[cfg(feature = "bitcoin")]

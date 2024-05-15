@@ -22,7 +22,7 @@ pub struct CryptoECKey<'a> {
 
 impl<'a> CryptoECKey<'a> {
     /// The CBOR tag used when [`CryptoECKey`] is embedded in other CBOR types.
-    pub const TAG: Tag = Tag::Unassigned(306);
+    pub const TAG: Tag = Tag::new(306);
 
     /// `secp256k1` curve type.
     pub const SECP256K1: u64 = 0;

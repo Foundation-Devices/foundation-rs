@@ -27,7 +27,7 @@ pub enum Model {
 
 impl Model {
     /// Tag for embedding [`Model`] in other types.
-    pub const TAG: Tag = Tag::Unassigned(721);
+    pub const TAG: Tag = Tag::new(721);
 }
 
 impl<'b, C> Decode<'b, C> for Model {

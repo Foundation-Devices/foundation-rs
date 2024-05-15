@@ -55,17 +55,17 @@ pub enum Terminal<'a, 'b> {
 }
 
 impl<'a, 'b> Terminal<'a, 'b> {
-    const TAG_SCRIPT_HASH: Tag = Tag::Unassigned(400);
-    const TAG_WITNESS_SCRIPT_HASH: Tag = Tag::Unassigned(401);
-    const TAG_PUBLIC_KEY: Tag = Tag::Unassigned(402);
-    const TAG_PUBLIC_KEY_HASH: Tag = Tag::Unassigned(403);
-    const TAG_WITNESS_PUBLIC_KEY_HASH: Tag = Tag::Unassigned(404);
-    const TAG_COMBO: Tag = Tag::Unassigned(405);
-    const TAG_MULTISIG: Tag = Tag::Unassigned(406);
-    const TAG_SORTED_MULTISIG: Tag = Tag::Unassigned(407);
-    const TAG_RAW_SCRIPT: Tag = Tag::Unassigned(408);
-    const TAG_TAPROOT: Tag = Tag::Unassigned(409);
-    const TAG_COSIGNER: Tag = Tag::Unassigned(410);
+    const TAG_SCRIPT_HASH: Tag = Tag::new(400);
+    const TAG_WITNESS_SCRIPT_HASH: Tag = Tag::new(401);
+    const TAG_PUBLIC_KEY: Tag = Tag::new(402);
+    const TAG_PUBLIC_KEY_HASH: Tag = Tag::new(403);
+    const TAG_WITNESS_PUBLIC_KEY_HASH: Tag = Tag::new(404);
+    const TAG_COMBO: Tag = Tag::new(405);
+    const TAG_MULTISIG: Tag = Tag::new(406);
+    const TAG_SORTED_MULTISIG: Tag = Tag::new(407);
+    const TAG_RAW_SCRIPT: Tag = Tag::new(408);
+    const TAG_TAPROOT: Tag = Tag::new(409);
+    const TAG_COSIGNER: Tag = Tag::new(410);
 }
 
 fn oom() -> Error {

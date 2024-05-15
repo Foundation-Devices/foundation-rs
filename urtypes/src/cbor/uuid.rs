@@ -23,7 +23,7 @@ use minicbor::{data::Tag, decode::Error, encode::Write, Decoder, Encoder};
 use uuid::Uuid;
 
 /// Tag representing of [`Uuid`].
-pub const TAG: Tag = Tag::Unassigned(37);
+pub const TAG: Tag = Tag::new(37);
 
 /// Encode an [`Uuid`].
 pub fn encode<C, W: Write>(

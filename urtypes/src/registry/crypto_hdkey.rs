@@ -22,7 +22,7 @@ pub enum CryptoHDKey<'a> {
 
 impl<'a> CryptoHDKey<'a> {
     /// The CBOR tag used when [`CryptoHDKey`] is embedded in other CBOR types.
-    pub const TAG: Tag = Tag::Unassigned(303);
+    pub const TAG: Tag = Tag::new(303);
 }
 
 #[cfg(feature = "bitcoin")]
@@ -254,20 +254,23 @@ impl<'b, C> Decode<'b, C> for DerivedKey<'b> {
                 }
             }
 
+            const TAGGED_COININFO: Tag = Tag::new(305);
+            const TAGGED_KEYPATH: Tag = Tag::new(304);
+
             match d.u32()? {
                 2 => is_private = d.bool()?,
                 3 => key_data = Some(DecodeBytes::decode_bytes(d, ctx)?),
                 4 => chain_code = Some(DecodeBytes::decode_bytes(d, ctx)?),
                 5 => match d.tag()? {
-                    Tag::Unassigned(305) => use_info = Some(CryptoCoinInfo::decode(d, ctx)?),
+                    TAGGED_COININFO => use_info = Some(CryptoCoinInfo::decode(d, ctx)?),
                     _ => return Err(Error::message("invalid tag for crypto-coininfo")),
                 },
                 6 => match d.tag()? {
-                    Tag::Unassigned(304) => origin = Some(CryptoKeypath::decode(d, ctx)?),
+                    TAGGED_KEYPATH => origin = Some(CryptoKeypath::decode(d, ctx)?),
                     _ => return Err(Error::message("invalid tag for crypto-keypath")),
                 },
                 7 => match d.tag()? {
-                    Tag::Unassigned(304) => children = Some(CryptoKeypath::decode(d, ctx)?),
+                    TAGGED_KEYPATH => children = Some(CryptoKeypath::decode(d, ctx)?),
                     _ => return Err(Error::message("invalid tag for crypto-keypath")),
                 },
                 8 => {
@@ -325,17 +328,17 @@ impl<'a, C> Encode<C> for DerivedKey<'a> {
         }
 
         if let Some(ref use_info) = self.use_info {
-            e.u8(5)?.tag(Tag::Unassigned(305))?;
+            e.u8(5)?.tag(Tag::new(305))?;
             use_info.encode(e, ctx)?;
         }
 
         if let Some(ref origin) = self.origin {
-            e.u8(6)?.tag(Tag::Unassigned(304))?;
+            e.u8(6)?.tag(Tag::new(304))?;
             origin.encode(e, ctx)?;
         }
 
         if let Some(ref children) = self.children {
-            e.u8(7)?.tag(Tag::Unassigned(304))?;
+            e.u8(7)?.tag(Tag::new(304))?;
             children.encode(e, ctx)?;
         }
 

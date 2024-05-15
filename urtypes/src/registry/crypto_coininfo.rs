@@ -21,7 +21,7 @@ pub struct CryptoCoinInfo {
 
 impl CryptoCoinInfo {
     /// Tag for embedding [`CryptoCoinInfo`] in other types.
-    pub const TAG: Tag = Tag::Unassigned(305);
+    pub const TAG: Tag = Tag::new(305);
 
     /// Universal value for unique network.
     pub const NETWORK_MAINNET: u64 = 0;
