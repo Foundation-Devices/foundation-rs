@@ -1,18 +1,26 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use bitcoin_hashes::{sha256, sha256d, Hash, HashEngine};
+use clap::{command, value_parser, Arg};
 use foundation_firmware::{header, verify_signature, Information, HEADER_LEN};
 use nom::Finish;
 use secp256k1::global::SECP256K1;
-use std::fs;
+use std::{fs, path::PathBuf};
 
 fn main() -> Result<()> {
-    let file_name = std::env::args_os()
-        .nth(1)
-        .ok_or_else(|| anyhow!("provide a file name"))?;
+    let matches = command!()
+        .arg(
+            Arg::new("file-name")
+                .value_name("file-name")
+                .required(true)
+                .value_parser(value_parser!(PathBuf))
+                .help("Firmware file name"),
+        )
+        .get_matches();
 
+    let file_name = matches.get_one::<PathBuf>("file-name").unwrap();
     let file_buf = fs::read(file_name).context("failed to read firmware")?;
 
     let header_len = usize::try_from(HEADER_LEN).unwrap();

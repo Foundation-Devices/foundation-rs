@@ -25,6 +25,7 @@ bip39 = { version = "2", default-features = false }
 bitcoin = { version = "0.31", default-features = false }
 bitcoin_hashes = { version = "0.14", default-features = false }
 bs58 = "0.5"
+clap = { version = "4", features = ["cargo"] }
 crc = "3"
 criterion = { version = "0.4" }
 heapless = { version = "0.8", default-features = false }
