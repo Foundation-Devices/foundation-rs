@@ -461,7 +461,6 @@ pub mod tests {
         let descriptor = Terminal::ScriptHash(multisig);
 
         let cbor = minicbor::to_vec(&descriptor).unwrap();
-        println!("{}", hex::encode(&cbor));
         assert_eq!(cbor, EXPECTED);
 
         let decoded: Terminal = minicbor::decode_with(&EXPECTED, &mut &a).unwrap();
