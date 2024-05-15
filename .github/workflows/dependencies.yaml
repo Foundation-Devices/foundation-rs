@@ -38,4 +38,6 @@ jobs:
       #
       # This is not needed for stable versions.
       - run: cargo update -p proc-macro2 --precise 1.0.66 -Z minimal-versions
+      # hex-conservative uses wrong minimal versions.
+      - run: cargo update -p arrayvec --precise 0.7.4 -Z minimal-versions
       - run: cargo check -Z minimal-versions

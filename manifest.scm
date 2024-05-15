@@ -11,6 +11,7 @@
     "guile"
     "jq"
     "make"
+    "nlohmann-json"
     "reuse"
     "rust"
     "rust:cargo"
@@ -18,4 +19,4 @@
 
     ;; Nice to have utilities.
     "hal"
-    "vim")) ;; For xxd command.
+    "xxd"))

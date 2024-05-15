@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "foundation-firmware"
+version = "0.1.0"
+description = "Firmware image format"
+homepage.workspace = true
+edition = "2021"
+license = "GPL-3.0-or-later AND GPL-3.0-only"
+
+[[bin]]
+name = "foundation-firmware"
+required-features = ["binary"]
+
+[features]
+default = ["std", "binary"]
+std = ["hex?/std", "nom/std", "secp256k1/std"]
+binary = ["anyhow", "hex", "secp256k1/global-context", "std"]
+
+[dependencies]
+bitcoin_hashes = { workspace = true }
+heapless = { workspace = true }
+hex = { workspace = true, optional = true }
+nom = { workspace = true }
+secp256k1 = { workspace = true }
+anyhow = { workspace = true, optional = true }
