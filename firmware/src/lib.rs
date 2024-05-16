@@ -228,7 +228,7 @@ impl Signature {
 }
 
 /// Errors that can happen when verifying the firmware header.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum VerifyHeaderError {
     /// Unknown magic bytes.
     UnknownMagic(u32),
