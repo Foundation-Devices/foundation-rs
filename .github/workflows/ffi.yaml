@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
-          toolchain: 1.70
+          toolchain: 1.74
       - run: cargo install cbindgen@^0.24
       - run: |
           cbindgen --config ffi/cbindgen.toml \
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/rust-toolchain
         with:
-          toolchain: 1.70
+          toolchain: 1.74
       - run: sudo apt-get install -y cmake nlohmann-json3-dev
       - run: |
           cmake -S ffi/integration/ \
