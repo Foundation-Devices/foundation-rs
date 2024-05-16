@@ -14,6 +14,7 @@ edition = "2021"
 default = ["std"]
 std = ["hex/std"]
 bip32 = ["bs58", "hex/serde"]
+firmware = []
 nostr = ["hex/serde"]
 psbt = ["hex/serde"]
 seedqr = ["bip39/serde", "hex/serde"]

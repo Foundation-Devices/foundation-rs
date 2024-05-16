@@ -40,6 +40,8 @@ impl SeedQRVector {
 
 #[cfg(feature = "bip32")]
 pub mod bip32;
+#[cfg(feature = "firmware")]
+pub mod firmware;
 #[cfg(feature = "psbt")]
 pub mod psbt;
 
