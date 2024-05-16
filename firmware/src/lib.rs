@@ -250,7 +250,7 @@ impl core::fmt::Display for VerifyHeaderError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             VerifyHeaderError::UnknownMagic(magic) => {
-                write!(f, "invalid magic bytes: {magic:#08X}")
+                write!(f, "invalid magic bytes: {magic:#010X}")
             }
             VerifyHeaderError::InvalidTimestamp => write!(f, "invalid timestamp"),
             VerifyHeaderError::FirmwareTooSmall(size) => {

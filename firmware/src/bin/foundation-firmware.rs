@@ -52,13 +52,13 @@ fn print_header(header: &Header) {
 
     println!("Firmware:");
     println!(
-        "{:>17}: {:#08X} ({}) ",
+        "{:>17}: {:#010X} ({}) ",
         "Magic",
         header.information.magic,
-        if header.information.magic == Information::MAGIC_COLOR {
-            "color"
-        } else {
-            "mono"
+        match header.information.magic {
+            Information::MAGIC_COLOR => "color",
+            Information::MAGIC_MONO => "mono",
+            _ => "unknown",
         },
     );
     println!("{:>17}: {}", "Timestamp", header.information.timestamp);
