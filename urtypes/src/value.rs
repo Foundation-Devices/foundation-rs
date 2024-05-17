@@ -50,9 +50,9 @@ impl<'a> Value<'a> {
     /// Construct a new [`Value`] from the type and the CBOR payload.
     pub fn from_ur(ur_type: &str, payload: &'a [u8]) -> Result<Self, Error> {
         let value = match ur_type {
-            "bytes" => Self::Bytes(&*minicbor::decode::<&ByteSlice>(payload)?),
+            "bytes" => Self::Bytes(minicbor::decode::<&ByteSlice>(payload)?),
             "crypto-hdkey" => Self::CryptoHDKey(minicbor::decode(payload)?),
-            "crypto-psbt" => Self::CryptoPsbt(&*minicbor::decode::<&ByteSlice>(payload)?),
+            "crypto-psbt" => Self::CryptoPsbt(minicbor::decode::<&ByteSlice>(payload)?),
             "crypto-request" => Self::PassportRequest(minicbor::decode(payload)?),
             "crypto-response" => Self::PassportResponse(minicbor::decode(payload)?),
             "x-passport-request" => Self::PassportRequest(minicbor::decode(payload)?),

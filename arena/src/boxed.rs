@@ -60,10 +60,6 @@ impl<'a, 'b, T: PartialEq> PartialEq<Box<'b, T>> for Box<'a, T> {
     fn eq(&self, other: &Box<'b, T>) -> bool {
         PartialEq::eq(&**self, &**other)
     }
-
-    fn ne(&self, other: &Box<'b, T>) -> bool {
-        PartialEq::ne(&**self, &**other)
-    }
 }
 
 impl<'a, T> Drop for Box<'a, T> {

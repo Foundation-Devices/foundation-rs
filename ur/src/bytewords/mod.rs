@@ -72,7 +72,7 @@ pub enum DecodeError {
     },
 }
 
-impl<'a> fmt::Display for DecodeError {
+impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DecodeError::InvalidWord {
@@ -196,6 +196,8 @@ pub fn validate(encoded: &str, style: Style) -> Result<usize, DecodeError> {
 ///
 /// This function returns an error if the `bytewords`-encoded string is larger
 /// than `result`.
+// FIXME: Refactor the loop to solve this:
+#[allow(clippy::while_let_on_iterator)]
 pub fn decode_to_slice(
     encoded: &str,
     result: &mut [u8],
