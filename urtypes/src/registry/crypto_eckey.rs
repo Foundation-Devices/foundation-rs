@@ -37,7 +37,7 @@ impl<'b, C> Decode<'b, C> for CryptoECKey<'b> {
         let mut len = d.map()?;
         loop {
             match len {
-                Some(n) if n == 0 => break,
+                Some(0) => break,
                 Some(n) => len = Some(n - 1),
                 None => {
                     if d.datatype()? == Type::Break {
@@ -69,16 +69,14 @@ impl<'a, C> Encode<C> for CryptoECKey<'a> {
         _ctx: &mut C,
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
         let is_not_default_curve = self.curve != Self::SECP256K1;
-        let is_not_default_private = self.is_private != false;
-
-        let len = is_not_default_curve as u64 + is_not_default_private as u64 + 1;
+        let len = is_not_default_curve as u64 + self.is_private as u64 + 1;
         e.map(len)?;
 
         if is_not_default_curve {
             e.u8(1)?.u64(self.curve)?;
         }
 
-        if is_not_default_private {
+        if self.is_private {
             e.u8(2)?.bool(self.is_private)?;
         }
 

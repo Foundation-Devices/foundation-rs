@@ -148,7 +148,7 @@ impl<'b, C> Decode<'b, C> for MasterKey {
         let mut len = d.map()?;
         loop {
             match len {
-                Some(n) if n == 0 => break,
+                Some(0) => break,
                 Some(n) => len = Some(n - 1),
                 None => {
                     if d.datatype()? == Type::Break {
@@ -245,7 +245,7 @@ impl<'b, C> Decode<'b, C> for DerivedKey<'b> {
         let mut len = d.map()?;
         loop {
             match len {
-                Some(n) if n == 0 => break,
+                Some(0) => break,
                 Some(n) => len = Some(n - 1),
                 None => {
                     if d.datatype()? == Type::Break {

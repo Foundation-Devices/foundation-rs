@@ -36,7 +36,7 @@ fn data_from_payload(payload: &bitcoin::address::Payload) -> Result<&[u8], Inter
         Payload::PubkeyHash(ref pkh) => Ok(pkh.as_ref()),
         Payload::ScriptHash(ref sh) => Ok(sh.as_ref()),
         Payload::WitnessProgram(ref wp) => Ok(wp.program().as_bytes()),
-        _ => return Err(InterpretAddressError::UnsupportedPayload),
+        _ => Err(InterpretAddressError::UnsupportedPayload),
     }
 }
 
@@ -99,7 +99,7 @@ impl<'b, C> Decode<'b, C> for CryptoAddress<'b> {
         let mut len = d.map()?;
         loop {
             match len {
-                Some(n) if n == 0 => break,
+                Some(0) => break,
                 Some(n) => len = Some(n - 1),
                 None => {
                     if d.datatype()? == Type::Break {

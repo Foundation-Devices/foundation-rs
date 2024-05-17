@@ -80,10 +80,10 @@ impl<'a, 'b, const N: usize> Decode<'b, &'a TerminalContext<'a, 'b, N>> for Term
         match d.tag()? {
             Self::TAG_SCRIPT_HASH => Box::new_in(Terminal::decode(d, ctx)?, ctx)
                 .map_err(|_| oom())
-                .map(|e| Terminal::ScriptHash(e)),
+                .map(Terminal::ScriptHash),
             Self::TAG_WITNESS_SCRIPT_HASH => Box::new_in(Terminal::decode(d, ctx)?, ctx)
                 .map_err(|_| oom())
-                .map(|e| Terminal::WitnessScriptHash(e)),
+                .map(Terminal::WitnessScriptHash),
             Self::TAG_PUBLIC_KEY => Key::decode(d, ctx).map(Terminal::PublicKey),
             Self::TAG_PUBLIC_KEY_HASH => Key::decode(d, ctx).map(Terminal::PublicKeyHash),
             Self::TAG_WITNESS_PUBLIC_KEY_HASH => {
@@ -96,7 +96,7 @@ impl<'a, 'b, const N: usize> Decode<'b, &'a TerminalContext<'a, 'b, N>> for Term
             Self::TAG_RAW_SCRIPT => d.bytes().map(Terminal::RawScript),
             Self::TAG_TAPROOT => Box::new_in(Terminal::decode(d, ctx)?, ctx)
                 .map_err(|_| oom())
-                .map(|e| Terminal::Taproot(e)),
+                .map(Terminal::Taproot),
             Self::TAG_COSIGNER => Key::decode(d, ctx).map(Terminal::Cosigner),
             _ => Err(Error::message("invalid tag")),
         }
@@ -231,7 +231,7 @@ impl<'b, C> Decode<'b, C> for Keys<'b> {
         let mut len: usize = 0;
         loop {
             match array_len {
-                Some(n) if n == 0 => break,
+                Some(0) => break,
                 Some(n) => array_len = Some(n.saturating_sub(1)),
                 None => {
                     if d.datatype()? == Type::Break {
@@ -260,7 +260,7 @@ impl<'b, C> Decode<'b, C> for Keys<'b> {
     }
 }
 
-impl<'a, C> Encode<C> for Keys<'_> {
+impl<'a, C> Encode<C> for Keys<'a> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,

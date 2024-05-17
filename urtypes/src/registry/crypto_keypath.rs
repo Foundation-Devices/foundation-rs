@@ -41,7 +41,7 @@ impl<'b, C> Decode<'b, C> for CryptoKeypath<'b> {
         let mut len = d.map()?;
         loop {
             match len {
-                Some(n) if n == 0 => break,
+                Some(0) => break,
                 Some(n) => len = Some(n - 1),
                 None => {
                     if d.datatype()? == Type::Break {
@@ -168,7 +168,7 @@ impl<'b, C> Decode<'b, C> for PathComponents<'b> {
         let mut len: usize = 0;
         loop {
             match array_len {
-                Some(n) if n == 0 => break,
+                Some(0) => break,
                 Some(n) => array_len = Some(n.saturating_sub(1)),
                 None => {
                     if d.datatype()? == Type::Break {
