@@ -93,7 +93,7 @@ impl<T: Types> BaseDecoder<T> {
     ///  - The CBOR-encoded fountain part may be inconsistent with previously received ones
     ///
     /// In all these cases, an error will be returned.
-    pub fn receive<'a>(&mut self, ur: UR) -> Result<(), Error> {
+    pub fn receive(&mut self, ur: UR) -> Result<(), Error> {
         if !ur.is_multi_part() {
             return Err(Error::NotMultiPart);
         }
@@ -293,7 +293,7 @@ pub enum Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-impl<'a> fmt::Display for Error {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Cbor(e) => write!(f, "CBOR decoding error: {e}"),
@@ -315,19 +315,19 @@ impl<'a> fmt::Display for Error {
     }
 }
 
-impl<'a> From<minicbor::decode::Error> for Error {
+impl From<minicbor::decode::Error> for Error {
     fn from(e: minicbor::decode::Error) -> Self {
         Self::Cbor(e)
     }
 }
 
-impl<'a> From<bytewords::DecodeError> for Error {
+impl From<bytewords::DecodeError> for Error {
     fn from(e: bytewords::DecodeError) -> Self {
         Self::Bytewords(e)
     }
 }
 
-impl<'a> From<fountain::decoder::Error> for Error {
+impl From<fountain::decoder::Error> for Error {
     fn from(e: fountain::decoder::Error) -> Self {
         Self::Fountain(e)
     }

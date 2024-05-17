@@ -146,11 +146,7 @@ impl<'a, C> minicbor::Encode<C> for Part<'a> {
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
         e.array(5)?
             .u32(self.sequence)?
-            .u64(
-                self.sequence_count
-                    .try_into()
-                    .map_err(|_| minicbor::encode::Error::message("expected u64"))?,
-            )?
+            .u64(u64::from(self.sequence_count))?
             .u64(
                 self.message_length
                     .try_into()
