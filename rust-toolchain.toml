@@ -3,6 +3,6 @@
 
 # Keep this in sync. with the CI.
 [toolchain]
-channel = "1.70"
+channel = "1.74"
 profile = "default"
 targets = ["thumbv7em-none-eabihf"]
