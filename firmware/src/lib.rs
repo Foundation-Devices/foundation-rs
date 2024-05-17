@@ -174,7 +174,7 @@ impl Information {
         buf[off..off + (DATE_LEN - self.date.len())].fill(0);
         off += DATE_LEN - self.date.len();
 
-        buf[off..off + self.version.len()].copy_from_slice(&self.version.as_bytes());
+        buf[off..off + self.version.len()].copy_from_slice(self.version.as_bytes());
         off += self.version.len();
 
         // Fill with zeroes the rest of the version.
@@ -424,8 +424,7 @@ pub fn verify_signature<C: Verification>(
             public_key
                 .verify(secp, &message, &header.signature.signature1)
                 .map_err(|error| VerifySignatureError::InvalidUserSignature {
-                    public_key: public_key.clone(),
-                    signature: header.signature.signature1.clone(),
+                    public_key: *public_key,
                     error,
                 })
         }
@@ -450,7 +449,6 @@ pub fn verify_signature<C: Verification>(
                 .verify(secp, &message, &signature1)
                 .map_err(|error| VerifySignatureError::FailedSignature1 {
                     index: header.signature.public_key1,
-                    signature: header.signature.signature1,
                     error,
                 })?;
 
@@ -460,7 +458,6 @@ pub fn verify_signature<C: Verification>(
                 .verify(secp, &message, &signature2)
                 .map_err(|error| VerifySignatureError::FailedSignature2 {
                     index: header.signature.public_key2,
-                    signature: header.signature.signature2,
                     error,
                 })?;
 
@@ -476,8 +473,6 @@ pub enum VerifySignatureError {
     InvalidUserSignature {
         /// The public key of the user.
         public_key: PublicKey,
-        /// The signature of the firmware.
-        signature: ecdsa::Signature,
         /// The signtature verification error.
         error: secp256k1::Error,
     },
@@ -485,8 +480,6 @@ pub enum VerifySignatureError {
     FailedSignature1 {
         /// The index of the public key used.
         index: u32,
-        /// The signature of the firmware.
-        signature: ecdsa::Signature,
         /// The signtature verification error.
         error: secp256k1::Error,
     },
@@ -494,8 +487,6 @@ pub enum VerifySignatureError {
     FailedSignature2 {
         /// The index of the public key used.
         index: u32,
-        /// The signature of the firmware.
-        signature: ecdsa::Signature,
         /// The signtature verification error.
         error: secp256k1::Error,
     },

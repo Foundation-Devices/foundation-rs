@@ -82,7 +82,7 @@ fn main() -> Result<()> {
     );
     println!();
 
-    verify_signature(&SECP256K1, &header, &validation_hash, None)
+    verify_signature(SECP256K1, &header, &validation_hash, None)
         .context("firmware signature verification failed.")?;
 
     println!("Firmware signature is valid!");
