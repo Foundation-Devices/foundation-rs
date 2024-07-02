@@ -254,8 +254,8 @@ impl<'b, C> Decode<'b, C> for DerivedKey<'b> {
                 }
             }
 
-            const TAGGED_COININFO: Tag = Tag::new(305);
-            const TAGGED_KEYPATH: Tag = Tag::new(304);
+            const TAGGED_COININFO: Tag = Tag::new(40305);
+            const TAGGED_KEYPATH: Tag = Tag::new(40304);
 
             match d.u32()? {
                 2 => is_private = d.bool()?,
@@ -263,15 +263,15 @@ impl<'b, C> Decode<'b, C> for DerivedKey<'b> {
                 4 => chain_code = Some(DecodeBytes::decode_bytes(d, ctx)?),
                 5 => match d.tag()? {
                     TAGGED_COININFO => use_info = Some(CoinInfo::decode(d, ctx)?),
-                    _ => return Err(Error::message("invalid tag for crypto-coininfo")),
+                    _ => return Err(Error::message("invalid tag for coininfo")),
                 },
                 6 => match d.tag()? {
                     TAGGED_KEYPATH => origin = Some(Keypath::decode(d, ctx)?),
-                    _ => return Err(Error::message("invalid tag for crypto-keypath")),
+                    _ => return Err(Error::message("invalid tag for keypath")),
                 },
                 7 => match d.tag()? {
                     TAGGED_KEYPATH => children = Some(Keypath::decode(d, ctx)?),
-                    _ => return Err(Error::message("invalid tag for crypto-keypath")),
+                    _ => return Err(Error::message("invalid tag for keypath")),
                 },
                 8 => {
                     parent_fingerprint = Some(
@@ -328,17 +328,17 @@ impl<'a, C> Encode<C> for DerivedKey<'a> {
         }
 
         if let Some(ref use_info) = self.use_info {
-            e.u8(5)?.tag(Tag::new(305))?;
+            e.u8(5)?.tag(Tag::new(40305))?;
             use_info.encode(e, ctx)?;
         }
 
         if let Some(ref origin) = self.origin {
-            e.u8(6)?.tag(Tag::new(304))?;
+            e.u8(6)?.tag(Tag::new(40304))?;
             origin.encode(e, ctx)?;
         }
 
         if let Some(ref children) = self.children {
-            e.u8(7)?.tag(Tag::new(304))?;
+            e.u8(7)?.tag(Tag::new(40304))?;
             children.encode(e, ctx)?;
         }
 

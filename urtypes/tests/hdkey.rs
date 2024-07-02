@@ -26,6 +26,8 @@ fn test_roundtrip() {
         };
 
         let cbor = minicbor::to_vec(&hdkey).unwrap();
+        println!("our cbor: {}", hex::encode(&cbor));
+        println!("test vector cbor: {}", hex::encode(&vector.as_cbor));
         assert_eq!(cbor, vector.as_cbor);
     }
 }
