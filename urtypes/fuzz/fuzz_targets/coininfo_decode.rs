@@ -3,9 +3,9 @@
 
 #![no_main]
 
-use foundation_urtypes::registry::CryptoHDKey;
+use foundation_urtypes::registry::CoinInfo;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    minicbor::decode::<'_, CryptoHDKey>(data).ok();
+    minicbor::decode::<'_, CoinInfo>(data).ok();
 });

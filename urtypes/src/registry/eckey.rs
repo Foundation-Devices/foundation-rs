@@ -11,7 +11,7 @@ use minicbor::{
 /// Elliptic Curve (EC) key.
 #[doc(alias("crypto-eckey"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CryptoECKey<'a> {
+pub struct ECKey<'a> {
     /// The curve type.
     pub curve: u64,
     /// Private key?
@@ -20,15 +20,15 @@ pub struct CryptoECKey<'a> {
     pub data: &'a [u8],
 }
 
-impl<'a> CryptoECKey<'a> {
-    /// The CBOR tag used when [`CryptoECKey`] is embedded in other CBOR types.
+impl<'a> ECKey<'a> {
+    /// The CBOR tag used when [`ECKey`] is embedded in other CBOR types.
     pub const TAG: Tag = Tag::new(306);
 
     /// `secp256k1` curve type.
     pub const SECP256K1: u64 = 0;
 }
 
-impl<'b, C> Decode<'b, C> for CryptoECKey<'b> {
+impl<'b, C> Decode<'b, C> for ECKey<'b> {
     fn decode(d: &mut Decoder<'b>, _ctx: &mut C) -> Result<Self, Error> {
         let mut curve = Self::SECP256K1;
         let mut is_private = false;
@@ -62,7 +62,7 @@ impl<'b, C> Decode<'b, C> for CryptoECKey<'b> {
     }
 }
 
-impl<'a, C> Encode<C> for CryptoECKey<'a> {
+impl<'a, C> Encode<C> for ECKey<'a> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
@@ -96,14 +96,11 @@ mod tests {
     fn test_roundtrip() {
         let vectors = URVector::new();
 
-        for vector in vectors
-            .iter()
-            .filter(|v| matches!(v.ur, UR::CryptoECKey(_)))
-        {
-            let crypto_eckey_vector = vector.ur.unwrap_crypto_eckey();
+        for vector in vectors.iter().filter(|v| matches!(v.ur, UR::ECKey(_))) {
+            let crypto_eckey_vector = vector.ur.unwrap_eckey();
 
-            let crypto_eckey = CryptoECKey {
-                curve: CryptoECKey::SECP256K1,
+            let crypto_eckey = ECKey {
+                curve: ECKey::SECP256K1,
                 is_private: crypto_eckey_vector.is_private,
                 data: &crypto_eckey_vector.data,
             };

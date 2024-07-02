@@ -6,9 +6,9 @@ use minicbor::{Decode, Encode};
 use crate::cbor::Timestamp;
 
 /// Cryptographic Seed.
-#[doc(alias("crypto-seed"))]
+#[doc(alias("seed"))]
 #[derive(Debug, Decode, Encode)]
-pub struct CryptoSeed<'a> {
+pub struct Seed<'a> {
     /// Seed entropy.
     #[cbor(n(0), with = "payload")]
     pub payload: &'a [u8],

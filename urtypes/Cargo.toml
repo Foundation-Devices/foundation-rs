@@ -3,7 +3,7 @@
 
 [package]
 name = "foundation-urtypes"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 homepage.workspace = true
 description = """
@@ -32,11 +32,11 @@ foundation-test-vectors = { workspace = true, features = ["blockchain-commons"] 
 minicbor = { workspace = true, features = ["alloc"] }
 
 [[test]]
-name = "crypto_address"
-path = "tests/crypto_address.rs"
+name = "address"
+path = "tests/address.rs"
 required-features = ["bitcoin"]
 
 [[test]]
-name = "crypto_hdkey"
-path = "tests/crypto_hdkey.rs"
+name = "hdkey"
+path = "tests/hdkey.rs"
 required-features = ["bitcoin"]

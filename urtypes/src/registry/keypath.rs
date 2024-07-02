@@ -8,7 +8,7 @@ use minicbor::{data::Type, decode::Error, encode::Write, Decode, Decoder, Encode
 /// Metadata for the complete or partial derivation path of a key.
 #[doc(alias("crypto-keypath"))]
 #[derive(Debug, Clone, PartialEq)]
-pub struct CryptoKeypath<'a> {
+pub struct Keypath<'a> {
     /// Path component.
     pub components: PathComponents<'a>,
     /// Fingerprint from the ancestor key.
@@ -17,7 +17,7 @@ pub struct CryptoKeypath<'a> {
     pub depth: Option<u8>,
 }
 
-impl<'a> CryptoKeypath<'a> {
+impl<'a> Keypath<'a> {
     /// Create a new key path for a master extended public key.
     ///
     /// The `source_fingerprint` parameter is the fingerprint of the master key.
@@ -32,7 +32,7 @@ impl<'a> CryptoKeypath<'a> {
     }
 }
 
-impl<'b, C> Decode<'b, C> for CryptoKeypath<'b> {
+impl<'b, C> Decode<'b, C> for Keypath<'b> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut components = None;
         let mut source_fingerprint = None;
@@ -71,7 +71,7 @@ impl<'b, C> Decode<'b, C> for CryptoKeypath<'b> {
     }
 }
 
-impl<'a, C> Encode<C> for CryptoKeypath<'a> {
+impl<'a, C> Encode<C> for Keypath<'a> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
@@ -97,7 +97,7 @@ impl<'a, C> Encode<C> for CryptoKeypath<'a> {
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> From<&'a bitcoin::bip32::DerivationPath> for CryptoKeypath<'a> {
+impl<'a> From<&'a bitcoin::bip32::DerivationPath> for Keypath<'a> {
     fn from(derivation_path: &'a bitcoin::bip32::DerivationPath) -> Self {
         Self {
             components: PathComponents {

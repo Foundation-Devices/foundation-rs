@@ -50,38 +50,39 @@ mod blockchain_commons {
     use serde::Deserialize;
 
     #[derive(Debug, Clone, Deserialize)]
-    #[serde(rename_all = "kebab-case")]
     pub enum UR {
-        #[serde(with = "hex")]
+        #[serde(rename = "bytes", with = "hex")]
         Bytes(Vec<u8>),
-        CryptoAddress(CryptoAddressVector),
-        #[serde(rename = "crypto-eckey")]
-        CryptoECKey(CryptoECKeyVector),
-        #[serde(rename = "crypto-hdkey")]
-        CryptoHDKey(CryptoHDKeyVector),
-        #[serde(with = "hex")]
-        CryptoPsbt(Vec<u8>),
-        CryptoSeed(CryptoSeedVector),
+        #[serde(rename = "address")]
+        Address(AddressVector),
+        #[serde(rename = "eckey")]
+        ECKey(ECKeyVector),
+        #[serde(rename = "hdkey")]
+        HDKey(HDKeyVector),
+        #[serde(rename = "psbt", with = "hex")]
+        Psbt(Vec<u8>),
+        #[serde(rename = "seed")]
+        Seed(SeedVector),
     }
 
     impl UR {
-        pub fn unwrap_crypto_address(&self) -> &CryptoAddressVector {
+        pub fn unwrap_address(&self) -> &AddressVector {
             match self {
-                UR::CryptoAddress(v) => v,
+                UR::Address(v) => v,
                 _ => panic!(),
             }
         }
 
-        pub fn unwrap_crypto_eckey(&self) -> &CryptoECKeyVector {
+        pub fn unwrap_eckey(&self) -> &ECKeyVector {
             match self {
-                UR::CryptoECKey(v) => v,
+                UR::ECKey(v) => v,
                 _ => panic!(),
             }
         }
 
-        pub fn unwrap_crypto_hdkey(&self) -> &CryptoHDKeyVector {
+        pub fn unwrap_hdkey(&self) -> &HDKeyVector {
             match self {
-                UR::CryptoHDKey(v) => v,
+                UR::HDKey(v) => v,
                 _ => panic!(),
             }
         }
@@ -89,7 +90,7 @@ mod blockchain_commons {
 
     #[derive(Debug, Clone, Deserialize)]
     #[serde(rename_all = "kebab-case")]
-    pub enum CryptoAddressVector {
+    pub enum AddressVector {
         Bitcoin(bitcoin::Address<bitcoin::address::NetworkUnchecked>),
         #[serde(with = "prefix_hex")]
         Ethereum(Vec<u8>),
@@ -97,7 +98,7 @@ mod blockchain_commons {
 
     #[derive(Debug, Clone, Deserialize)]
     #[serde(rename_all = "kebab-case")]
-    pub struct CryptoECKeyVector {
+    pub struct ECKeyVector {
         pub is_private: bool,
         #[serde(with = "hex")]
         pub data: Vec<u8>,
@@ -105,7 +106,7 @@ mod blockchain_commons {
 
     #[derive(Debug, Clone, Deserialize)]
     #[serde(rename_all = "kebab-case")]
-    pub enum CryptoHDKeyVector {
+    pub enum HDKeyVector {
         Xpub {
             key: bitcoin::bip32::Xpub,
             origin: Option<bitcoin::bip32::DerivationPath>,
@@ -117,7 +118,7 @@ mod blockchain_commons {
 
     #[derive(Debug, Clone, Deserialize)]
     #[serde(rename_all = "kebab-case")]
-    pub struct CryptoSeedVector {
+    pub struct SeedVector {
         #[serde(with = "hex")]
         pub payload: Vec<u8>,
         pub creation_date: u64,
