@@ -51,12 +51,16 @@ impl<'a> Value<'a> {
     pub fn from_ur(ur_type: &str, payload: &'a [u8]) -> Result<Self, Error> {
         let value = match ur_type {
             "bytes" => Self::Bytes(minicbor::decode::<&ByteSlice>(payload)?),
-            "crypto-hdkey" => Self::CryptoHDKey(minicbor::decode(payload)?),
-            "crypto-psbt" => Self::CryptoPsbt(minicbor::decode::<&ByteSlice>(payload)?),
-            "crypto-request" => Self::PassportRequest(minicbor::decode(payload)?),
-            "crypto-response" => Self::PassportResponse(minicbor::decode(payload)?),
-            "x-passport-request" => Self::PassportRequest(minicbor::decode(payload)?),
-            "x-passport-response" => Self::PassportResponse(minicbor::decode(payload)?),
+            "hdkey" | "crypto-hdkey" => Self::CryptoHDKey(minicbor::decode(payload)?),
+            "psbt" | "crypto-psbt" => Self::CryptoPsbt(minicbor::decode::<&ByteSlice>(payload)?),
+            // TODO: Remove crypto-request and crypto-response, these have
+            // been removed from the UR registry standard (BCR-2020-006).
+            "x-passport-request" | "crypto-request" => {
+                Self::PassportRequest(minicbor::decode(payload)?)
+            }
+            "x-passport-response" | "crypto-response" => {
+                Self::PassportResponse(minicbor::decode(payload)?)
+            }
             _ => return Err(Error::UnsupportedResource),
         };
 
@@ -64,6 +68,14 @@ impl<'a> Value<'a> {
     }
 
     /// Return the type of this value as a string.
+    ///
+    /// # Notes
+    ///
+    /// This will return the _deprecated_ types as some implementers of UR
+    /// still don't support the newer ones.
+    ///
+    /// When changing this to use the newer types also change
+    /// [`Value::from_ur`].
     pub fn ur_type(&self) -> &'static str {
         match self {
             Value::Bytes(_) => "bytes",
