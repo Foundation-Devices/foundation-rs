@@ -8,7 +8,7 @@ use minicbor::{
 /// Metadata for the type and use of a cryptocurrency.
 #[doc(alias("crypto-coininfo"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CryptoCoinInfo {
+pub struct CoinInfo {
     /// Coin type.
     pub coin_type: CoinType,
     /// Network identifier.
@@ -19,8 +19,8 @@ pub struct CryptoCoinInfo {
     pub network: u64,
 }
 
-impl CryptoCoinInfo {
-    /// Tag for embedding [`CryptoCoinInfo`] in other types.
+impl CoinInfo {
+    /// Tag for embedding [`CoinInfo`] in other types.
     pub const TAG: Tag = Tag::new(305);
 
     /// Universal value for unique network.
@@ -35,7 +35,7 @@ impl CryptoCoinInfo {
         network: Self::NETWORK_MAINNET,
     };
 
-    /// Construct a new [`CryptoCoinInfo`].
+    /// Construct a new [`CoinInfo`].
     pub const fn new(coin_type: CoinType, network: u64) -> Self {
         Self { coin_type, network }
     }
@@ -45,7 +45,7 @@ impl CryptoCoinInfo {
     }
 }
 
-impl<'b, C> Decode<'b, C> for CryptoCoinInfo {
+impl<'b, C> Decode<'b, C> for CoinInfo {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut coin_type = None;
         let mut network = None;
@@ -76,7 +76,7 @@ impl<'b, C> Decode<'b, C> for CryptoCoinInfo {
     }
 }
 
-impl<C> Encode<C> for CryptoCoinInfo {
+impl<C> Encode<C> for CoinInfo {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
@@ -163,7 +163,7 @@ mod tests {
     // Basic test. No independent test vectors available.
     #[test]
     fn test_crypto_coininfo_roundtrip() {
-        let crypto_coininfo = CryptoCoinInfo::BTC_MAINNET;
+        let crypto_coininfo = CoinInfo::BTC_MAINNET;
         let cbor = minicbor::to_vec(&crypto_coininfo).unwrap();
         let decoded = minicbor::decode(&cbor).unwrap();
         assert_eq!(crypto_coininfo, decoded);

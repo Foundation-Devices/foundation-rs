@@ -3,20 +3,20 @@
 
 //! Uniform Resources registry.
 
-mod crypto_address;
-mod crypto_coininfo;
-mod crypto_eckey;
-mod crypto_hdkey;
-mod crypto_keypath;
-mod crypto_output;
-mod crypto_seed;
+mod address;
+mod coininfo;
+mod eckey;
+mod hdkey;
+mod keypath;
+mod output_descriptor;
 mod passport;
+mod seed;
 
-pub use self::crypto_address::*;
-pub use self::crypto_coininfo::*;
-pub use self::crypto_eckey::*;
-pub use self::crypto_hdkey::*;
-pub use self::crypto_keypath::*;
-pub use self::crypto_output::*;
-pub use self::crypto_seed::*;
+pub use self::address::*;
+pub use self::coininfo::*;
+pub use self::eckey::*;
+pub use self::hdkey::*;
+pub use self::keypath::*;
+pub use self::output_descriptor::*;
 pub use self::passport::*;
+pub use self::seed::*;

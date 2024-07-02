@@ -8,25 +8,25 @@ use minicbor::{
     Encode, Encoder,
 };
 
-use crate::registry::{CryptoCoinInfo, CryptoKeypath};
+use crate::registry::{CoinInfo, Keypath};
 
 /// HD Key.
 #[doc(alias("hd-key"))]
 #[derive(Debug, Clone, PartialEq)]
-pub enum CryptoHDKey<'a> {
+pub enum HDKey<'a> {
     /// Master key.
     MasterKey(MasterKey),
     /// Derived key.
     DerivedKey(DerivedKey<'a>),
 }
 
-impl<'a> CryptoHDKey<'a> {
-    /// The CBOR tag used when [`CryptoHDKey`] is embedded in other CBOR types.
+impl<'a> HDKey<'a> {
+    /// The CBOR tag used when [`HDKey`] is embedded in other CBOR types.
     pub const TAG: Tag = Tag::new(303);
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for CryptoHDKey<'a> {
+impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for HDKey<'a> {
     type Error = InterpretExtendedKeyError;
 
     fn try_from(xprv: &'a bitcoin::bip32::Xpriv) -> Result<Self, Self::Error> {
@@ -46,11 +46,11 @@ impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for CryptoHDKey<'a> {
                 is_private: true,
                 key_data,
                 chain_code: Some(xprv.chain_code.to_bytes()),
-                use_info: Some(CryptoCoinInfo::new(
+                use_info: Some(CoinInfo::new(
                     CoinType::BTC,
                     match xprv.network {
-                        bitcoin::Network::Bitcoin => CryptoCoinInfo::NETWORK_MAINNET,
-                        bitcoin::Network::Testnet => CryptoCoinInfo::NETWORK_BTC_TESTNET,
+                        bitcoin::Network::Bitcoin => CoinInfo::NETWORK_MAINNET,
+                        bitcoin::Network::Testnet => CoinInfo::NETWORK_BTC_TESTNET,
                         _ => return Err(InterpretExtendedKeyError),
                     },
                 )),
@@ -67,7 +67,7 @@ impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for CryptoHDKey<'a> {
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> TryFrom<&'a bitcoin::bip32::Xpub> for CryptoHDKey<'a> {
+impl<'a> TryFrom<&'a bitcoin::bip32::Xpub> for HDKey<'a> {
     type Error = InterpretExtendedKeyError;
 
     fn try_from(xpub: &'a bitcoin::bip32::Xpub) -> Result<Self, Self::Error> {
@@ -77,11 +77,11 @@ impl<'a> TryFrom<&'a bitcoin::bip32::Xpub> for CryptoHDKey<'a> {
             is_private: false,
             key_data: xpub.public_key.serialize(),
             chain_code: Some(xpub.chain_code.to_bytes()),
-            use_info: Some(CryptoCoinInfo::new(
+            use_info: Some(CoinInfo::new(
                 CoinType::BTC,
                 match xpub.network {
-                    bitcoin::Network::Bitcoin => CryptoCoinInfo::NETWORK_MAINNET,
-                    bitcoin::Network::Testnet => CryptoCoinInfo::NETWORK_BTC_TESTNET,
+                    bitcoin::Network::Bitcoin => CoinInfo::NETWORK_MAINNET,
+                    bitcoin::Network::Testnet => CoinInfo::NETWORK_BTC_TESTNET,
                     _ => return Err(InterpretExtendedKeyError),
                 },
             )),
@@ -100,14 +100,14 @@ impl<'a> TryFrom<&'a bitcoin::bip32::Xpub> for CryptoHDKey<'a> {
 #[derive(Debug)]
 pub struct InterpretExtendedKeyError;
 
-impl<'b, C> Decode<'b, C> for CryptoHDKey<'b> {
+impl<'b, C> Decode<'b, C> for HDKey<'b> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         if MasterKey::decode(&mut d.probe(), ctx).is_ok() {
-            return Ok(CryptoHDKey::MasterKey(MasterKey::decode(d, ctx)?));
+            return Ok(HDKey::MasterKey(MasterKey::decode(d, ctx)?));
         }
 
         if DerivedKey::decode(&mut d.probe(), ctx).is_ok() {
-            return Ok(CryptoHDKey::DerivedKey(DerivedKey::decode(d, ctx)?));
+            return Ok(HDKey::DerivedKey(DerivedKey::decode(d, ctx)?));
         }
 
         Err(Error::message(
@@ -116,15 +116,15 @@ impl<'b, C> Decode<'b, C> for CryptoHDKey<'b> {
     }
 }
 
-impl<'a, C> Encode<C> for CryptoHDKey<'a> {
+impl<'a, C> Encode<C> for HDKey<'a> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
         ctx: &mut C,
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
         match self {
-            CryptoHDKey::MasterKey(master_key) => master_key.encode(e, ctx),
-            CryptoHDKey::DerivedKey(derived_key) => derived_key.encode(e, ctx),
+            HDKey::MasterKey(master_key) => master_key.encode(e, ctx),
+            HDKey::DerivedKey(derived_key) => derived_key.encode(e, ctx),
         }
     }
 }
@@ -217,11 +217,11 @@ pub struct DerivedKey<'a> {
     /// Optional chain code.
     pub chain_code: Option<[u8; 32]>,
     /// How the key is to be used.
-    pub use_info: Option<CryptoCoinInfo>,
+    pub use_info: Option<CoinInfo>,
     /// How the key was derived.
-    pub origin: Option<CryptoKeypath<'a>>,
+    pub origin: Option<Keypath<'a>>,
     /// What children should/can be derived from this.
-    pub children: Option<CryptoKeypath<'a>>,
+    pub children: Option<Keypath<'a>>,
     /// The fingerprint of this key's direct ancestor.
     pub parent_fingerprint: Option<NonZeroU32>,
     /// A short name for this key.
@@ -262,15 +262,15 @@ impl<'b, C> Decode<'b, C> for DerivedKey<'b> {
                 3 => key_data = Some(DecodeBytes::decode_bytes(d, ctx)?),
                 4 => chain_code = Some(DecodeBytes::decode_bytes(d, ctx)?),
                 5 => match d.tag()? {
-                    TAGGED_COININFO => use_info = Some(CryptoCoinInfo::decode(d, ctx)?),
+                    TAGGED_COININFO => use_info = Some(CoinInfo::decode(d, ctx)?),
                     _ => return Err(Error::message("invalid tag for crypto-coininfo")),
                 },
                 6 => match d.tag()? {
-                    TAGGED_KEYPATH => origin = Some(CryptoKeypath::decode(d, ctx)?),
+                    TAGGED_KEYPATH => origin = Some(Keypath::decode(d, ctx)?),
                     _ => return Err(Error::message("invalid tag for crypto-keypath")),
                 },
                 7 => match d.tag()? {
-                    TAGGED_KEYPATH => children = Some(CryptoKeypath::decode(d, ctx)?),
+                    TAGGED_KEYPATH => children = Some(Keypath::decode(d, ctx)?),
                     _ => return Err(Error::message("invalid tag for crypto-keypath")),
                 },
                 8 => {

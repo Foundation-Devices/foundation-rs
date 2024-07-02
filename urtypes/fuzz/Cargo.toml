@@ -18,44 +18,44 @@ libfuzzer-sys = { workspace = true }
 minicbor = { workspace = true }
 
 [[bin]]
-name = "crypto_address_decode"
-path = "fuzz_targets/crypto_address_decode.rs"
+name = "address_decode"
+path = "fuzz_targets/address_decode.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "crypto_coininfo_decode"
-path = "fuzz_targets/crypto_coininfo_decode.rs"
+name = "coininfo_decode"
+path = "fuzz_targets/coininfo_decode.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "crypto_eckey_decode"
-path = "fuzz_targets/crypto_eckey_decode.rs"
+name = "eckey_decode"
+path = "fuzz_targets/eckey_decode.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "crypto_hdkey_decode"
-path = "fuzz_targets/crypto_hdkey_decode.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "crypto_output_decode"
-path = "fuzz_targets/crypto_output_decode.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "crypto_seed_decode"
-path = "fuzz_targets/crypto_seed_decode.rs"
+name = "hdkey_decode"
+path = "fuzz_targets/hdkey_decode.rs"
 test = false
 doc = false
 
 [[bin]]
 name = "model_decode"
 path = "fuzz_targets/model_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "output_descriptor_decode"
+path = "fuzz_targets/output_descriptor_decode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "seed_decode"
+path = "fuzz_targets/seed_decode.rs"
 test = false
 doc = false
 

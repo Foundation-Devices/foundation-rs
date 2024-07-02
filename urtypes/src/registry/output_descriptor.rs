@@ -10,7 +10,7 @@ use minicbor::{
 
 use foundation_arena::{boxed::Box, Arena};
 
-use crate::registry::{CryptoAddress, CryptoECKey, CryptoHDKey};
+use crate::registry::{Address, ECKey, HDKey};
 
 /// Context type passed to [`Terminal`] [`minicbor::Decode`] implementation.
 ///
@@ -43,7 +43,7 @@ pub enum Terminal<'a, 'b> {
     /// Sorted (deterministic) multiple signature checking.
     SortedMultisig(Multikey<'a>),
     /// A bare Bitcoin address.
-    Address(CryptoAddress<'a>),
+    Address(Address<'a>),
     /// A raw script.
     RawScript(&'a [u8]),
     /// Taproot script.
@@ -92,7 +92,7 @@ impl<'a, 'b, const N: usize> Decode<'b, &'a TerminalContext<'a, 'b, N>> for Term
             Self::TAG_COMBO => Key::decode(d, ctx).map(Terminal::Combo),
             Self::TAG_MULTISIG => Multikey::decode(d, ctx).map(Terminal::Multisig),
             Self::TAG_SORTED_MULTISIG => Multikey::decode(d, ctx).map(Terminal::SortedMultisig),
-            CryptoAddress::TAG => CryptoAddress::decode(d, ctx).map(Terminal::Address),
+            Address::TAG => Address::decode(d, ctx).map(Terminal::Address),
             Self::TAG_RAW_SCRIPT => d.bytes().map(Terminal::RawScript),
             Self::TAG_TAPROOT => Box::new_in(Terminal::decode(d, ctx)?, ctx)
                 .map_err(|_| oom())
@@ -143,7 +143,7 @@ impl<'a, 'b, C> Encode<C> for Terminal<'a, 'b> {
                 multikey.encode(e, ctx)?;
             }
             Terminal::Address(address) => {
-                e.tag(CryptoAddress::TAG)?;
+                e.tag(Address::TAG)?;
                 address.encode(e, ctx)?;
             }
             Terminal::RawScript(script) => {
@@ -167,16 +167,16 @@ impl<'a, 'b, C> Encode<C> for Terminal<'a, 'b> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Key<'a> {
     /// Elliptic-curve key.
-    CryptoECKey(CryptoECKey<'a>),
+    ECKey(ECKey<'a>),
     /// Elliptic-curve key with the derivation information.
-    CryptoHDKey(CryptoHDKey<'a>),
+    HDKey(HDKey<'a>),
 }
 
 impl<'b, C> Decode<'b, C> for Key<'b> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.tag().and_then(|t| match t {
-            CryptoECKey::TAG => CryptoECKey::decode(d, ctx).map(Self::CryptoECKey),
-            CryptoHDKey::TAG => CryptoHDKey::decode(d, ctx).map(Self::CryptoHDKey),
+            ECKey::TAG => ECKey::decode(d, ctx).map(Self::ECKey),
+            HDKey::TAG => HDKey::decode(d, ctx).map(Self::HDKey),
             _ => Err(Error::message("invalid tag")),
         })
     }
@@ -189,12 +189,12 @@ impl<'a, C> Encode<C> for Key<'a> {
         ctx: &mut C,
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
         match self {
-            Key::CryptoECKey(k) => {
-                e.tag(CryptoECKey::TAG)?;
+            Key::ECKey(k) => {
+                e.tag(ECKey::TAG)?;
                 k.encode(e, ctx)
             }
-            Key::CryptoHDKey(k) => {
-                e.tag(CryptoHDKey::TAG)?;
+            Key::HDKey(k) => {
+                e.tag(HDKey::TAG)?;
                 k.encode(e, ctx)
             }
         }
@@ -359,7 +359,7 @@ pub struct Multikey<'a> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::registry::CryptoECKey;
+    use crate::registry::ECKey;
 
     #[test]
     fn test_example_1() {
@@ -371,8 +371,8 @@ pub mod tests {
         ];
 
         let a: TerminalContext<1> = TerminalContext::new();
-        let descriptor = Terminal::PublicKeyHash(Key::CryptoECKey(CryptoECKey {
-            curve: CryptoECKey::SECP256K1,
+        let descriptor = Terminal::PublicKeyHash(Key::ECKey(ECKey {
+            curve: ECKey::SECP256K1,
             is_private: false,
             data: &[
                 0x02, 0xc6, 0x04, 0x7f, 0x94, 0x41, 0xed, 0x7d, 0x6d, 0x30, 0x45, 0x40, 0x6e, 0x95,
@@ -401,8 +401,8 @@ pub mod tests {
         let a: TerminalContext<8> = TerminalContext::new();
 
         let wpkh = Box::new_in(
-            Terminal::WitnessPublicKeyHash(Key::CryptoECKey(CryptoECKey {
-                curve: CryptoECKey::SECP256K1,
+            Terminal::WitnessPublicKeyHash(Key::ECKey(ECKey {
+                curve: ECKey::SECP256K1,
                 is_private: false,
                 data: &[
                     0x03, 0xff, 0xf9, 0x7b, 0xd5, 0x75, 0x5e, 0xee, 0xa4, 0x20, 0x45, 0x3a, 0x14,
@@ -436,8 +436,8 @@ pub mod tests {
         ];
 
         let a: TerminalContext<8> = TerminalContext::new();
-        let key1 = Key::CryptoECKey(CryptoECKey {
-            curve: CryptoECKey::SECP256K1,
+        let key1 = Key::ECKey(ECKey {
+            curve: ECKey::SECP256K1,
             is_private: false,
             data: &[
                 0x02, 0x2f, 0x01, 0xe5, 0xe1, 0x5c, 0xca, 0x35, 0x1d, 0xaf, 0xf3, 0x84, 0x3f, 0xb7,
@@ -445,8 +445,8 @@ pub mod tests {
                 0xf3, 0xe1, 0x0a, 0x2a, 0x01,
             ],
         });
-        let key2 = Key::CryptoECKey(CryptoECKey {
-            curve: CryptoECKey::SECP256K1,
+        let key2 = Key::ECKey(ECKey {
+            curve: ECKey::SECP256K1,
             is_private: false,
             data: &[
                 0x03, 0xac, 0xd4, 0x84, 0xe2, 0xf0, 0xc7, 0xf6, 0x53, 0x09, 0xad, 0x17, 0x8a, 0x9f,

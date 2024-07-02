@@ -9,21 +9,21 @@ use minicbor::{
     data::Tag, data::Type, decode::Error, encode::Write, Decode, Decoder, Encode, Encoder,
 };
 
-use crate::registry::CryptoCoinInfo;
+use crate::registry::CoinInfo;
 
 /// A cryptocurrency address.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CryptoAddress<'a> {
+pub struct Address<'a> {
     /// Coin information.
-    pub info: Option<CryptoCoinInfo>,
+    pub info: Option<CoinInfo>,
     /// Address type if applicable.
     pub kind: Option<AddressKind>,
     /// The address data.
     pub data: &'a [u8],
 }
 
-impl<'a> CryptoAddress<'a> {
-    /// The CBOR tag used when [`CryptoAddress`] is embedded in other CBOR
+impl<'a> Address<'a> {
+    /// The CBOR tag used when [`Address`] is embedded in other CBOR
     /// types.
     pub const TAG: Tag = Tag::new(307);
 }
@@ -41,7 +41,7 @@ fn data_from_payload(payload: &bitcoin::address::Payload) -> Result<&[u8], Inter
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> TryFrom<&'a bitcoin::Address<bitcoin::address::NetworkUnchecked>> for CryptoAddress<'a> {
+impl<'a> TryFrom<&'a bitcoin::Address<bitcoin::address::NetworkUnchecked>> for Address<'a> {
     type Error = InterpretAddressError;
 
     fn try_from(
@@ -59,7 +59,7 @@ impl<'a> TryFrom<&'a bitcoin::Address<bitcoin::address::NetworkUnchecked>> for C
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> TryFrom<&'a bitcoin::Address<bitcoin::address::NetworkChecked>> for CryptoAddress<'a> {
+impl<'a> TryFrom<&'a bitcoin::Address<bitcoin::address::NetworkChecked>> for Address<'a> {
     type Error = InterpretAddressError;
 
     fn try_from(address: &'a bitcoin::Address) -> Result<Self, Self::Error> {
@@ -67,11 +67,11 @@ impl<'a> TryFrom<&'a bitcoin::Address<bitcoin::address::NetworkChecked>> for Cry
         use bitcoin::Network;
 
         let network = match address.network() {
-            Network::Bitcoin => CryptoCoinInfo::NETWORK_MAINNET,
-            Network::Testnet => CryptoCoinInfo::NETWORK_BTC_TESTNET,
+            Network::Bitcoin => CoinInfo::NETWORK_MAINNET,
+            Network::Testnet => CoinInfo::NETWORK_BTC_TESTNET,
             _ => return Err(InterpretAddressError::UnsupportedNetwork),
         };
-        let info = CryptoCoinInfo::new(CoinType::BTC, network);
+        let info = CoinInfo::new(CoinType::BTC, network);
         let kind = AddressKind::try_from(address.payload()).ok();
         let data = data_from_payload(address.payload())?;
 
@@ -90,7 +90,7 @@ pub enum InterpretAddressError {
     UnsupportedPayload,
 }
 
-impl<'b, C> Decode<'b, C> for CryptoAddress<'b> {
+impl<'b, C> Decode<'b, C> for Address<'b> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut info = None;
         let mut address_type = None;
@@ -110,11 +110,11 @@ impl<'b, C> Decode<'b, C> for CryptoAddress<'b> {
 
             match d.u32()? {
                 1 => {
-                    if CryptoCoinInfo::TAG != d.tag()? {
+                    if CoinInfo::TAG != d.tag()? {
                         return Err(Error::message("crypto-coin-info tag is invalid"));
                     }
 
-                    info = Some(CryptoCoinInfo::decode(d, ctx)?);
+                    info = Some(CoinInfo::decode(d, ctx)?);
                 }
                 2 => address_type = Some(AddressKind::decode(d, ctx)?),
                 3 => data = Some(d.bytes()?),
@@ -130,7 +130,7 @@ impl<'b, C> Decode<'b, C> for CryptoAddress<'b> {
     }
 }
 
-impl<'a, C> Encode<C> for CryptoAddress<'a> {
+impl<'a, C> Encode<C> for Address<'a> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
@@ -146,7 +146,7 @@ impl<'a, C> Encode<C> for CryptoAddress<'a> {
 
         if include_info {
             let info = self.info.as_ref().unwrap();
-            e.u8(1)?.tag(CryptoCoinInfo::TAG)?;
+            e.u8(1)?.tag(CoinInfo::TAG)?;
             info.encode(e, ctx)?;
         }
 

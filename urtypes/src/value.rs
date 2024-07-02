@@ -30,16 +30,16 @@ use core::fmt::{Display, Formatter};
 
 use minicbor::{bytes::ByteSlice, encode::Write, Encode, Encoder};
 
-use crate::registry::{CryptoHDKey, PassportRequest, PassportResponse};
+use crate::registry::{HDKey, PassportRequest, PassportResponse};
 
 #[derive(Debug, PartialEq)]
 pub enum Value<'a> {
     /// bytes.
     Bytes(&'a [u8]),
     /// crypto-hdkey.
-    CryptoHDKey(CryptoHDKey<'a>),
+    HDKey(HDKey<'a>),
     /// crypto-psbt.
-    CryptoPsbt(&'a [u8]),
+    Psbt(&'a [u8]),
     /// crypto-request for Passport.
     PassportRequest(PassportRequest),
     /// crypto-response for Passport.
@@ -51,8 +51,8 @@ impl<'a> Value<'a> {
     pub fn from_ur(ur_type: &str, payload: &'a [u8]) -> Result<Self, Error> {
         let value = match ur_type {
             "bytes" => Self::Bytes(minicbor::decode::<&ByteSlice>(payload)?),
-            "hdkey" | "crypto-hdkey" => Self::CryptoHDKey(minicbor::decode(payload)?),
-            "psbt" | "crypto-psbt" => Self::CryptoPsbt(minicbor::decode::<&ByteSlice>(payload)?),
+            "hdkey" | "crypto-hdkey" => Self::HDKey(minicbor::decode(payload)?),
+            "psbt" | "crypto-psbt" => Self::Psbt(minicbor::decode::<&ByteSlice>(payload)?),
             // TODO: Remove crypto-request and crypto-response, these have
             // been removed from the UR registry standard (BCR-2020-006).
             "x-passport-request" | "crypto-request" => {
@@ -79,8 +79,8 @@ impl<'a> Value<'a> {
     pub fn ur_type(&self) -> &'static str {
         match self {
             Value::Bytes(_) => "bytes",
-            Value::CryptoHDKey(_) => "crypto-hdkey",
-            Value::CryptoPsbt(_) => "crypto-psbt",
+            Value::HDKey(_) => "crypto-hdkey",
+            Value::Psbt(_) => "crypto-psbt",
             Value::PassportRequest(_) => "crypto-request",
             Value::PassportResponse(_) => "crypto-response",
         }
@@ -95,8 +95,8 @@ impl<'a, C> Encode<C> for Value<'a> {
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
         match self {
             Value::Bytes(v) => minicbor::bytes::encode(v, e, ctx),
-            Value::CryptoHDKey(v) => v.encode(e, ctx),
-            Value::CryptoPsbt(v) => minicbor::bytes::encode(v, e, ctx),
+            Value::HDKey(v) => v.encode(e, ctx),
+            Value::Psbt(v) => minicbor::bytes::encode(v, e, ctx),
             Value::PassportRequest(v) => v.encode(e, ctx),
             Value::PassportResponse(v) => v.encode(e, ctx),
         }
