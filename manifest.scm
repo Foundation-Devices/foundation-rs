@@ -12,6 +12,10 @@
     "jq"
     "make"
     "nlohmann-json"
+    "opencv"
+    "python"
+    ;; Remove once <https://issues.guix.gnu.org/68953> gets merged.
+    "python-numpy"
     "reuse"
     "rust"
     "rust:cargo"
