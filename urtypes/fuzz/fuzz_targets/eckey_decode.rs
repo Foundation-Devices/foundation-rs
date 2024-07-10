@@ -3,9 +3,9 @@
 
 #![no_main]
 
-use foundation_urtypes::registry::CryptoSeed;
+use foundation_urtypes::registry::ECKey;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    minicbor::decode::<'_, CryptoSeed>(data).ok();
+    minicbor::decode::<'_, ECKey>(data).ok();
 });

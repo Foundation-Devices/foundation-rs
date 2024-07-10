@@ -1,20 +1,20 @@
 [
   {
     "name": "Example/Test Vector 1",
-    "as-cbor": "A1035477BFF20C60E522DFAA3350C39B030A5D004E839A",
-    "as-ur": "ur:crypto-address/oyaxghktrswzbnhnvwcpurpkeogdsrndaxbkhlaegllsnyolrsemgu",
+    "as-cbor": "a1035477bff20c60e522dfaa3350c39b030a5d004e839a",
+    "as-ur": "ur:address/oyaxghktrswzbnhnvwcpurpkeogdsrndaxbkhlaegllsnyolrsemgu",
     "ur": {
-      "crypto-address": {
+      "address": {
         "bitcoin": "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"
       }
     }
   },
   {
     "name": "Example/Test Vector 2",
-    "as-cbor": "A201D90131A201183C0201035481B7E08F65BDF5648606C89998A9CC8164397647",
-    "as-ur": "ur:crypto-address/oeadtaadehoeadcsfnaoadaxghlyrlvtmyihryykielnamspnlmkptsflyieeskofllosfeecf",
+    "as-cbor": "a201d99d71a201183c0201035481b7e08f65bdf5648606c89998a9cc8164397647",
+    "as-ur": "ur:address/oeadtantjsoeadcsfnaoadaxghlyrlvtmyihryykielnamspnlmkptsflyieeskoflkovdfdlb",
     "ur": {
-      "crypto-address": {
+      "address": {
         "ethereum": "0x81b7E08F65Bdf5648606c89998A9CC8164397647"
       }
     }
