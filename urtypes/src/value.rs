@@ -79,7 +79,7 @@ impl<'a> Value<'a> {
     pub fn ur_type(&self) -> &'static str {
         match self {
             Value::Bytes(_) => "bytes",
-            Value::HDKey(_) => "crypto-hdkey",
+            Value::HDKey(_) => "hdkey",
             Value::Psbt(_) => "crypto-psbt",
             Value::PassportRequest(_) => "crypto-request",
             Value::PassportResponse(_) => "crypto-response",
