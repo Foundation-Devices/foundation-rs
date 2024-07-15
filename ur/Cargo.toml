@@ -14,7 +14,7 @@ with static memory allocation for embedded devices while also allowing
 to use dynamic memory allocation for platforms with more resources.
 """
 homepage.workspace = true
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 
