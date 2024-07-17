@@ -30,14 +30,14 @@ use core::fmt::{Display, Formatter};
 
 use minicbor::{bytes::ByteSlice, encode::Write, Encode, Encoder};
 
-use crate::registry::{HDKey, PassportRequest, PassportResponse};
+use crate::registry::{HDKeyRef, PassportRequest, PassportResponse};
 
 #[derive(Debug, PartialEq)]
 pub enum Value<'a> {
     /// bytes.
     Bytes(&'a [u8]),
     /// crypto-hdkey.
-    HDKey(HDKey<'a>),
+    HDKey(HDKeyRef<'a>),
     /// crypto-psbt.
     Psbt(&'a [u8]),
     /// crypto-request for Passport.

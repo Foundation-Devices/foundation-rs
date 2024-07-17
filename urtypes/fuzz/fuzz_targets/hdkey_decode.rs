@@ -3,9 +3,9 @@
 
 #![no_main]
 
-use foundation_urtypes::registry::HDKey;
+use foundation_urtypes::registry::HDKeyRef;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    minicbor::decode::<'_, HDKey>(data).ok();
+    minicbor::decode::<'_, HDKeyRef>(data).ok();
 });
