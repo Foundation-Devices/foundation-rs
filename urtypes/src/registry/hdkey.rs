@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#[cfg(feature = "alloc")]
+use alloc::string::String;
 use core::num::NonZeroU32;
 
 use minicbor::{
@@ -8,25 +10,27 @@ use minicbor::{
     Encode, Encoder,
 };
 
-use crate::registry::{CoinInfo, Keypath};
+#[cfg(feature = "alloc")]
+use crate::registry::Keypath;
+use crate::registry::{CoinInfo, KeypathRef};
 
-/// HD Key.
+/// HD Key (non owned, zero copy).
 #[doc(alias("hd-key"))]
 #[derive(Debug, Clone, PartialEq)]
-pub enum HDKey<'a> {
+pub enum HDKeyRef<'a> {
     /// Master key.
     MasterKey(MasterKey),
     /// Derived key.
-    DerivedKey(DerivedKey<'a>),
+    DerivedKey(DerivedKeyRef<'a>),
 }
 
-impl<'a> HDKey<'a> {
-    /// The CBOR tag used when [`HDKey`] is embedded in other CBOR types.
+impl<'a> HDKeyRef<'a> {
+    /// The CBOR tag used when [`HDKeyRef`] is embedded in other CBOR types.
     pub const TAG: Tag = Tag::new(303);
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for HDKey<'a> {
+impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for HDKeyRef<'a> {
     type Error = InterpretExtendedKeyError;
 
     fn try_from(xprv: &'a bitcoin::bip32::Xpriv) -> Result<Self, Self::Error> {
@@ -42,7 +46,7 @@ impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for HDKey<'a> {
             key_data[0] = 0;
             key_data[1..].copy_from_slice(&xprv.private_key.secret_bytes());
 
-            Ok(Self::DerivedKey(DerivedKey {
+            Ok(Self::DerivedKey(DerivedKeyRef {
                 is_private: true,
                 key_data,
                 chain_code: Some(xprv.chain_code.to_bytes()),
@@ -67,13 +71,13 @@ impl<'a> TryFrom<&'a bitcoin::bip32::Xpriv> for HDKey<'a> {
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> TryFrom<&'a bitcoin::bip32::Xpub> for HDKey<'a> {
+impl<'a> TryFrom<&'a bitcoin::bip32::Xpub> for HDKeyRef<'a> {
     type Error = InterpretExtendedKeyError;
 
     fn try_from(xpub: &'a bitcoin::bip32::Xpub) -> Result<Self, Self::Error> {
         use crate::registry::CoinType;
 
-        Ok(Self::DerivedKey(DerivedKey {
+        Ok(Self::DerivedKey(DerivedKeyRef {
             is_private: false,
             key_data: xpub.public_key.serialize(),
             chain_code: Some(xpub.chain_code.to_bytes()),
@@ -100,14 +104,14 @@ impl<'a> TryFrom<&'a bitcoin::bip32::Xpub> for HDKey<'a> {
 #[derive(Debug)]
 pub struct InterpretExtendedKeyError;
 
-impl<'b, C> Decode<'b, C> for HDKey<'b> {
+impl<'b, C> Decode<'b, C> for HDKeyRef<'b> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         if MasterKey::decode(&mut d.probe(), ctx).is_ok() {
-            return Ok(HDKey::MasterKey(MasterKey::decode(d, ctx)?));
+            return Ok(HDKeyRef::MasterKey(MasterKey::decode(d, ctx)?));
         }
 
-        if DerivedKey::decode(&mut d.probe(), ctx).is_ok() {
-            return Ok(HDKey::DerivedKey(DerivedKey::decode(d, ctx)?));
+        if DerivedKeyRef::decode(&mut d.probe(), ctx).is_ok() {
+            return Ok(HDKeyRef::DerivedKey(DerivedKeyRef::decode(d, ctx)?));
         }
 
         Err(Error::message(
@@ -116,16 +120,42 @@ impl<'b, C> Decode<'b, C> for HDKey<'b> {
     }
 }
 
-impl<'a, C> Encode<C> for HDKey<'a> {
+impl<'a, C> Encode<C> for HDKeyRef<'a> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
         ctx: &mut C,
     ) -> Result<(), minicbor::encode::Error<W::Error>> {
         match self {
-            HDKey::MasterKey(master_key) => master_key.encode(e, ctx),
-            HDKey::DerivedKey(derived_key) => derived_key.encode(e, ctx),
+            HDKeyRef::MasterKey(master_key) => master_key.encode(e, ctx),
+            HDKeyRef::DerivedKey(derived_key) => derived_key.encode(e, ctx),
         }
+    }
+}
+
+/// HD Key.
+#[doc(alias("hd-key"))]
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq)]
+pub enum HDKey {
+    MasterKey(MasterKey),
+    DerivedKey(DerivedKey),
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> From<HDKeyRef<'a>> for HDKey {
+    fn from(hdkey: HDKeyRef<'a>) -> Self {
+        match hdkey {
+            HDKeyRef::MasterKey(m) => Self::MasterKey(m),
+            HDKeyRef::DerivedKey(d) => Self::DerivedKey(DerivedKey::from(d)),
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'b, C> Decode<'b, C> for HDKey {
+    fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
+        HDKeyRef::decode(d, ctx).map(HDKey::from)
     }
 }
 
@@ -206,10 +236,10 @@ impl<C> Encode<C> for MasterKey {
     }
 }
 
-/// A derived key.
+/// A derived key (non-owned, zero copy).
 #[doc(alias("derived-key"))]
 #[derive(Debug, Clone, PartialEq)]
-pub struct DerivedKey<'a> {
+pub struct DerivedKeyRef<'a> {
     /// `true` if key is private, `false` if public.
     pub is_private: bool,
     /// Key data bytes.
@@ -219,9 +249,9 @@ pub struct DerivedKey<'a> {
     /// How the key is to be used.
     pub use_info: Option<CoinInfo>,
     /// How the key was derived.
-    pub origin: Option<Keypath<'a>>,
+    pub origin: Option<KeypathRef<'a>>,
     /// What children should/can be derived from this.
-    pub children: Option<Keypath<'a>>,
+    pub children: Option<KeypathRef<'a>>,
     /// The fingerprint of this key's direct ancestor.
     pub parent_fingerprint: Option<NonZeroU32>,
     /// A short name for this key.
@@ -230,7 +260,7 @@ pub struct DerivedKey<'a> {
     pub note: Option<&'a str>,
 }
 
-impl<'b, C> Decode<'b, C> for DerivedKey<'b> {
+impl<'b, C> Decode<'b, C> for DerivedKeyRef<'b> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut is_private = false;
         let mut key_data = None;
@@ -266,11 +296,11 @@ impl<'b, C> Decode<'b, C> for DerivedKey<'b> {
                     _ => return Err(Error::message("invalid tag for coininfo")),
                 },
                 6 => match d.tag()? {
-                    TAGGED_KEYPATH => origin = Some(Keypath::decode(d, ctx)?),
+                    TAGGED_KEYPATH => origin = Some(KeypathRef::decode(d, ctx)?),
                     _ => return Err(Error::message("invalid tag for keypath")),
                 },
                 7 => match d.tag()? {
-                    TAGGED_KEYPATH => children = Some(Keypath::decode(d, ctx)?),
+                    TAGGED_KEYPATH => children = Some(KeypathRef::decode(d, ctx)?),
                     _ => return Err(Error::message("invalid tag for keypath")),
                 },
                 8 => {
@@ -299,7 +329,7 @@ impl<'b, C> Decode<'b, C> for DerivedKey<'b> {
     }
 }
 
-impl<'a, C> Encode<C> for DerivedKey<'a> {
+impl<'a, C> Encode<C> for DerivedKeyRef<'a> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
@@ -355,5 +385,47 @@ impl<'a, C> Encode<C> for DerivedKey<'a> {
         }
 
         Ok(())
+    }
+}
+
+/// A derived key.
+#[doc(alias("derived-key"))]
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq)]
+pub struct DerivedKey {
+    /// `true` if key is private, `false` if public.
+    pub is_private: bool,
+    /// Key data bytes.
+    pub key_data: [u8; 33],
+    /// Optional chain code.
+    pub chain_code: Option<[u8; 32]>,
+    /// How the key is to be used.
+    pub use_info: Option<CoinInfo>,
+    /// How the key was derived.
+    pub origin: Option<Keypath>,
+    /// What children should/can be derived from this.
+    pub children: Option<Keypath>,
+    /// The fingerprint of this key's direct ancestor.
+    pub parent_fingerprint: Option<NonZeroU32>,
+    /// A short name for this key.
+    pub name: Option<String>,
+    /// An arbitrary amount of text describing the key.
+    pub note: Option<String>,
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> From<DerivedKeyRef<'a>> for DerivedKey {
+    fn from(derived_key: DerivedKeyRef<'a>) -> Self {
+        Self {
+            is_private: derived_key.is_private,
+            key_data: derived_key.key_data,
+            chain_code: derived_key.chain_code,
+            use_info: derived_key.use_info,
+            origin: derived_key.origin.map(Keypath::from),
+            children: derived_key.children.map(Keypath::from),
+            parent_fingerprint: derived_key.parent_fingerprint,
+            name: derived_key.name.map(String::from),
+            note: derived_key.note.map(String::from),
+        }
     }
 }

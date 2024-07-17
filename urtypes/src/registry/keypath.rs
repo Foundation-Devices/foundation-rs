@@ -1,14 +1,17 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 use core::{num::NonZeroU32, ops::Range};
 
 use minicbor::{data::Type, decode::Error, encode::Write, Decode, Decoder, Encode, Encoder};
 
-/// Metadata for the complete or partial derivation path of a key.
+/// Metadata for the complete or partial derivation path of a key
+/// (non-owned, zero copy).
 #[doc(alias("crypto-keypath"))]
 #[derive(Debug, Clone, PartialEq)]
-pub struct Keypath<'a> {
+pub struct KeypathRef<'a> {
     /// Path component.
     pub components: PathComponents<'a>,
     /// Fingerprint from the ancestor key.
@@ -17,7 +20,7 @@ pub struct Keypath<'a> {
     pub depth: Option<u8>,
 }
 
-impl<'a> Keypath<'a> {
+impl<'a> KeypathRef<'a> {
     /// Create a new key path for a master extended public key.
     ///
     /// The `source_fingerprint` parameter is the fingerprint of the master key.
@@ -32,7 +35,7 @@ impl<'a> Keypath<'a> {
     }
 }
 
-impl<'b, C> Decode<'b, C> for Keypath<'b> {
+impl<'b, C> Decode<'b, C> for KeypathRef<'b> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         let mut components = None;
         let mut source_fingerprint = None;
@@ -71,7 +74,7 @@ impl<'b, C> Decode<'b, C> for Keypath<'b> {
     }
 }
 
-impl<'a, C> Encode<C> for Keypath<'a> {
+impl<'a, C> Encode<C> for KeypathRef<'a> {
     fn encode<W: Write>(
         &self,
         e: &mut Encoder<W>,
@@ -97,7 +100,7 @@ impl<'a, C> Encode<C> for Keypath<'a> {
 }
 
 #[cfg(feature = "bitcoin")]
-impl<'a> From<&'a bitcoin::bip32::DerivationPath> for Keypath<'a> {
+impl<'a> From<&'a bitcoin::bip32::DerivationPath> for KeypathRef<'a> {
     fn from(derivation_path: &'a bitcoin::bip32::DerivationPath) -> Self {
         Self {
             components: PathComponents {
@@ -105,6 +108,30 @@ impl<'a> From<&'a bitcoin::bip32::DerivationPath> for Keypath<'a> {
             },
             source_fingerprint: None,
             depth: None,
+        }
+    }
+}
+
+/// Metadata for the complete or partial derivation path of a key.
+#[doc(alias("crypto-keypath"))]
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq)]
+pub struct Keypath {
+    /// Path component.
+    pub components: Vec<PathComponent>,
+    /// Fingerprint from the ancestor key.
+    pub source_fingerprint: Option<NonZeroU32>,
+    /// How many derivations this key is from the master (which is 0).
+    pub depth: Option<u8>,
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> From<KeypathRef<'a>> for Keypath {
+    fn from(keypath: KeypathRef<'a>) -> Self {
+        Self {
+            components: keypath.components.iter().collect(),
+            source_fingerprint: keypath.source_fingerprint,
+            depth: keypath.depth,
         }
     }
 }

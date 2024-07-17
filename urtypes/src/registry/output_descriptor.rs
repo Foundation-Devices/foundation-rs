@@ -10,7 +10,7 @@ use minicbor::{
 
 use foundation_arena::{boxed::Box, Arena};
 
-use crate::registry::{Address, ECKey, HDKey};
+use crate::registry::{Address, ECKey, HDKeyRef};
 
 /// Context type passed to [`Terminal`] [`minicbor::Decode`] implementation.
 ///
@@ -169,14 +169,14 @@ pub enum Key<'a> {
     /// Elliptic-curve key.
     ECKey(ECKey<'a>),
     /// Elliptic-curve key with the derivation information.
-    HDKey(HDKey<'a>),
+    HDKey(HDKeyRef<'a>),
 }
 
 impl<'b, C> Decode<'b, C> for Key<'b> {
     fn decode(d: &mut Decoder<'b>, ctx: &mut C) -> Result<Self, Error> {
         d.tag().and_then(|t| match t {
             ECKey::TAG => ECKey::decode(d, ctx).map(Self::ECKey),
-            HDKey::TAG => HDKey::decode(d, ctx).map(Self::HDKey),
+            HDKeyRef::TAG => HDKeyRef::decode(d, ctx).map(Self::HDKey),
             _ => Err(Error::message("invalid tag")),
         })
     }
@@ -194,7 +194,7 @@ impl<'a, C> Encode<C> for Key<'a> {
                 k.encode(e, ctx)
             }
             Key::HDKey(k) => {
-                e.tag(HDKey::TAG)?;
+                e.tag(HDKeyRef::TAG)?;
                 k.encode(e, ctx)
             }
         }
