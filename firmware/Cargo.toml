@@ -3,7 +3,7 @@
 
 [package]
 name = "foundation-firmware"
-version = "0.1.1"
+version = "0.1.2"
 description = """Foundation Devices, Inc. Passport Firmware image parser.
 
 This provides a command-line tool to verify the signatures of a Passport
