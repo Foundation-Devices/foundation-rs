@@ -52,6 +52,14 @@ fn main() -> Result<()> {
             .map(parse_public_key)
             .transpose()?;
 
+        if let Some(public_key) = user_public_key {
+            println!(
+                "{:>17}: {}",
+                "User Public Key",
+                hex::encode(public_key.serialize_uncompressed())
+            );
+        }
+
         verify_signature(&header, &file_buf, user_public_key.as_ref())?;
     }
 
@@ -90,7 +98,7 @@ fn verify_signature(
 ) -> anyhow::Result<()> {
     let header_len = usize::try_from(HEADER_LEN).unwrap();
 
-    let file_hash = sha256::Hash::hash(&file_buf);
+    let download_hash = sha256::Hash::hash(&file_buf);
     let build_hash = sha256::Hash::hash(&file_buf[header_len..]);
 
     let mut engine = sha256d::Hash::engine();
@@ -114,7 +122,7 @@ fn verify_signature(
     }
 
     println!("Validation:");
-    println!("{:>17}: {}", "File Hash", file_hash);
+    println!("{:>17}: {}", "Download Hash", download_hash);
     println!("{:>17}: {}", "Build Hash", build_hash);
     println!(
         "{:>17}: {}",

@@ -422,7 +422,7 @@ pub fn verify_signature<C: Verification>(
             signature1.normalize_s();
 
             public_key
-                .verify(secp, &message, &header.signature.signature1)
+                .verify(secp, &message, &signature1)
                 .map_err(|error| VerifySignatureError::InvalidUserSignature {
                     public_key: *public_key,
                     error,
