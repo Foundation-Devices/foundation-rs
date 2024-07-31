@@ -18,7 +18,7 @@ members = [
 homepage = "https://github.com/Foundation-Devices/foundation-rs"
 
 [workspace.dependencies]
-anyhow = "1.0.83"
+anyhow = { version = "1.0.83", default-features = false }
 arbitrary = { version = "1", features = ["derive"] }
 bech32 = { version = "0.9", default-features = false }
 bip39 = { version = "2", default-features = false }
