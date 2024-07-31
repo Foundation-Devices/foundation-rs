@@ -18,7 +18,7 @@ required-features = ["binary"]
 
 [features]
 default = ["std", "binary"]
-std = ["hex?/std", "nom/std", "secp256k1/std"]
+std = ["anyhow/std", "hex?/std", "nom/std", "secp256k1/std"]
 binary = ["anyhow", "clap", "hex", "secp256k1/global-context", "std"]
 
 [dependencies]
