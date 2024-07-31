@@ -12,7 +12,7 @@ edition = "2021"
 
 [features]
 default = ["std"]
-std = ["hex/std"]
+std = ["hex/std", "serde/std"]
 bip32 = ["bs58", "hex/serde"]
 firmware = []
 nostr = ["hex/serde"]
