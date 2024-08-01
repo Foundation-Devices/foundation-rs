@@ -17,7 +17,7 @@ impl TestVectors {
 #[derive(Debug, serde::Deserialize)]
 pub struct TestVector {
     pub description: String,
-    #[serde(with = "hex", rename = "as-hex")]
+    #[serde(with = "faster_hex::nopfx_ignorecase", rename = "as-hex")]
     pub data: Vec<u8>,
 }
 

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use faster_hex::hex_string;
 use foundation_test_vectors::{HDKeyVector, URVector, UR};
 use foundation_urtypes::registry::{HDKeyRef, KeypathRef};
 
@@ -26,8 +27,8 @@ fn test_roundtrip_ref() {
         };
 
         let cbor = minicbor::to_vec(&hdkey).unwrap();
-        println!("our cbor: {}", hex::encode(&cbor));
-        println!("test vector cbor: {}", hex::encode(&vector.as_cbor));
+        println!("our cbor: {}", hex_string(&cbor));
+        println!("test vector cbor: {}", hex_string(&vector.as_cbor));
         assert_eq!(cbor, vector.as_cbor);
     }
 }

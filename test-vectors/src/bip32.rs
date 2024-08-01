@@ -18,7 +18,7 @@ impl TestVectors {
 #[serde(rename_all = "kebab-case")]
 pub struct TestVector {
     pub name: String,
-    #[serde(rename = "seed-hex", with = "hex")]
+    #[serde(rename = "seed-hex", with = "faster_hex::nopfx_ignorecase")]
     pub seed: Vec<u8>,
     pub chains: Vec<Chain>,
 }
