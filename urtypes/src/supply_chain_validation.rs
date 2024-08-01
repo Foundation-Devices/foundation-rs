@@ -29,6 +29,7 @@
 
 use core::str;
 
+use faster_hex::{hex_decode, hex_encode};
 use minicbor::data::{Tag, Type};
 use minicbor::decode::Error;
 use minicbor::encode::Write;
@@ -58,13 +59,13 @@ impl<'b, C> Decode<'b, C> for Challenge {
                 match d.u32()? {
                     1 => {
                         let mut buf = [0; 32];
-                        hex::decode_to_slice(d.str()?, &mut buf)
+                        hex_decode(d.str()?.as_bytes(), &mut buf)
                             .map_err(|_| Error::message("invalid hex string (id)"))?;
                         id = Some(buf);
                     }
                     2 => {
                         let mut buf = [0; 64];
-                        hex::decode_to_slice(d.str()?, &mut buf)
+                        hex_decode(d.str()?.as_bytes(), &mut buf)
                             .map_err(|_| Error::message("invalid hex string (signature)"))?;
                         signature = Some(buf);
                     }
@@ -101,10 +102,8 @@ impl<C> Encode<C> for Challenge {
         let mut signature = [0; 128];
 
         // unreachable errors.
-        hex::encode_to_slice(self.id, &mut id).unwrap();
-        hex::encode_to_slice(self.signature, &mut signature).unwrap();
-        let id = str::from_utf8(&id).unwrap();
-        let signature = str::from_utf8(&signature).unwrap();
+        let id = hex_encode(&self.id, &mut id).unwrap();
+        let signature = hex_encode(&self.signature, &mut signature).unwrap();
 
         e.map(2)?;
         e.u8(1)?.str(id)?;

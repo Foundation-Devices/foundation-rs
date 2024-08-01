@@ -4,6 +4,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use bitcoin_hashes::{sha256, sha256d, Hash, HashEngine};
 use clap::{command, value_parser, Arg, ArgAction};
+use faster_hex::hex_string;
 use foundation_firmware::{header, Header, Information, HEADER_LEN};
 use nom::Finish;
 use secp256k1::{global::SECP256K1, PublicKey};
@@ -56,7 +57,7 @@ fn main() -> Result<()> {
             println!(
                 "{:>17}: {}",
                 "User Public Key",
-                hex::encode(public_key.serialize_uncompressed())
+                hex_string(&public_key.serialize_uncompressed())
             );
         }
 
@@ -86,9 +87,9 @@ fn print_header(header: &Header) {
     println!("{:>17}: {}", "Version", header.information.version);
     println!("{:>17}: {} bytes", "Length", header.information.length);
     println!("{:>17}: {}", "Key", header.signature.public_key1);
-    println!("{:>17}: {}", "Signature", hex::encode(signature1));
+    println!("{:>17}: {}", "Signature", hex_string(&signature1));
     println!("{:>17}: {}", "Key", header.signature.public_key2);
-    println!("{:>17}: {}", "Signature", hex::encode(signature2));
+    println!("{:>17}: {}", "Signature", hex_string(&signature2));
 }
 
 fn verify_signature(
@@ -127,12 +128,12 @@ fn verify_signature(
     println!(
         "{:>17}: {}",
         "Validation Hash",
-        hex::encode(validation_hash.to_byte_array())
+        hex_string(validation_hash.as_byte_array())
     );
     println!(
         "{:>17}: {}",
         "Single Hash",
-        hex::encode(single_hash.to_byte_array())
+        hex_string(single_hash.as_byte_array())
     );
     println!();
 

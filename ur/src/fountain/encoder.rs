@@ -235,7 +235,7 @@ pub mod tests {
         );
         for &expected_fragment in EXPECTED_FRAGMENTS.iter() {
             let part = encoder.next_part();
-            assert_eq!(hex::encode(part.data), expected_fragment);
+            assert_eq!(faster_hex::hex_string(part.data), expected_fragment);
         }
     }
 
@@ -270,7 +270,11 @@ pub mod tests {
 
         for (i, data) in EXPECTED_DATA
             .iter()
-            .map(|v| hex::decode(v).unwrap())
+            .map(|v| {
+                let mut tmp = vec![0; v.len() / 2];
+                faster_hex::hex_decode(v.as_bytes(), &mut tmp).unwrap();
+                tmp
+            })
             .enumerate()
         {
             let sequence = u32::try_from(i).unwrap();
@@ -334,7 +338,10 @@ pub mod tests {
             u32::try_from(SEQUENCE_COUNT).unwrap()
         );
 
-        for expected_cbor in EXPECTED_PARTS_CBOR.iter().map(|v| hex::decode(v).unwrap()) {
+        for expected_cbor_hex in EXPECTED_PARTS_CBOR.iter() {
+            let mut expected_cbor = vec![0; expected_cbor_hex.len() / 2];
+            faster_hex::hex_decode(expected_cbor_hex.as_bytes(), &mut expected_cbor).unwrap();
+
             let mut cbor = alloc::vec::Vec::new();
             minicbor::encode(encoder.next_part(), &mut cbor).unwrap();
 

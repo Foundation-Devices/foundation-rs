@@ -98,7 +98,9 @@ pub mod tests {
         let vectors = NIP19Vector::new();
 
         for vector in vectors.iter().filter(|t| t.kind == NPUB) {
-            let encoded = encode_npub(&vector.bytes);
+            let mut public_key = [0; 32];
+            public_key.copy_from_slice(&vector.bytes);
+            let encoded = encode_npub(&public_key);
             assert_eq!(&encoded, &*vector.encoded);
         }
     }
@@ -108,7 +110,9 @@ pub mod tests {
         let vectors = NIP19Vector::new();
 
         for vector in vectors.iter().filter(|t| t.kind == NSEC) {
-            let encoded = encode_nsec(&vector.bytes);
+            let mut private_key = [0; 32];
+            private_key.copy_from_slice(&vector.bytes);
+            let encoded = encode_nsec(&private_key);
             assert_eq!(&encoded, &*vector.encoded);
         }
     }

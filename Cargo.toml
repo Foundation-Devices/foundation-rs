@@ -28,8 +28,8 @@ bs58 = "0.5"
 clap = { version = "4", features = ["cargo"] }
 crc = "3"
 criterion = { version = "0.4" }
+faster-hex = { version = "0.9", default-features = false }
 heapless = { version = "0.8", default-features = false }
-hex = { version = "0.4.2", default-features = false }
 itertools = { version = "0.10", default-features = false }
 libfuzzer-sys = "0.4"
 minicbor = { version = "0.24", features = ["derive"] }

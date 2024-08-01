@@ -33,4 +33,4 @@ phf = { workspace = true }
 rand_xoshiro = { workspace = true }
 
 [dev-dependencies]
-hex = { workspace = true, features = ["alloc"] }
+faster-hex = { workspace = true, features = ["alloc"] }

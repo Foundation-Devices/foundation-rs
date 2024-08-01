@@ -23,7 +23,7 @@ alloc = ["minicbor/alloc"]
 bitcoin = { workspace = true, optional = true }
 foundation-arena = { workspace = true }
 heapless = { workspace = true }
-hex = { workspace = true }
+faster-hex = { workspace = true }
 minicbor = { workspace = true }
 uuid = { workspace = true }
 

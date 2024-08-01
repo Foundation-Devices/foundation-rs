@@ -268,6 +268,8 @@ impl<'a, C> Encode<C> for PassportResponse<'a> {
 
 #[cfg(test)]
 mod tests {
+    use faster_hex::hex_decode;
+
     use super::*;
 
     #[test]
@@ -275,12 +277,15 @@ mod tests {
         let mut id = [0; 32];
         let mut signature = [0; 64];
 
-        hex::decode_to_slice(
-            "2e99758548972a8e8822ad47fa1017ff72f06f3ff6a016851f45c398732bc50c",
+        hex_decode(
+            "2e99758548972a8e8822ad47fa1017ff72f06f3ff6a016851f45c398732bc50c".as_bytes(),
             &mut id,
         )
         .unwrap();
-        hex::decode_to_slice("7d0a8468ed220400c0b8e6f335baa7e070ce880a37e2ac5995b9a97b809026de626da636ac7365249bb974c719edf543b52ed286646f437dc7f810cc2068375c", &mut signature).unwrap();
+        hex_decode(
+            "7d0a8468ed220400c0b8e6f335baa7e070ce880a37e2ac5995b9a97b809026de626da636ac7365249bb974c719edf543b52ed286646f437dc7f810cc2068375c".as_bytes(),
+            &mut signature,
+        ).unwrap();
 
         let request = PassportRequest {
             transaction_id: Default::default(),
@@ -300,12 +305,15 @@ mod tests {
         let mut id = [0; 32];
         let mut signature = [0; 64];
 
-        hex::decode_to_slice(
-            "2e99758548972a8e8822ad47fa1017ff72f06f3ff6a016851f45c398732bc50c",
+        hex_decode(
+            "2e99758548972a8e8822ad47fa1017ff72f06f3ff6a016851f45c398732bc50c".as_bytes(),
             &mut id,
         )
         .unwrap();
-        hex::decode_to_slice("7d0a8468ed220400c0b8e6f335baa7e070ce880a37e2ac5995b9a97b809026de626da636ac7365249bb974c719edf543b52ed286646f437dc7f810cc2068375c", &mut signature).unwrap();
+        hex_decode(
+            "7d0a8468ed220400c0b8e6f335baa7e070ce880a37e2ac5995b9a97b809026de626da636ac7365249bb974c719edf543b52ed286646f437dc7f810cc2068375c".as_bytes(),
+            &mut signature,
+        ).unwrap();
 
         let response = PassportResponse {
             transaction_id: Default::default(),
@@ -328,7 +336,8 @@ mod tests {
     #[test]
     fn test_request_decode() {
         const TEST_VECTOR: &str = "a201d8255083816f6064ff4046b93a85687f8f608202d902c6a30178403338633663303561633639613166623737626366333736333330383835326364336530383066653165343630346361613831623534383236653264613062643202788037393035306564663562386636343937663936626661633031333363396365663561303764613363343835613432373466646666396433616637346632393833636566386432303337663164626636613435356431356530666236346162313665333664643336353062363533323265333239303138313639633631356636610378603045022079050ec39f5bc28f64c297c3b96bc3bac380133cc29cc3af5a07c39a3c485a4274c3bdc3bfc29d3ac3b74f29c283022100c38ec3b8c392037f1dc2bf6a455d15c3a0c3bb64c2ab16c3a36dc393650b65322e32c2901816c29c615f6a";
-        let cbor = hex::decode(TEST_VECTOR).unwrap();
+        let mut cbor = vec![0; TEST_VECTOR.len() / 2];
+        hex_decode(TEST_VECTOR.as_bytes(), &mut cbor).unwrap();
         minicbor::decode::<'_, PassportRequest>(&cbor).unwrap();
     }
 }
