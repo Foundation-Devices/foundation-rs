@@ -8,6 +8,7 @@ members = [
     "codecs",
     "ffi",
     "firmware",
+    "stratum-v1",
     "test-vectors",
     "ur",
     "urtypes",
