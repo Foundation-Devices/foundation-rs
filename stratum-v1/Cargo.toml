@@ -7,14 +7,28 @@ version = "0.1.0"
 description = """Stratum v1 client.
 
 This provides a `#[no_std]` library to implement a Stratum v1 client."""
+categories = [
+    "embedded",
+    "no-std",
+]
 homepage.workspace = true
 edition = "2021"
 license = "GPL-3.0-or-later AND GPL-3.0-only"
 
 [dependencies]
-anyhow = { workspace = true }
-faster-hex = { version = "0.9", default-features = false, git = "https://github.com/Georges760/faster-hex.git", branch = "no-alloc" }
+derive_more = { workspace = true, features = ["from"] }
+embedded-io = { workspace = true }
+embedded-io-async = { workspace = true }
+faster-hex = { version = "0.9", default-features = false, git = "https://github.com/Georges760/faster-hex.git", branch = "no-alloc-error-partialeq" }
 heapless = { workspace = true, features = ["serde"] }
-json-rpc-types = { workspace = true, features = ["id-number-only"] }
 serde = { workspace = true }
 serde-json-core = { workspace = true, features = ["custom-error-messages"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+embedded-io-adapters = { version = "0.6", features = ["tokio-1"] }
+env_logger = "0.10.1"
+
+[[example]]
+name = "tokio-cli"
+path = "examples/tokio-cli.rs"
