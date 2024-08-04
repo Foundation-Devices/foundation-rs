@@ -3,8 +3,8 @@
 
 use anyhow::{Error, Result};
 use core::str::FromStr;
+use faster_hex::hex_string;
 use heapless::{String, Vec};
-use hex::ToHex;
 use json_rpc_types::{Id, Version};
 use serde::Serialize;
 
@@ -139,7 +139,7 @@ pub fn configure_request(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<us
             .push(String::from_str("version-rolling").unwrap())
             .unwrap();
         if let Some(mask) = &version_rolling.mask {
-            ext_params.version_rolling_mask = Some(mask.to_be_bytes().encode_hex());
+            ext_params.version_rolling_mask = Some(hex_string::<8>(&mask.to_be_bytes()));
         }
         ext_params.version_rolling_min_bit_count = Some(version_rolling.min_bit_count);
     }
@@ -335,32 +335,14 @@ pub fn submit_request(id: u64, share: Share, buf: &mut [u8]) -> Result<usize> {
     let mut vec = Vec::<String<32>, 6>::new();
     vec.push(share.user).map_err(Error::msg)?;
     vec.push(share.job_id).map_err(Error::msg)?;
-    vec.push(
-        share
-            .extranonce2
-            .to_be_bytes()
-            .as_ref()
-            .encode_hex::<String<32>>(),
-    )
-    .map_err(Error::msg)?;
-    vec.push(
-        share
-            .ntime
-            .to_be_bytes()
-            .as_ref()
-            .encode_hex::<String<32>>(),
-    )
-    .map_err(Error::msg)?;
-    vec.push(
-        share
-            .nonce
-            .to_be_bytes()
-            .as_ref()
-            .encode_hex::<String<32>>(),
-    )
-    .map_err(Error::msg)?;
+    vec.push(hex_string::<32>(&share.extranonce2.to_be_bytes()))
+        .map_err(Error::msg)?;
+    vec.push(hex_string::<32>(&share.ntime.to_be_bytes()))
+        .map_err(Error::msg)?;
+    vec.push(hex_string::<32>(&share.nonce.to_be_bytes()))
+        .map_err(Error::msg)?;
     if let Some(v) = share.version_bits {
-        vec.push(v.to_be_bytes().as_ref().encode_hex::<String<32>>())
+        vec.push(hex_string::<32>(&v.to_be_bytes()))
             .map_err(Error::msg)?;
     }
     let params = Some(vec);

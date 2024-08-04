@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Error, Result};
+use faster_hex::hex_decode;
 use heapless::{String, Vec};
 use serde::Deserialize;
 
@@ -51,26 +52,25 @@ pub fn parse_notification_method(resp: &[u8]) -> Result<String<32>> {
 /// ```
 /// use stratum_v1::client_not::parse_notification_set_version_mask;
 ///
-/// let resp = br#"{"params":["00003000"], "id":null, "method": "mining.set_version_mask"}"#;
+/// let resp = br#"{"params":["1fffe000"], "id":null, "method": "mining.set_version_mask"}"#;
 /// let r = parse_notification_set_version_mask(resp);
 /// println!("{:?}", r);
-/// assert_eq!(parse_notification_set_version_mask(resp).unwrap(), 0x00003000);
+/// assert_eq!(parse_notification_set_version_mask(resp).unwrap(), 0x1fff_e000);
 /// ```
 pub fn parse_notification_set_version_mask(resp: &[u8]) -> Result<u32> {
-    #[derive(Deserialize)]
-    struct SetVersionMaskNotificationParams(
-        // mask: The meaning is the same as the "version-rolling.mask" return parameter.
-        #[serde(deserialize_with = "hex::deserialize")] Vec<u8, 8>,
-    );
-    let v: Vec<u8, 4> = hex::decode_heapless(
+    let mut v: Vec<u8, 4> = Vec::new();
+    v.resize(4, 0).unwrap();
+    hex_decode(
         serde_json_core::from_slice::<json_rpc_types::Request<Vec<String<8>, 1>, String<64>>>(resp)
             .map_err(Error::msg)?
             .0
             .params
             .unwrap()
             .pop()
-            .unwrap(),
+            .unwrap()
+            .as_bytes(),
+        &mut v,
     )
     .expect("decode error");
-    Ok(u32::from_be_bytes(v[0..4].try_into().unwrap()))
+    Ok(u32::from_be_bytes(v.into_array::<4>().unwrap()))
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Error, Result};
+use faster_hex::hex_decode;
 use heapless::{String, Vec};
 use serde::Deserialize;
 
@@ -130,7 +131,7 @@ pub fn parse_response_configure(resp: &[u8]) -> Result<ConfigureResp> {
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct ConnectResp(
-    // Subscriptions details - 2-tuple with name of subscribed notification and subscription ID. Teoretically it may be used for unsubscribing, but obviously miners won't use it.
+    // Subscriptions details - 2-tuple with name of subscribed notification and subscription ID. Theoretically it may be used for unsubscribing, but obviously miners won't use it.
     Vec<Vec<String<32>, 2>, 2>,
     // Extranonce1 - Hex-encoded, per-connection unique string which will be used for coinbase serialization later. Keep it safe!
     String<8>,
@@ -144,8 +145,10 @@ impl ConnectResp {
     }
 
     pub fn extranonce1(&self) -> u32 {
-        let v: Vec<u8, 4> = hex::decode_heapless(&self.1).expect("decode error");
-        u32::from_be_bytes(v[0..4].try_into().unwrap())
+        let mut v: Vec<u8, 4> = Vec::new();
+        v.resize(4, 0).unwrap();
+        hex_decode(self.1.as_bytes(), &mut v).expect("decode error");
+        u32::from_be_bytes(v.into_array::<4>().unwrap())
     }
 
     pub fn extranonce2_size(&self) -> usize {
