@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{Error, Result};
+use core::str::FromStr;
 use heapless::{String, Vec};
 use hex::ToHex;
 use json_rpc_types::{Id, Version};
@@ -85,7 +86,7 @@ pub struct Extensions {
 /// assert_eq!(&buf[0..206], br#"{"jsonrpc":"2.0","method":"mining.configure","params":[["version-rolling","minimum-difficulty"],{"version-rolling.mask":"1fffe000","version-rolling.min-bit-count":2,"minimum-difficulty.value":2048}],"id":0}"#);
 /// ```
 pub fn configure_request(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usize> {
-    let method = String::from("mining.configure");
+    let method = String::from_str("mining.configure").unwrap();
 
     type ExtList = Vec<String<32>, 4>;
 
@@ -134,21 +135,27 @@ pub fn configure_request(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<us
         info_hw_id: None,
     };
     if let Some(version_rolling) = &exts.version_rolling {
-        ext_list.push(String::from("version-rolling")).unwrap();
+        ext_list
+            .push(String::from_str("version-rolling").unwrap())
+            .unwrap();
         if let Some(mask) = &version_rolling.mask {
             ext_params.version_rolling_mask = Some(mask.to_be_bytes().encode_hex());
         }
         ext_params.version_rolling_min_bit_count = Some(version_rolling.min_bit_count);
     }
     if let Some(minimum_difficulty) = &exts.minimum_difficulty {
-        ext_list.push(String::from("minimum-difficulty")).unwrap();
+        ext_list
+            .push(String::from_str("minimum-difficulty").unwrap())
+            .unwrap();
         ext_params.minimum_difficulty_value = Some(*minimum_difficulty);
     }
     if let Some(()) = &exts.subscribe_extranonce {
-        ext_list.push(String::from("subscribe-extranonce")).unwrap();
+        ext_list
+            .push(String::from_str("subscribe-extranonce").unwrap())
+            .unwrap();
     }
     if let Some(info) = &exts.info {
-        ext_list.push(String::from("info")).unwrap();
+        ext_list.push(String::from_str("info").unwrap()).unwrap();
         if let Some(connection_url) = &info.connection_url {
             ext_params.info_connection_url = Some(connection_url.clone());
         }
@@ -185,16 +192,17 @@ pub fn configure_request(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<us
 ///
 /// ## Example
 /// ```
-/// use stratum_v1::client_req::connect_request;
+/// use core::str::FromStr;
 /// use heapless::String;
+/// use stratum_v1::client_req::connect_request;
 ///
 /// let mut buf = [0u8; 1024];
-/// let len = connect_request(0, Some(String::<32>::from("test")), buf.as_mut_slice());
+/// let len = connect_request(0, Some(String::<32>::from_str("test").unwrap()), buf.as_mut_slice());
 /// assert!(len.is_ok());
 /// assert_eq!(len.unwrap(),70);
 /// assert_eq!(&buf[0..70], br#"{"jsonrpc":"2.0","method":"mining.subscribe","params":["test"],"id":0}"#);
 ///
-/// let len = connect_request(1, Some(String::<32>::from("")), buf.as_mut_slice());
+/// let len = connect_request(1, Some(String::<32>::from_str("").unwrap()), buf.as_mut_slice());
 /// assert!(len.is_ok());
 /// assert_eq!(len.unwrap(),66);
 /// assert_eq!(&buf[0..66], br#"{"jsonrpc":"2.0","method":"mining.subscribe","params":[""],"id":1}"#);
@@ -205,7 +213,7 @@ pub fn configure_request(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<us
 /// assert_eq!(&buf[0..64], br#"{"jsonrpc":"2.0","method":"mining.subscribe","params":[],"id":1}"#);
 /// ```
 pub fn connect_request(id: u64, identifier: Option<String<32>>, buf: &mut [u8]) -> Result<usize> {
-    let method = String::from("mining.subscribe");
+    let method = String::from_str("mining.subscribe").unwrap();
     let mut vec = Vec::<String<32>, 1>::new();
     if let Some(identifier) = identifier {
         vec.push(identifier).map_err(Error::msg)?;
@@ -236,16 +244,17 @@ pub fn connect_request(id: u64, identifier: Option<String<32>>, buf: &mut [u8]) 
 ///
 /// ## Example
 /// ```
-/// use stratum_v1::client_req::authorize_request;
+/// use core::str::FromStr;
 /// use heapless::String;
+/// use stratum_v1::client_req::authorize_request;
 ///
 /// let mut buf = [0u8; 1024];
-/// let len = authorize_request(1, String::<32>::from("slush.miner1"), String::<32>::from("password"), buf.as_mut_slice());
+/// let len = authorize_request(1, String::<32>::from_str("slush.miner1").unwrap(), String::<32>::from_str("password").unwrap(), buf.as_mut_slice());
 /// assert!(len.is_ok());
 /// assert_eq!(len.unwrap(),89);
 /// assert_eq!(&buf[0..89], br#"{"jsonrpc":"2.0","method":"mining.authorize","params":["slush.miner1","password"],"id":1}"#);
 ///
-/// let len = authorize_request(2, String::<32>::from(""), String::<32>::from(""), buf.as_mut_slice());
+/// let len = authorize_request(2, String::<32>::from_str("").unwrap(), String::<32>::from_str("").unwrap(), buf.as_mut_slice());
 /// assert!(len.is_ok());
 /// assert_eq!(len.unwrap(),69);
 /// assert_eq!(&buf[0..69], br#"{"jsonrpc":"2.0","method":"mining.authorize","params":["",""],"id":2}"#);
@@ -256,7 +265,7 @@ pub fn authorize_request(
     pass: String<32>,
     buf: &mut [u8],
 ) -> Result<usize> {
-    let method = String::from("mining.authorize");
+    let method = String::from_str("mining.authorize").unwrap();
     let mut vec = Vec::<String<32>, 2>::new();
     vec.push(user).map_err(Error::msg)?;
     vec.push(pass).map_err(Error::msg)?;
@@ -303,13 +312,14 @@ pub struct Share {
 ///
 /// ## Example
 /// ```
-/// use stratum_v1::client_req::{submit_request, Share};
+/// use core::str::FromStr;
 /// use heapless::String;
+/// use stratum_v1::client_req::{submit_request, Share};
 ///
 /// let mut buf = [0u8; 1024];
 /// let share = Share {
-///     user: String::<32>::from("slush.miner1"),
-///     job_id: String::<32>::from("bf"),
+///     user: String::<32>::from_str("slush.miner1").unwrap(),
+///     job_id: String::<32>::from_str("bf").unwrap(),
 ///     extranonce2: 1,
 ///     ntime: 1347323629,
 ///     nonce: 0xb2957c02,
@@ -321,7 +331,7 @@ pub struct Share {
 /// assert_eq!(&buf[0..113], br#"{"jsonrpc":"2.0","method":"mining.submit","params":["slush.miner1","bf","00000001","504e86ed","b2957c02"],"id":1}"#);
 /// ```
 pub fn submit_request(id: u64, share: Share, buf: &mut [u8]) -> Result<usize> {
-    let method = String::from("mining.submit");
+    let method = String::from_str("mining.submit").unwrap();
     let mut vec = Vec::<String<32>, 6>::new();
     vec.push(share.user).map_err(Error::msg)?;
     vec.push(share.job_id).map_err(Error::msg)?;

@@ -101,13 +101,14 @@ pub struct ConfigureResp {
 ///
 /// ## Examples
 /// ```
-/// use stratum_v1::client_resp::{ConfigureResp, parse_response_configure};
+/// use core::str::FromStr;
 /// use heapless::String;
+/// use stratum_v1::client_resp::{ConfigureResp, parse_response_configure};
 ///
 /// let resp = br#"{"error": null,"id": 1,"result": {"version-rolling": true,"version-rolling.mask": "18000000","minimum-difficulty": true}}"#;
 /// assert_eq!(parse_response_configure(resp).unwrap(), ConfigureResp {
 ///     version_rolling: Some(true),
-///     version_rolling_mask: Some(String::from("18000000")),
+///     version_rolling_mask: Some(String::from_str("18000000").unwrap()),
 ///     version_rolling_min_bit_count: None,
 ///     minimum_difficulty: Some(true),
 ///     minimum_difficulty_value: None,

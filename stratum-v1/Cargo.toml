@@ -12,9 +12,9 @@ edition = "2021"
 license = "GPL-3.0-or-later AND GPL-3.0-only"
 
 [dependencies]
-anyhow = { version = "1", default-features = false }
-heapless = { version = "0.7", features = ["serde"] }
+anyhow = { workspace = true }
+heapless = { workspace = true, features = ["serde"] }
 hex = { version = "0.4.3", default-features = false, features = ["serde", "heapless"], git = "https://github.com/Georges760/rust-hex.git", branch = "heapless" }
 json-rpc-types = { workspace = true, features = ["id-number-only"] }
-serde = { version = "1", default-features = false, features = ["derive"] }
+serde = { workspace = true }
 serde-json-core = { workspace = true, features = ["custom-error-messages"] }
