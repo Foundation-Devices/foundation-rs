@@ -7,6 +7,7 @@ use heapless::{String, Vec};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum ReqKind {
     Configure,
     Connect,
@@ -15,6 +16,7 @@ pub(crate) enum ReqKind {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct ReqIdKind(pub(crate) u64, pub(crate) ReqKind);
 
 ///Request representation.
@@ -29,6 +31,7 @@ pub(crate) struct ReqIdKind(pub(crate) u64, pub(crate) ReqKind);
 ///- `T` - specifies textual type. By default it uses static buffer of 32 bytes, which is more than enough in normal cases.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Request<P> {
     #[serde(skip_serializing_if = "Option::is_none")]
     ///An identifier established by the Client.
@@ -46,6 +49,7 @@ pub struct Request<P> {
 }
 
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct VersionRolling {
     /// Bits set to 1 can be changed by the miner.
     /// If a miner changes bits with mask value 0, the server will reject the submit.
@@ -55,6 +59,7 @@ pub struct VersionRolling {
 }
 
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Info {
     /// Exact URL used by the mining software to connect to the stratum server.
     pub connection_url: Option<String<32>>,
@@ -67,6 +72,7 @@ pub struct Info {
 }
 
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Extensions {
     /// This extension allows the miner to change the value of some bits in the version field
     /// in the block header. Currently there are no standard bits used for version rolling
@@ -89,6 +95,7 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
     type ExtList = Vec<String<32>, 4>;
 
     #[derive(Debug, Serialize)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     struct ExtParams {
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "version-rolling.mask")]
@@ -120,6 +127,7 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
     }
 
     #[derive(Debug, Serialize)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     struct ConfigureParams(ExtList, ExtParams);
 
     let mut ext_list = Vec::new();
@@ -214,6 +222,8 @@ pub(crate) fn authorize(
     serde_json_core::to_slice(&req, buf).map_err(|_| Error::JsonBufferFull)
 }
 
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Share {
     pub job_id: String<64>,
     pub extranonce2: Vec<u8, 8>,

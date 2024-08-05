@@ -18,11 +18,13 @@ license = "GPL-3.0-or-later AND GPL-3.0-only"
 [dependencies]
 bitcoin = { version = "0.32", default-features = false }
 bitcoin_hashes = { workspace = true }
+defmt = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["from"] }
 embedded-io = { workspace = true }
 embedded-io-async = { workspace = true }
 faster-hex = { version = "0.9", default-features = false, git = "https://github.com/Georges760/faster-hex.git", branch = "no-alloc-error-partialeq" }
 heapless = { workspace = true, features = ["serde"] }
+log = { workspace = true, optional = true }
 serde = { workspace = true }
 serde-json-core = { workspace = true, features = ["custom-error-messages"] }
 
@@ -30,6 +32,12 @@ serde-json-core = { workspace = true, features = ["custom-error-messages"] }
 tokio = { version = "1", features = ["full"] }
 embedded-io-adapters = { version = "0.6", features = ["tokio-1"] }
 env_logger = "0.10.1"
+log = { workspace = true }
+
+[features]
+default = []
+defmt = ["dep:defmt", "heapless/defmt-03"]
+log = ["dep:log"]
 
 [[example]]
 name = "tokio-cli"

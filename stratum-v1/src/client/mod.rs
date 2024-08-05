@@ -19,11 +19,15 @@ use heapless::{
     FnvIndexMap, HistoryBuffer, String, Vec,
 };
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Client<R: Read, W: Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize> {
     phantom_read: core::marker::PhantomData<R>,
     phantom_write: core::marker::PhantomData<W>,
 }
 
+// #[derive(Debug)]
+// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ClientRx<R: Read, const BUF_SIZE: usize> {
     network_reader: R,
     buf: [u8; BUF_SIZE],
@@ -42,6 +46,8 @@ pub struct ClientRx<R: Read, const BUF_SIZE: usize> {
     work_queue_prod: Producer<'static, Work, 2>,
 }
 
+// #[derive(Debug, PartialEq)]
+// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ClientTx<W: Write, const BUF_SIZE: usize> {
     network_writer: W,
     buf: [u8; BUF_SIZE],
@@ -63,7 +69,6 @@ impl<R: Read, W: Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize>
         network_reader: R,
         network_writer: W,
         vers_mask_queue_prod: Producer<'static, u32, 2>,
-
         work_queue_prod: Producer<'static, Work, 2>, // TODO: transform into local Job queue consumed by ClientTx
     ) -> (ClientRx<R, RX_BUF_SIZE>, ClientTx<W, TX_BUF_SIZE>) {
         let req_queue: &'static mut Queue<ReqIdKind, 32> = {
@@ -124,17 +129,18 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
 
     pub async fn run(&mut self) -> Result<()> {
         while let Some(req) = self.req_queue_cons.dequeue() {
-            // println!("dequeue: {:?}", req.clone());
+            debug!("ClientRx::run dequeue: {:?}", req.clone());
             self.reqs.insert(req.0, req.1).map_err(|_| Error::MapFull)?;
         }
         // TODO: maybe add some garbage collection here to remove old reqs never responded by Pool
         while let Some(i) = self.buf[..self.pos].iter().position(|&c| c == b'\n') {
             let line = &self.buf[..i];
-            // println!(
-            //     "pos: {}; i: {i}; line: {:?}",
-            //     self.pos,
-            //     std::str::from_utf8(line)
-            // );
+            debug!(
+                "pos: {}; i: {}; line: {:?}",
+                self.pos,
+                i,
+                core::str::from_utf8(line)
+            );
             if let Some(id) = response::parse_id(line)? {
                 // it's a Response
                 match self.reqs.get(&id) {
@@ -144,7 +150,7 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
                             .enqueue(ReqKind::Configure)
                             .map_err(|_| Error::QueueFull)?;
                         self.reqs.remove(&id);
-                        // println!("enqueue: {:?}, reqs: {:?}", ReqKind::Configure, self.reqs);
+                        debug!("enqueue: {:?}, reqs: {:?}", ReqKind::Configure, self.reqs);
                     }
                     Some(ReqKind::Connect) => {
                         let conn = response::parse_connect(line)?;
@@ -155,7 +161,7 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
                             .enqueue(ReqKind::Connect)
                             .map_err(|_| Error::QueueFull)?;
                         self.reqs.remove(&id);
-                        // println!("enqueue: {:?}, reqs: {:?}", ReqKind::Connect, self.reqs);
+                        debug!("enqueue: {:?}, reqs: {:?}", ReqKind::Connect, self.reqs);
                     }
                     Some(ReqKind::Authorize) => {
                         if response::parse_authorize(line)? {
@@ -163,7 +169,7 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
                                 .enqueue(ReqKind::Authorize)
                                 .map_err(|_| Error::QueueFull)?;
                             self.reqs.remove(&id);
-                            // println!("enqueue: {:?}, reqs: {:?}", ReqKind::Authorize, self.reqs);
+                            debug!("enqueue: {:?}, reqs: {:?}", ReqKind::Authorize, self.reqs);
                         }
                     }
                     Some(ReqKind::Submit) => {
@@ -177,7 +183,7 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
                             Err(e) => return Err(e),
                         }
                         self.reqs.remove(&id);
-                        // println!("rx sumbit response, reqs: {:?}", self.reqs);
+                        debug!("rx sumbit response, reqs: {:?}", self.reqs);
                     }
                     None => return Err(Error::IdNotFound(id)),
                 }
@@ -202,9 +208,9 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
                         // while !self.jobs.is_full() {
                         self.jobs.write(self.job_creator.roll(&work)?);
                         // }
-                        if work.clean_jobs {
-                            todo!("inform app to immediately change job")
-                        }
+                        // if work.clean_jobs {
+                        //     todo!("inform app to immediately change job")
+                        // }
                         self.work_queue_prod
                             .enqueue(work)
                             .map_err(|_| Error::QueueFull)?;
@@ -221,11 +227,12 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
             .read(self.buf[self.pos..].as_mut())
             .await
             .map_err(|_| Error::NetworkError)?;
-        // println!(
-        //     "read {n} bytes, pos {}: {:?}",
-        //     self.pos,
-        //     std::str::from_utf8(&self.buf[self.pos..self.pos + n])
-        // );
+        trace!(
+            "read {} bytes, pos {}: {:?}",
+            n,
+            self.pos,
+            core::str::from_utf8(&self.buf[self.pos..self.pos + n])
+        );
         self.pos += n;
         Ok(())
     }
@@ -234,26 +241,27 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
 impl<T: Write, const TX_BUF_SIZE: usize> ClientTx<T, TX_BUF_SIZE> {
     fn check_queues(&mut self) {
         if let Some(state) = self.state_queue_cons.dequeue() {
-            // println!("dequeue req: {:?}", state);
+            debug!("dequeue req: {:?}", state);
             match state {
                 ReqKind::Configure => self.configured = true,
                 ReqKind::Connect => self.connected = true,
                 ReqKind::Authorize => self.authorized = true,
-                _ => todo!("add some log here"),
+                _ => unreachable!("unknown state: {:?}", state),
             }
         }
         if let Some(diff) = self.diff_queue_cons.dequeue() {
-            // println!("dequeue diff: {:?}", diff);
+            debug!("dequeue diff: {:?}", diff);
             self.pool_target_difficulty = diff;
         }
     }
 
     fn prepare_req(&mut self, req_kind: ReqKind) -> Result<()> {
         self.req_id += 1;
+        let req_id_kind = ReqIdKind(self.req_id, req_kind);
         self.req_queue_prod
-            .enqueue(ReqIdKind(self.req_id, req_kind))
+            .enqueue(req_id_kind.clone())
             .map_err(|_| Error::QueueFull)?;
-        // println!("enqueue: {:?}", ReqIdKind(self.req_id, req_kind));
+        debug!("enqueue: {:?}", req_id_kind);
         Ok(())
     }
 

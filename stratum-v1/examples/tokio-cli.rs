@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             nonce: 0,
             version_bits: None,
         };
-        client_tx.send_submit(fake_share, 1000.0).await.unwrap();
+        client_tx.send_submit(fake_share, 1000000.0).await.unwrap();
     }
 }
 

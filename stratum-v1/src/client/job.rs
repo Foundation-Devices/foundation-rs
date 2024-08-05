@@ -8,14 +8,18 @@ use bitcoin::{
 };
 use heapless::{String, Vec};
 
+#[derive(Debug)]
+// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Job {
     pub job_id: u64,
     pub extranonce2: Vec<u8, 8>,
     pub version_bits: i32,
     pub header: Header,
 }
+//TODO: implement defmt::Format manually because Header does not implement it
 
 #[derive(Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct JobCreator {
     job_id: u64,
     last_job_id: String<32>,
@@ -116,7 +120,7 @@ impl JobCreator {
             header: Header {
                 version: Version::from_consensus(rolled_version),
                 prev_blockhash: BlockHash::from_byte_array(work.prev_hash),
-                merkle_root: TxMerkleNode::from_byte_array(self.merkle_root(&work)?),
+                merkle_root: TxMerkleNode::from_byte_array(self.merkle_root(work)?),
                 time: work.ntime,
                 bits: CompactTarget::from_consensus(work.nbits),
                 nonce: 0,

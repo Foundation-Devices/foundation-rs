@@ -7,6 +7,7 @@ use heapless::String;
 pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug, Clone, From, PartialEq)]
+// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Client is already configured against the Pool
     AlreadyConfigured,
@@ -78,7 +79,7 @@ pub enum Error {
 impl core::error::Error for Error {}
 
 impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{self:?}")
     }
 }
