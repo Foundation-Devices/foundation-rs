@@ -1,20 +1,22 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+mod job;
 mod notification;
 mod request;
 mod response;
 
 use crate::{Error, Result};
+use job::{Job, JobCreator};
 pub use notification::{Notification, Work};
 pub use request::{Extensions, Info, Share, VersionRolling};
 use request::{ReqIdKind, ReqKind};
-use response::ConnectResp;
+use response::Subscription;
 
 use embedded_io_async::{Read, Write};
 use heapless::{
     spsc::{Consumer, Producer, Queue},
-    FnvIndexMap, String,
+    FnvIndexMap, HistoryBuffer, String, Vec,
 };
 
 pub struct Client<R: Read, W: Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize> {
@@ -27,8 +29,10 @@ pub struct ClientRx<R: Read, const BUF_SIZE: usize> {
     buf: [u8; BUF_SIZE],
     pos: usize,
     reqs: FnvIndexMap<u64, ReqKind, 16>,
+    job_creator: JobCreator,
+    jobs: HistoryBuffer<Job, 16>,
     configuration: Option<Extensions>,
-    connection: Option<ConnectResp>,
+    subscriptions: Vec<Subscription, 2>,
     shares_accepted: u64,
     shares_rejected: u64,
     req_queue_cons: Consumer<'static, ReqIdKind, 32>,
@@ -45,9 +49,11 @@ pub struct ClientTx<W: Write, const BUF_SIZE: usize> {
     configured: bool,
     connected: bool,
     authorized: bool,
+    pool_target_difficulty: f64,
     user: String<64>,
     req_queue_prod: Producer<'static, ReqIdKind, 32>,
     state_queue_cons: Consumer<'static, ReqKind, 2>,
+    diff_queue_cons: Consumer<'static, f64, 2>,
 }
 
 impl<R: Read, W: Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize>
@@ -57,8 +63,8 @@ impl<R: Read, W: Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize>
         network_reader: R,
         network_writer: W,
         vers_mask_queue_prod: Producer<'static, u32, 2>,
-        diff_queue_prod: Producer<'static, f64, 2>,
-        work_queue_prod: Producer<'static, Work, 2>,
+
+        work_queue_prod: Producer<'static, Work, 2>, // TODO: transform into local Job queue consumed by ClientTx
     ) -> (ClientRx<R, RX_BUF_SIZE>, ClientTx<W, TX_BUF_SIZE>) {
         let req_queue: &'static mut Queue<ReqIdKind, 32> = {
             static mut Q: Queue<ReqIdKind, 32> = Queue::new();
@@ -70,14 +76,21 @@ impl<R: Read, W: Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize>
             unsafe { &mut Q }
         };
         let (state_queue_prod, state_queue_cons) = state_queue.split();
+        let diff_queue: &'static mut Queue<f64, 2> = {
+            static mut Q: Queue<f64, 2> = Queue::new();
+            unsafe { &mut Q }
+        };
+        let (diff_queue_prod, diff_queue_cons) = diff_queue.split();
         (
             ClientRx {
                 network_reader,
                 buf: [0; RX_BUF_SIZE],
                 pos: 0,
                 reqs: FnvIndexMap::new(),
+                job_creator: JobCreator::default(),
+                jobs: HistoryBuffer::new(),
                 configuration: None,
-                connection: None,
+                subscriptions: Vec::new(),
                 shares_accepted: 0,
                 shares_rejected: 0,
                 req_queue_cons,
@@ -93,15 +106,22 @@ impl<R: Read, W: Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize>
                 configured: false,
                 connected: false,
                 authorized: false,
+                pool_target_difficulty: 0.0,
                 user: String::new(),
                 req_queue_prod,
                 state_queue_cons,
+                diff_queue_cons,
             },
         )
     }
 }
 
 impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
+    pub fn software_rolling(&mut self, version: bool, extranonce2: bool) {
+        self.job_creator.version_rolling = version;
+        self.job_creator.extranonce2_rolling = extranonce2;
+    }
+
     pub async fn run(&mut self) -> Result<()> {
         while let Some(req) = self.req_queue_cons.dequeue() {
             // println!("dequeue: {:?}", req.clone());
@@ -127,7 +147,10 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
                         // println!("enqueue: {:?}, reqs: {:?}", ReqKind::Configure, self.reqs);
                     }
                     Some(ReqKind::Connect) => {
-                        self.connection = Some(response::parse_connect(line)?);
+                        let conn = response::parse_connect(line)?;
+                        self.subscriptions = conn.subscriptions;
+                        self.job_creator
+                            .set_extranonces(conn.extranonce1, conn.extranonce2_size)?;
                         self.state_queue_prod
                             .enqueue(ReqKind::Connect)
                             .map_err(|_| Error::QueueFull)?;
@@ -162,8 +185,10 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
                 // it's a Notification
                 match notification::parse_method(line)? {
                     Notification::SetVersionMask => {
+                        let mask = notification::parse_set_version_mask(line)?;
+                        self.job_creator.set_version_mask(mask);
                         self.vers_mask_queue_prod
-                            .enqueue(notification::parse_set_version_mask(line)?)
+                            .enqueue(mask)
                             .map_err(|_| Error::QueueFull)?;
                     }
                     Notification::SetDifficulty => {
@@ -172,8 +197,16 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
                             .map_err(|_| Error::QueueFull)?;
                     }
                     Notification::Notify => {
+                        let work = notification::parse_notify(line)?;
+                        self.jobs.clear();
+                        // while !self.jobs.is_full() {
+                        self.jobs.write(self.job_creator.roll(&work)?);
+                        // }
+                        if work.clean_jobs {
+                            todo!("inform app to immediately change job")
+                        }
                         self.work_queue_prod
-                            .enqueue(notification::parse_notify(line)?)
+                            .enqueue(work)
                             .map_err(|_| Error::QueueFull)?;
                     }
                 }
@@ -199,15 +232,19 @@ impl<R: Read, const RX_BUF_SIZE: usize> ClientRx<R, RX_BUF_SIZE> {
 }
 
 impl<T: Write, const TX_BUF_SIZE: usize> ClientTx<T, TX_BUF_SIZE> {
-    fn check_state(&mut self) {
+    fn check_queues(&mut self) {
         if let Some(state) = self.state_queue_cons.dequeue() {
-            // println!("dequeue: {:?}", state);
+            // println!("dequeue req: {:?}", state);
             match state {
                 ReqKind::Configure => self.configured = true,
                 ReqKind::Connect => self.connected = true,
                 ReqKind::Authorize => self.authorized = true,
                 _ => todo!("add some log here"),
             }
+        }
+        if let Some(diff) = self.diff_queue_cons.dequeue() {
+            // println!("dequeue diff: {:?}", diff);
+            self.pool_target_difficulty = diff;
         }
     }
 
@@ -235,7 +272,7 @@ impl<T: Write, const TX_BUF_SIZE: usize> ClientTx<T, TX_BUF_SIZE> {
     /// exts: a list of extensions to configure.
     ///
     pub async fn send_configure(&mut self, exts: Extensions) -> Result<()> {
-        self.check_state();
+        self.check_queues();
         if self.configured {
             return Err(Error::AlreadyConfigured);
         }
@@ -251,7 +288,7 @@ impl<T: Write, const TX_BUF_SIZE: usize> ClientTx<T, TX_BUF_SIZE> {
     /// identifier: a string to identify the client to the pool.
     ///
     pub async fn send_connect(&mut self, identifier: Option<String<32>>) -> Result<()> {
-        self.check_state();
+        self.check_queues();
         if !self.configured {
             return Err(Error::NotConfigured);
         }
@@ -273,7 +310,7 @@ impl<T: Write, const TX_BUF_SIZE: usize> ClientTx<T, TX_BUF_SIZE> {
     /// pass: a string with user password.
     ///
     pub async fn send_authorize(&mut self, user: String<64>, pass: String<64>) -> Result<()> {
-        self.check_state();
+        self.check_queues();
         if !self.connected {
             return Err(Error::NotConnected);
         }
@@ -300,10 +337,16 @@ impl<T: Write, const TX_BUF_SIZE: usize> ClientTx<T, TX_BUF_SIZE> {
     ///
     /// version_bits: an optional 32-bits unsigned integer with the share's version_bits.
     ///
-    pub async fn send_submit(&mut self, share: Share) -> Result<()> {
-        self.check_state();
+    pub async fn send_submit(&mut self, share: Share, diff: f64) -> Result<()> {
+        self.check_queues();
         if !self.authorized {
             return Err(Error::Unauthorized);
+        }
+        if diff < self.pool_target_difficulty {
+            return Err(Error::LowDifficulty {
+                share_diff: diff,
+                pool_diff: self.pool_target_difficulty,
+            });
         }
         self.prepare_req(ReqKind::Submit)?;
         let n = request::submit(

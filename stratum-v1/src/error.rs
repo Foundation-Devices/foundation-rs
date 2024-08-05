@@ -56,6 +56,11 @@ pub enum Error {
 
     IdNotFound(u64),
 
+    LowDifficulty {
+        share_diff: f64,
+        pool_diff: f64,
+    },
+
     /// correspond to serde_json_core::ser:Error::BufferFull
     JsonBufferFull,
     /// correspond to all serde_json_core::de:Error

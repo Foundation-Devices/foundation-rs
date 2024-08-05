@@ -276,9 +276,11 @@ pub(crate) fn parse_configure(resp: &[u8]) -> Result<Extensions> {
         .try_into()
 }
 
+pub type Subscription = Vec<String<32>, 2>;
+
 #[derive(Debug, PartialEq)]
 pub struct ConnectResp {
-    pub subscriptions: Vec<Vec<String<32>, 2>, 2>,
+    pub subscriptions: Vec<Subscription, 2>,
     pub extranonce1: Vec<u8, 8>,
     pub extranonce2_size: usize,
 }
@@ -429,7 +431,9 @@ mod tests {
         sub.push("e26e1928".try_into().unwrap()).unwrap();
         subs.push(sub).unwrap();
         let mut extranonce1 = Vec::new();
-        extranonce1.extend_from_slice(&[0xe2, 0x6e, 0x19, 0x28]).unwrap();
+        extranonce1
+            .extend_from_slice(&[0xe2, 0x6e, 0x19, 0x28])
+            .unwrap();
         assert_eq!(
             parse_connect(resp),
             Ok(ConnectResp {

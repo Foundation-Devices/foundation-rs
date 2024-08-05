@@ -43,19 +43,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let diff_queue: &'static mut Queue<f64, 2> = {
-        static mut Q: Queue<f64, 2> = Queue::new();
-        unsafe { &mut Q }
-    };
-    let (diff_queue_prod, mut diff_queue_cons) = diff_queue.split();
-    tokio::spawn(async move {
-        loop {
-            if let Some(diff) = diff_queue_cons.dequeue() {
-                println!("new difficulty from Pool: {}", diff);
-            }
-        }
-    });
-
     let work_queue: &'static mut Queue<Work, 2> = {
         static mut Q: Queue<Work, 2> = Queue::new();
         unsafe { &mut Q }
@@ -73,11 +60,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         conn_reader,
         conn_writer,
         vers_mask_queue_prod,
-        diff_queue_prod,
         work_queue_prod,
     );
 
     tokio::spawn(async move {
+        client_rx.software_rolling(true, false);
         loop {
             if let Err(e) = client_rx.run().await {
                 println!("client_rx error: {:?}", e);
@@ -121,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             nonce: 0,
             version_bits: None,
         };
-        client_tx.send_submit(fake_share).await.unwrap();
+        client_tx.send_submit(fake_share, 1000.0).await.unwrap();
     }
 }
 

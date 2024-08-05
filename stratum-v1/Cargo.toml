@@ -16,6 +16,8 @@ edition = "2021"
 license = "GPL-3.0-or-later AND GPL-3.0-only"
 
 [dependencies]
+bitcoin = { version = "0.32", default-features = false }
+bitcoin_hashes = { workspace = true }
 derive_more = { workspace = true, features = ["from"] }
 embedded-io = { workspace = true }
 embedded-io-async = { workspace = true }
