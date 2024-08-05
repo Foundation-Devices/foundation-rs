@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use heapless::{spsc::Queue, String};
+use heapless::{spsc::Queue, String, Vec};
 use stratum_v1::{Client, Extensions, Share, VersionRolling, Work};
 use tokio::{
     io::{ReadHalf, WriteHalf},
@@ -111,9 +111,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
     loop {
         tokio::time::sleep(Duration::from_millis(5000)).await;
+        let mut extranonce2 = Vec::new();
+        extranonce2.resize(4, 0).unwrap();
+        extranonce2[3] = 0x01;
         let fake_share = Share {
             job_id: String::<64>::from_str("01").unwrap(),
-            extranonce2: 0,
+            extranonce2,
             ntime: 1722789905,
             nonce: 0,
             version_bits: None,

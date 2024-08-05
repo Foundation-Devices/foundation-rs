@@ -292,7 +292,7 @@ impl<T: Write, const TX_BUF_SIZE: usize> ClientTx<T, TX_BUF_SIZE> {
     ///
     /// job_id: a string with the Job ID given in the Mining Job Notification.
     ///
-    /// extranonce2: a 32-bits unsigned integer with the share's Extranonce2.
+    /// extranonce2: a slice of 8-bits unsigned integer with the share's Extranonce2.
     ///
     /// ntime: a 32-bits unsigned integer with the share's nTime.
     ///

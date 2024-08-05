@@ -216,7 +216,7 @@ pub(crate) fn authorize(
 
 pub struct Share {
     pub job_id: String<64>,
-    pub extranonce2: u32,
+    pub extranonce2: Vec<u8, 8>,
     pub ntime: u32,
     pub nonce: u32,
     pub version_bits: Option<u32>,
@@ -227,7 +227,7 @@ pub(crate) fn submit(id: u64, user: String<64>, share: Share, buf: &mut [u8]) ->
     let mut vec = Vec::<String<64>, 6>::new();
     vec.push(user).map_err(|_| Error::VecFull)?;
     vec.push(share.job_id).map_err(|_| Error::VecFull)?;
-    vec.push(hex_string::<64>(&share.extranonce2.to_be_bytes()))
+    vec.push(hex_string::<64>(share.extranonce2.as_slice()))
         .map_err(|_| Error::VecFull)?;
     vec.push(hex_string::<64>(&share.ntime.to_be_bytes()))
         .map_err(|_| Error::VecFull)?;
@@ -343,9 +343,12 @@ mod tests {
     #[test]
     fn test_submit() {
         let mut buf = [0u8; 1024];
+        let mut extranonce2 = Vec::new();
+        extranonce2.resize(4, 0).unwrap();
+        extranonce2[3] = 0x01;
         let share = Share {
             job_id: "bf".try_into().unwrap(),
-            extranonce2: 1,
+            extranonce2,
             ntime: 1347323629,
             nonce: 0xb295_7c02,
             version_bits: None,
