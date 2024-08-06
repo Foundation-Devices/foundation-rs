@@ -3,14 +3,15 @@
 
 #![allow(static_mut_refs)]
 
+use stratum_v1::{Client, Extensions, Share, VersionRolling, Work};
+
+use heapless::{spsc::Queue, String, Vec};
+use inquire::Select;
 use std::{
     net::{Ipv4Addr, SocketAddr},
     str::FromStr,
     time::Duration,
 };
-
-use heapless::{spsc::Queue, String, Vec};
-use stratum_v1::{Client, Extensions, Share, VersionRolling, Work};
 use tokio::{
     io::{ReadHalf, WriteHalf},
     net::TcpStream,
@@ -20,9 +21,14 @@ use tokio::{
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let addr = SocketAddr::new(Ipv4Addr::new(68, 235, 52, 36).into(), 21496); // PP
+    let pool =
+        Select::new("Which Pool should be used?", vec!["Public-Pool", "Braiins"]).prompt()?;
 
-    // let addr = SocketAddr::new(Ipv4Addr::new(64, 225, 5, 77).into(), 3333); // braiins
+    let addr = match pool {
+        "Public-Pool" => SocketAddr::new(Ipv4Addr::new(68, 235, 52, 36).into(), 21496),
+        "Braiins" => SocketAddr::new(Ipv4Addr::new(64, 225, 5, 77).into(), 3333),
+        _ => unreachable!(),
+    };
 
     let stream = TcpStream::connect(addr).await?;
     let (stream_reader, stream_writer) = tokio::io::split(stream);
@@ -90,9 +96,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::time::sleep(Duration::from_millis(1000)).await;
     client_tx
         .send_authorize(
-            String::<64>::from_str("1HLQGxzAQWnLore3fWHc2W8UP1CgMv1GKQ.miner1").unwrap(),
-            // String::<32>::from_str("slush.miner1").unwrap(),
-            String::<64>::from_str("password").unwrap(),
+            match pool {
+                "Public-Pool" => {
+                    String::<64>::from_str("1HLQGxzAQWnLore3fWHc2W8UP1CgMv1GKQ.miner1").unwrap()
+                }
+                "Braiins" => String::<64>::from_str("slush.miner1").unwrap(),
+                _ => unreachable!(),
+            },
+            String::<64>::from_str("x").unwrap(),
         )
         .await
         .unwrap();

@@ -1,15 +1,15 @@
 #![macro_use]
 #![allow(unused_macros)]
 
-#[cfg(all(feature = "defmt", feature = "log"))]
+#[cfg(all(feature = "defmt-03", feature = "log"))]
 compile_error!("You may not enable both `defmt` and `log` features.");
 
 macro_rules! assert {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::assert!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::assert!($($x)*);
         }
     };
@@ -18,9 +18,9 @@ macro_rules! assert {
 macro_rules! assert_eq {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::assert_eq!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::assert_eq!($($x)*);
         }
     };
@@ -29,9 +29,9 @@ macro_rules! assert_eq {
 macro_rules! assert_ne {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::assert_ne!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::assert_ne!($($x)*);
         }
     };
@@ -40,9 +40,9 @@ macro_rules! assert_ne {
 macro_rules! debug_assert {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::debug_assert!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::debug_assert!($($x)*);
         }
     };
@@ -51,9 +51,9 @@ macro_rules! debug_assert {
 macro_rules! debug_assert_eq {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::debug_assert_eq!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::debug_assert_eq!($($x)*);
         }
     };
@@ -62,9 +62,9 @@ macro_rules! debug_assert_eq {
 macro_rules! debug_assert_ne {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::debug_assert_ne!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::debug_assert_ne!($($x)*);
         }
     };
@@ -73,9 +73,9 @@ macro_rules! debug_assert_ne {
 macro_rules! todo {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::todo!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::todo!($($x)*);
         }
     };
@@ -84,9 +84,9 @@ macro_rules! todo {
 macro_rules! unreachable {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::unreachable!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::unreachable!($($x)*);
         }
     };
@@ -95,9 +95,9 @@ macro_rules! unreachable {
 macro_rules! panic {
     ($($x:tt)*) => {
         {
-            #[cfg(not(feature = "defmt"))]
+            #[cfg(not(feature = "defmt-03"))]
             ::core::panic!($($x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::panic!($($x)*);
         }
     };
@@ -108,9 +108,9 @@ macro_rules! trace {
         {
             #[cfg(feature = "log")]
             ::log::trace!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::trace!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature="defmt-03")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -121,9 +121,9 @@ macro_rules! debug {
         {
             #[cfg(feature = "log")]
             ::log::debug!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::debug!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature="defmt-03")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -134,9 +134,9 @@ macro_rules! info {
         {
             #[cfg(feature = "log")]
             ::log::info!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::info!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature="defmt-03")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -147,9 +147,9 @@ macro_rules! warn {
         {
             #[cfg(feature = "log")]
             ::log::warn!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::warn!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature="defmt-03")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -160,22 +160,22 @@ macro_rules! error {
         {
             #[cfg(feature = "log")]
             ::log::error!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(feature = "defmt-03")]
             ::defmt::error!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature="defmt-03")))]
             let _ = ($( & $x ),*);
         }
     };
 }
 
-#[cfg(feature = "defmt")]
+#[cfg(feature = "defmt-03")]
 macro_rules! unwrap {
     ($($x:tt)*) => {
         ::defmt::unwrap!($($x)*)
     };
 }
 
-#[cfg(not(feature = "defmt"))]
+#[cfg(not(feature = "defmt-03"))]
 macro_rules! unwrap {
     ($arg:expr) => {
         match $crate::fmt::Try::into_result($arg) {
@@ -198,6 +198,7 @@ macro_rules! unwrap {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct NoneError;
 
+#[allow(dead_code)]
 pub trait Try {
     type Ok;
     type Error;

@@ -9,7 +9,7 @@ use bitcoin::{
 use heapless::{String, Vec};
 
 #[derive(Debug)]
-// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+// #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct Job {
     pub job_id: u64,
     pub extranonce2: Vec<u8, 8>,
@@ -19,7 +19,7 @@ pub struct Job {
 //TODO: implement defmt::Format manually because Header does not implement it
 
 #[derive(Debug, Default)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub(crate) struct JobCreator {
     job_id: u64,
     last_job_id: String<32>,

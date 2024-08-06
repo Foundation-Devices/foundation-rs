@@ -20,14 +20,14 @@ use heapless::{
 };
 
 #[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct Client<R: Read, W: Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize> {
     phantom_read: core::marker::PhantomData<R>,
     phantom_write: core::marker::PhantomData<W>,
 }
 
 // #[derive(Debug)]
-// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+// #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct ClientRx<R: Read, const BUF_SIZE: usize> {
     network_reader: R,
     buf: [u8; BUF_SIZE],
@@ -47,7 +47,7 @@ pub struct ClientRx<R: Read, const BUF_SIZE: usize> {
 }
 
 // #[derive(Debug, PartialEq)]
-// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+// #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct ClientTx<W: Write, const BUF_SIZE: usize> {
     network_writer: W,
     buf: [u8; BUF_SIZE],

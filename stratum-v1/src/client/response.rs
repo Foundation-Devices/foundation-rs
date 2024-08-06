@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer};
 
 pub(crate) fn parse_id(resp: &[u8]) -> Result<Option<u64>> {
     #[derive(Debug, Deserialize)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
     struct IdOnly {
         id: Option<u64>,
     }
@@ -33,7 +33,7 @@ pub(crate) fn parse_id(resp: &[u8]) -> Result<Option<u64>> {
 ///
 ///- `R`  - Type of payload for successful response
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct Response<R> {
     ///An identifier established by the Client.
     ///
@@ -52,7 +52,7 @@ impl<'de, R: Deserialize<'de>> Deserialize<'de> for Response<R> {
         use serde::de::{self, Visitor};
 
         #[derive(Debug, Deserialize)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
         struct RespErr(isize, String<32>, Option<String<32>>);
 
         impl From<RespErr> for Error {
@@ -183,7 +183,7 @@ impl<'de, R: Deserialize<'de>> Deserialize<'de> for Response<R> {
 
 pub(crate) fn parse_configure(resp: &[u8]) -> Result<Extensions> {
     #[derive(Debug, Deserialize)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
     pub struct ConfigureRespRaw {
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "version-rolling")]
@@ -283,7 +283,7 @@ pub(crate) fn parse_configure(resp: &[u8]) -> Result<Extensions> {
 pub type Subscription = Vec<String<32>, 2>;
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct ConnectResp {
     pub subscriptions: Vec<Subscription, 2>,
     pub extranonce1: Vec<u8, 8>,
@@ -292,7 +292,7 @@ pub struct ConnectResp {
 
 pub(crate) fn parse_connect(resp: &[u8]) -> Result<ConnectResp> {
     #[derive(Debug, Deserialize)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
     struct ConnectRespRaw(
         // Subscriptions details - 2-tuple with name of subscribed notification and subscription ID. Theoretically it may be used for unsubscribing, but obviously miners won't use it.
         Vec<Vec<String<32>, 2>, 2>,
