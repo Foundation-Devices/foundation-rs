@@ -22,14 +22,16 @@ faster-hex = { version = "0.9", default-features = false, git = "https://github.
 heapless = { workspace = true, features = ["serde"] }
 log = { workspace = true, optional = true }
 serde = { workspace = true }
-serde-json-core = { workspace = true, features = ["custom-error-messages"] }
+serde-json-core = { features = ["custom-error-messages"], git = "https://github.com/rust-embedded-community/serde-json-core.git", branch = "master" }
 
 [features]
 default = []
 defmt-03 = [
     "dep:defmt",
     "embedded-io-async/defmt-03",
-    "heapless/defmt-03"
+    "faster-hex/defmt-03",
+    "heapless/defmt-03",
+    "serde-json-core/defmt"
 ]
 
 [dev-dependencies]

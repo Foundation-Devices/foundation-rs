@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::{Error, Result, Work};
 
 use bitcoin::{
@@ -9,14 +12,31 @@ use bitcoin::{
 use heapless::{String, Vec};
 
 #[derive(Debug)]
-// #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct Job {
     pub job_id: u64,
     pub extranonce2: Vec<u8, 8>,
     pub version_bits: i32,
     pub header: Header,
 }
-//TODO: implement defmt::Format manually because Header does not implement it
+
+#[cfg(feature = "defmt-03")]
+impl defmt::Format for Job {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(
+            fmt,
+            "Job {{ job_id: {}, extranonce2: {:?}, version_bits: {}, header: {{ version: {:x}, prev_block_hash: {:x}, merkle_root: {:x}, time: {:x}, bits: {:x}, nonce: {:x} }} }}",
+            self.job_id,
+            self.extranonce2,
+            self.version_bits,
+            self.header.version.to_consensus(),
+            self.header.prev_blockhash.to_byte_array(),
+            self.header.merkle_root.to_byte_array(),
+            self.header.time,
+            self.header.bits.to_consensus(),
+            self.header.nonce
+        );
+    }
+}
 
 #[derive(Debug, Default)]
 #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
