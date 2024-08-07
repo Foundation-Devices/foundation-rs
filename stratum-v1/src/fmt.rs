@@ -227,3 +227,21 @@ impl<T, E> Try for Result<T, E> {
         self
     }
 }
+
+macro_rules! hstring {
+    ($l:expr, $s:expr) => {
+        heapless::String::<$l>::from_str($s).unwrap()
+    };
+}
+
+macro_rules! hvec {
+    ($t:ident, $l:expr, $s:expr) => {
+        heapless::Vec::<$t, $l>::from_slice($s).unwrap()
+    };
+}
+
+macro_rules! hveca {
+    ($t:ident, $la:expr, $l:expr, $s:expr) => {
+        heapless::Vec::<[$t; $la], $l>::from_slice($s).unwrap()
+    };
+}

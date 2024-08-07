@@ -10,13 +10,12 @@ use bitcoin::{
     hashes::{sha256d::Hash as DHash, Hash},
     CompactTarget,
 };
-use heapless::Vec;
+use heapless::{String, Vec};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Job {
-    pub job_id: u64,
+    pub job_id: String<32>,
     pub extranonce2: Vec<u8, 8>,
-    pub version_bits: i32,
     pub header: Header,
 }
 
@@ -25,7 +24,7 @@ impl defmt::Format for Job {
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
             fmt,
-            "Job {{ job_id: {}, extranonce2: {:?}, version_bits: {}, header: {{ version: {:x}, prev_block_hash: {:x}, merkle_root: {:x}, time: {:x}, bits: {:x}, nonce: {:x} }} }}",
+            "Job {{ job_id: {}, extranonce2: {:?}, header: {{ version: {:x}, prev_block_hash: {:x}, merkle_root: {:x}, ntime: {:x}, nbits: {:x}, nonce: {:x} }} }}",
             self.job_id,
             self.extranonce2,
             self.version_bits,
@@ -42,7 +41,6 @@ impl defmt::Format for Job {
 #[derive(Debug, Default)]
 #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub(crate) struct JobCreator {
-    job_id: u64,
     last_work: Option<Work>,
     version_mask: i32,
     pub(crate) version_rolling: bool,
@@ -79,6 +77,7 @@ impl JobCreator {
             .resize_default(self.extranonce2_size)
             .map_err(|_| Error::VecFull)?;
         self.extranonce2.fill(0);
+        self.ntime_bits = 0;
         Ok(())
     }
 
@@ -134,11 +133,9 @@ impl JobCreator {
         } else {
             work.ntime
         };
-        self.job_id += self.job_id.wrapping_add(1);
         Ok(Job {
-            job_id: self.job_id,
+            job_id: work.job_id.clone(),
             extranonce2: self.extranonce2.clone(),
-            version_bits: rolled_version,
             header: Header {
                 version: Version::from_consensus(rolled_version),
                 prev_blockhash: BlockHash::from_byte_array(work.prev_hash),
@@ -153,128 +150,257 @@ impl JobCreator {
 
 #[cfg(test)]
 mod tests {
+    use core::str::FromStr;
+
     use super::*;
+
+    #[test]
+    fn test_roll() {
+        let mut job_creator = JobCreator::default();
+        assert_eq!(job_creator.roll(), Err(Error::NoWork));
+        let job_id = hstring!(32, "1234");
+        job_creator
+            .set_work(Work {
+                job_id: job_id.clone(),
+                prev_hash: [0; 32],
+                coinb1: Vec::new(),
+                coinb2: Vec::new(),
+                merkle_branch: Vec::new(),
+                version: 0x2000_0000,
+                nbits: 0x1234_5678,
+                ntime: 0,
+                clean_jobs: false,
+            })
+            .unwrap();
+        job_creator.set_version_mask(0x1fff_e000);
+        job_creator.set_extranonces(Vec::new(), 1).unwrap();
+        assert_eq!(
+            job_creator.roll(),
+            Ok(Job {
+                job_id: job_id.clone(),
+                extranonce2: hvec!(u8, 8, &[0]),
+                header: Header {
+                    version: Version::from_consensus(0x2000_0000),
+                    prev_blockhash: BlockHash::from_byte_array([0; 32]),
+                    merkle_root: TxMerkleNode::from_byte_array([
+                        0x14, 0x06, 0xe0, 0x58, 0x81, 0xe2, 0x99, 0x36, 0x77, 0x66, 0xd3, 0x13,
+                        0xe2, 0x6c, 0x05, 0x56, 0x4e, 0xc9, 0x1b, 0xf7, 0x21, 0xd3, 0x17, 0x26,
+                        0xbd, 0x6e, 0x46, 0xe6, 0x06, 0x89, 0x53, 0x9a,
+                    ]),
+                    time: 0,
+                    bits: CompactTarget::from_consensus(0x1234_5678),
+                    nonce: 0,
+                }
+            })
+        );
+        job_creator.version_rolling = true;
+        assert_eq!(
+            job_creator.roll(),
+            Ok(Job {
+                job_id: job_id.clone(),
+                extranonce2: hvec!(u8, 8, &[0]),
+                header: Header {
+                    version: Version::from_consensus(0x2000_2000),
+                    prev_blockhash: BlockHash::from_byte_array([0; 32]),
+                    merkle_root: TxMerkleNode::from_byte_array([
+                        0x14, 0x06, 0xe0, 0x58, 0x81, 0xe2, 0x99, 0x36, 0x77, 0x66, 0xd3, 0x13,
+                        0xe2, 0x6c, 0x05, 0x56, 0x4e, 0xc9, 0x1b, 0xf7, 0x21, 0xd3, 0x17, 0x26,
+                        0xbd, 0x6e, 0x46, 0xe6, 0x06, 0x89, 0x53, 0x9a,
+                    ]),
+                    time: 0,
+                    bits: CompactTarget::from_consensus(0x1234_5678),
+                    nonce: 0,
+                }
+            })
+        );
+        job_creator.ntime_rolling = true;
+        assert_eq!(
+            job_creator.roll(),
+            Ok(Job {
+                job_id: job_id.clone(),
+                extranonce2: hvec!(u8, 8, &[0]),
+                header: Header {
+                    version: Version::from_consensus(0x2000_4000),
+                    prev_blockhash: BlockHash::from_byte_array([0; 32]),
+                    merkle_root: TxMerkleNode::from_byte_array([
+                        0x14, 0x06, 0xe0, 0x58, 0x81, 0xe2, 0x99, 0x36, 0x77, 0x66, 0xd3, 0x13,
+                        0xe2, 0x6c, 0x05, 0x56, 0x4e, 0xc9, 0x1b, 0xf7, 0x21, 0xd3, 0x17, 0x26,
+                        0xbd, 0x6e, 0x46, 0xe6, 0x06, 0x89, 0x53, 0x9a,
+                    ]),
+                    time: 1,
+                    bits: CompactTarget::from_consensus(0x1234_5678),
+                    nonce: 0,
+                }
+            })
+        );
+        job_creator.extranonce2_rolling = true;
+        assert_eq!(
+            job_creator.roll(),
+            Ok(Job {
+                job_id: job_id.clone(),
+                extranonce2: hvec!(u8, 8, &[1]),
+                header: Header {
+                    version: Version::from_consensus(0x2000_6000),
+                    prev_blockhash: BlockHash::from_byte_array([0; 32]),
+                    merkle_root: TxMerkleNode::from_byte_array([
+                        0x9c, 0x12, 0xcf, 0xdc, 0x04, 0xc7, 0x45, 0x84, 0xd7, 0x87, 0xac, 0x3d,
+                        0x23, 0x77, 0x21, 0x32, 0xc1, 0x85, 0x24, 0xbc, 0x7a, 0xb2, 0x8d, 0xec,
+                        0x42, 0x19, 0xb8, 0xfc, 0x5b, 0x42, 0x5f, 0x70,
+                    ]),
+                    time: 2,
+                    bits: CompactTarget::from_consensus(0x1234_5678),
+                    nonce: 0,
+                }
+            })
+        );
+        job_creator
+            .set_work(Work {
+                job_id: job_id.clone(),
+                prev_hash: [0; 32],
+                coinb1: Vec::new(),
+                coinb2: Vec::new(),
+                merkle_branch: Vec::new(),
+                version: 0x2000_0000,
+                nbits: 0x1234_5678,
+                ntime: 0,
+                clean_jobs: false,
+            })
+            .unwrap();
+        assert_eq!(
+            job_creator.roll(),
+            Ok(Job {
+                job_id: job_id.clone(),
+                extranonce2: hvec!(u8, 8, &[1]),
+                header: Header {
+                    version: Version::from_consensus(0x2000_2000),
+                    prev_blockhash: BlockHash::from_byte_array([0; 32]),
+                    merkle_root: TxMerkleNode::from_byte_array([
+                        0x9c, 0x12, 0xcf, 0xdc, 0x04, 0xc7, 0x45, 0x84, 0xd7, 0x87, 0xac, 0x3d,
+                        0x23, 0x77, 0x21, 0x32, 0xc1, 0x85, 0x24, 0xbc, 0x7a, 0xb2, 0x8d, 0xec,
+                        0x42, 0x19, 0xb8, 0xfc, 0x5b, 0x42, 0x5f, 0x70,
+                    ]),
+                    time: 1,
+                    bits: CompactTarget::from_consensus(0x1234_5678),
+                    nonce: 0,
+                }
+            })
+        );
+    }
 
     #[test]
     fn test_merkle_root() {
         // example from https://github.com/stratum-mining/stratum/pull/305/files
-        let mut coinb1 = Vec::new();
-        coinb1
-            .extend_from_slice(&[
-                1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 75, 3, 63, 146, 11, 250, 190, 109,
-                109, 86, 6, 110, 64, 228, 218, 247, 203, 127, 75, 141, 53, 51, 197, 180, 38, 117,
-                115, 221, 103, 2, 11, 85, 213, 65, 221, 74, 90, 97, 128, 91, 182, 1, 0, 0, 0, 0, 0,
-                0, 0, 49, 101, 7, 7, 139, 168, 76, 0, 1, 0, 0, 0, 0, 0, 0, 70, 84, 183, 110, 24,
-                47, 115, 108, 117, 115, 104, 47, 0, 0, 0, 0, 3,
-            ])
-            .unwrap();
-        let mut coinb2 = Vec::new();
-        coinb2
-            .extend_from_slice(&[
-                25, 118, 169, 20, 124, 21, 78, 209, 220, 89, 96, 158, 61, 38, 171, 178, 223, 46,
-                163, 213, 135, 205, 140, 65, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 44, 106, 76, 41, 82,
-                83, 75, 66, 76, 79, 67, 75, 58, 216, 82, 49, 182, 148, 133, 228, 178, 20, 248, 55,
-                219, 145, 83, 227, 86, 32, 97, 240, 182, 3, 175, 116, 196, 69, 114, 83, 46, 0, 71,
-                230, 205, 0, 0, 0, 0, 0, 0, 0, 0, 38, 106, 36, 170, 33, 169, 237, 179, 75, 32, 206,
-                223, 111, 113, 150, 112, 248, 21, 36, 163, 123, 107, 168, 153, 76, 233, 86, 77,
-                218, 162, 59, 48, 26, 180, 38, 62, 34, 3, 185, 0, 0, 0, 0,
-            ])
-            .unwrap();
-        let mut merkle_branch = Vec::new();
-        merkle_branch
-            .push([
-                122, 97, 64, 124, 164, 158, 164, 14, 87, 119, 226, 169, 34, 196, 251, 51, 31, 131,
-                109, 250, 13, 54, 94, 6, 177, 27, 156, 154, 101, 30, 123, 159,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                180, 113, 121, 253, 215, 85, 129, 38, 108, 2, 86, 66, 46, 12, 131, 139, 130, 87,
-                29, 92, 59, 164, 247, 114, 251, 140, 129, 88, 127, 196, 125, 116,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                171, 77, 225, 148, 80, 32, 41, 157, 246, 77, 161, 49, 87, 139, 214, 236, 149, 164,
-                192, 128, 195, 9, 5, 168, 131, 27, 250, 9, 60, 179, 206, 94,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                6, 187, 202, 75, 155, 220, 255, 166, 199, 35, 182, 220, 20, 96, 123, 41, 109, 40,
-                186, 142, 13, 139, 230, 164, 116, 177, 217, 23, 16, 123, 135, 202,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                109, 45, 171, 89, 223, 39, 132, 14, 150, 128, 241, 113, 136, 227, 105, 123, 224,
-                48, 66, 240, 189, 186, 222, 49, 173, 143, 80, 90, 110, 219, 192, 235,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                196, 7, 21, 180, 228, 161, 182, 132, 28, 153, 242, 12, 210, 127, 157, 86, 62, 123,
-                181, 33, 84, 3, 105, 129, 148, 162, 5, 152, 64, 7, 196, 156,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                22, 16, 18, 180, 109, 237, 68, 167, 197, 10, 195, 134, 11, 119, 219, 184, 49, 140,
-                239, 45, 27, 210, 212, 120, 186, 60, 155, 105, 106, 219, 218, 32,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                83, 228, 21, 241, 42, 240, 8, 254, 109, 156, 59, 171, 167, 46, 183, 60, 27, 63,
-                241, 211, 235, 179, 147, 99, 46, 3, 22, 166, 159, 169, 183, 159,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                230, 81, 3, 190, 66, 73, 200, 55, 94, 135, 209, 50, 92, 193, 114, 202, 141, 170,
-                124, 142, 206, 29, 88, 9, 22, 110, 203, 145, 238, 66, 166, 35,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                43, 106, 86, 239, 237, 74, 208, 202, 247, 133, 88, 42, 15, 77, 163, 186, 85, 26,
-                89, 151, 5, 19, 30, 122, 108, 220, 215, 104, 152, 226, 113, 55,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                148, 76, 200, 221, 206, 54, 56, 45, 252, 60, 123, 202, 195, 73, 144, 65, 168, 184,
-                59, 130, 145, 229, 250, 44, 213, 70, 175, 128, 34, 31, 102, 80,
-            ])
-            .unwrap();
-        merkle_branch
-            .push([
-                203, 112, 102, 31, 49, 147, 24, 25, 245, 61, 179, 146, 205, 127, 126, 100, 78, 204,
-                228, 146, 209, 154, 89, 194, 209, 81, 57, 167, 88, 251, 44, 76,
-            ])
-            .unwrap();
-        let work = Work {
-            job_id: "662ede".try_into().unwrap(),
-            prev_hash: [
-                0xa8, 0x0f, 0x3e, 0x7f, 0xb2, 0xfa, 0xe8, 0x23, 0x68, 0x12, 0xba, 0xa7, 0x66, 0xc2,
-                0xc6, 0x14, 0x1b, 0x91, 0x18, 0x53, 0x00, 0x01, 0xc1, 0xce, 0x00, 0x00, 0x00, 0x00,
-                0x00, 0x00, 0x00, 0x00,
-            ],
-            coinb1,
-            coinb2,
-            merkle_branch,
-            version: 0x2000_0000,
-            nbits: 0x1703_1abe,
-            ntime: 0x66aa_d286,
-            clean_jobs: false,
-        };
         let mut job_creator = JobCreator::default();
-        let mut extranonce1 = Vec::new();
-        extranonce1.extend_from_slice(&[120, 55, 179, 37]).unwrap();
-        job_creator.set_extranonces(extranonce1, 4).unwrap();
+        job_creator
+            .set_extranonces(hvec!(u8, 8, &[120, 55, 179, 37]), 4)
+            .unwrap();
         assert_eq!(
-            job_creator.merkle_root(&work),
+            job_creator.merkle_root(&Work {
+                job_id: hstring!(32, "662ede"),
+                prev_hash: [
+                    0xa8, 0x0f, 0x3e, 0x7f, 0xb2, 0xfa, 0xe8, 0x23, 0x68, 0x12, 0xba, 0xa7, 0x66,
+                    0xc2, 0xc6, 0x14, 0x1b, 0x91, 0x18, 0x53, 0x00, 0x01, 0xc1, 0xce, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ],
+                coinb1: hvec!(
+                    u8,
+                    128,
+                    &[
+                        1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 75, 3, 63, 146, 11,
+                        250, 190, 109, 109, 86, 6, 110, 64, 228, 218, 247, 203, 127, 75, 141, 53,
+                        51, 197, 180, 38, 117, 115, 221, 103, 2, 11, 85, 213, 65, 221, 74, 90, 97,
+                        128, 91, 182, 1, 0, 0, 0, 0, 0, 0, 0, 49, 101, 7, 7, 139, 168, 76, 0, 1, 0,
+                        0, 0, 0, 0, 0, 70, 84, 183, 110, 24, 47, 115, 108, 117, 115, 104, 47, 0, 0,
+                        0, 0, 3,
+                    ]
+                ),
+                coinb2: hvec!(
+                    u8,
+                    130,
+                    &[
+                        25, 118, 169, 20, 124, 21, 78, 209, 220, 89, 96, 158, 61, 38, 171, 178,
+                        223, 46, 163, 213, 135, 205, 140, 65, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 44,
+                        106, 76, 41, 82, 83, 75, 66, 76, 79, 67, 75, 58, 216, 82, 49, 182, 148,
+                        133, 228, 178, 20, 248, 55, 219, 145, 83, 227, 86, 32, 97, 240, 182, 3,
+                        175, 116, 196, 69, 114, 83, 46, 0, 71, 230, 205, 0, 0, 0, 0, 0, 0, 0, 0,
+                        38, 106, 36, 170, 33, 169, 237, 179, 75, 32, 206, 223, 111, 113, 150, 112,
+                        248, 21, 36, 163, 123, 107, 168, 153, 76, 233, 86, 77, 218, 162, 59, 48,
+                        26, 180, 38, 62, 34, 3, 185, 0, 0, 0, 0,
+                    ]
+                ),
+                merkle_branch: hveca!(
+                    u8,
+                    32,
+                    16,
+                    &[
+                        [
+                            122, 97, 64, 124, 164, 158, 164, 14, 87, 119, 226, 169, 34, 196, 251,
+                            51, 31, 131, 109, 250, 13, 54, 94, 6, 177, 27, 156, 154, 101, 30, 123,
+                            159,
+                        ],
+                        [
+                            180, 113, 121, 253, 215, 85, 129, 38, 108, 2, 86, 66, 46, 12, 131, 139,
+                            130, 87, 29, 92, 59, 164, 247, 114, 251, 140, 129, 88, 127, 196, 125,
+                            116,
+                        ],
+                        [
+                            171, 77, 225, 148, 80, 32, 41, 157, 246, 77, 161, 49, 87, 139, 214,
+                            236, 149, 164, 192, 128, 195, 9, 5, 168, 131, 27, 250, 9, 60, 179, 206,
+                            94,
+                        ],
+                        [
+                            6, 187, 202, 75, 155, 220, 255, 166, 199, 35, 182, 220, 20, 96, 123,
+                            41, 109, 40, 186, 142, 13, 139, 230, 164, 116, 177, 217, 23, 16, 123,
+                            135, 202,
+                        ],
+                        [
+                            109, 45, 171, 89, 223, 39, 132, 14, 150, 128, 241, 113, 136, 227, 105,
+                            123, 224, 48, 66, 240, 189, 186, 222, 49, 173, 143, 80, 90, 110, 219,
+                            192, 235,
+                        ],
+                        [
+                            196, 7, 21, 180, 228, 161, 182, 132, 28, 153, 242, 12, 210, 127, 157,
+                            86, 62, 123, 181, 33, 84, 3, 105, 129, 148, 162, 5, 152, 64, 7, 196,
+                            156,
+                        ],
+                        [
+                            22, 16, 18, 180, 109, 237, 68, 167, 197, 10, 195, 134, 11, 119, 219,
+                            184, 49, 140, 239, 45, 27, 210, 212, 120, 186, 60, 155, 105, 106, 219,
+                            218, 32,
+                        ],
+                        [
+                            83, 228, 21, 241, 42, 240, 8, 254, 109, 156, 59, 171, 167, 46, 183, 60,
+                            27, 63, 241, 211, 235, 179, 147, 99, 46, 3, 22, 166, 159, 169, 183,
+                            159,
+                        ],
+                        [
+                            230, 81, 3, 190, 66, 73, 200, 55, 94, 135, 209, 50, 92, 193, 114, 202,
+                            141, 170, 124, 142, 206, 29, 88, 9, 22, 110, 203, 145, 238, 66, 166,
+                            35,
+                        ],
+                        [
+                            43, 106, 86, 239, 237, 74, 208, 202, 247, 133, 88, 42, 15, 77, 163,
+                            186, 85, 26, 89, 151, 5, 19, 30, 122, 108, 220, 215, 104, 152, 226,
+                            113, 55,
+                        ],
+                        [
+                            148, 76, 200, 221, 206, 54, 56, 45, 252, 60, 123, 202, 195, 73, 144,
+                            65, 168, 184, 59, 130, 145, 229, 250, 44, 213, 70, 175, 128, 34, 31,
+                            102, 80,
+                        ],
+                        [
+                            203, 112, 102, 31, 49, 147, 24, 25, 245, 61, 179, 146, 205, 127, 126,
+                            100, 78, 204, 228, 146, 209, 154, 89, 194, 209, 81, 57, 167, 88, 251,
+                            44, 76,
+                        ]
+                    ]
+                ),
+                version: 0x2000_0000,
+                nbits: 0x1703_1abe,
+                ntime: 0x66aa_d286,
+                clean_jobs: false,
+            }),
             Ok([
                 73, 100, 41, 247, 106, 44, 1, 242, 3, 64, 100, 1, 98, 155, 40, 91, 170, 255, 170,
                 29, 193, 255, 244, 71, 236, 29, 134, 218, 94, 45, 78, 77,

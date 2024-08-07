@@ -349,12 +349,9 @@ mod tests {
     #[test]
     fn test_submit() {
         let mut buf = [0u8; 1024];
-        let mut extranonce2 = Vec::new();
-        extranonce2.resize(4, 0).unwrap();
-        extranonce2[3] = 0x01;
         let share = Share {
             job_id: "bf".try_into().unwrap(),
-            extranonce2,
+            extranonce2: hvec!(u8, 8, &[0, 0, 0, 1]),
             ntime: 1347323629,
             nonce: 0xb295_7c02,
             version_bits: None,

@@ -339,6 +339,7 @@ pub(crate) fn parse_submit(resp: &[u8]) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
+    use core::str::FromStr;
     use heapless::Vec;
 
     use super::*;
@@ -384,14 +385,13 @@ mod tests {
         let resp = br#"{"id": 1, "result": [ [ ["mining.set_difficulty", "b4b6693b72a50c7116db18d6497cac52"], ["mining.notify", "ae6812eb4cd7735a302a8a9dd95cf71f"]], "08000002", 4], "error": null}"#;
         let mut subs = Vec::new();
         let mut sub = Vec::new();
-        sub.push("mining.set_difficulty".try_into().unwrap())
-            .unwrap();
-        sub.push("b4b6693b72a50c7116db18d6497cac52".try_into().unwrap())
+        sub.push(hstring!(32, "mining.set_difficulty")).unwrap();
+        sub.push(hstring!(32, "b4b6693b72a50c7116db18d6497cac52"))
             .unwrap();
         subs.push(sub).unwrap();
         let mut sub = Vec::new();
-        sub.push("mining.notify".try_into().unwrap()).unwrap();
-        sub.push("ae6812eb4cd7735a302a8a9dd95cf71f".try_into().unwrap())
+        sub.push(hstring!(32, "mining.notify")).unwrap();
+        sub.push(hstring!(32, "ae6812eb4cd7735a302a8a9dd95cf71f"))
             .unwrap();
         subs.push(sub).unwrap();
         let mut extranonce1 = Vec::new();
@@ -410,21 +410,18 @@ mod tests {
         let resp = br#"{"id":2,"result":[[["mining.set_difficulty","1"],["mining.notify","1"]],"00",6],"error":null}"#;
         let mut subs = Vec::new();
         let mut sub = Vec::new();
-        sub.push("mining.set_difficulty".try_into().unwrap())
-            .unwrap();
-        sub.push("1".try_into().unwrap()).unwrap();
+        sub.push(hstring!(32, "mining.set_difficulty")).unwrap();
+        sub.push(hstring!(32, "1")).unwrap();
         subs.push(sub).unwrap();
         let mut sub = Vec::new();
-        sub.push("mining.notify".try_into().unwrap()).unwrap();
-        sub.push("1".try_into().unwrap()).unwrap();
+        sub.push(hstring!(32, "mining.notify")).unwrap();
+        sub.push(hstring!(32, "1")).unwrap();
         subs.push(sub).unwrap();
-        let mut extranonce1 = Vec::new();
-        extranonce1.extend_from_slice(&[0x00]).unwrap();
         assert_eq!(
             parse_connect(resp),
             Ok(ConnectResp {
                 subscriptions: subs,
-                extranonce1,
+                extranonce1: hvec!(u8, 8, &[0x00]),
                 extranonce2_size: 6,
             })
         );
@@ -433,18 +430,14 @@ mod tests {
             br#"{"id":2,"error":null,"result":[[["mining.notify","e26e1928"]],"e26e1928",4]}"#;
         let mut subs = Vec::new();
         let mut sub = Vec::new();
-        sub.push("mining.notify".try_into().unwrap()).unwrap();
-        sub.push("e26e1928".try_into().unwrap()).unwrap();
+        sub.push(hstring!(32, "mining.notify")).unwrap();
+        sub.push(hstring!(32, "e26e1928")).unwrap();
         subs.push(sub).unwrap();
-        let mut extranonce1 = Vec::new();
-        extranonce1
-            .extend_from_slice(&[0xe2, 0x6e, 0x19, 0x28])
-            .unwrap();
         assert_eq!(
             parse_connect(resp),
             Ok(ConnectResp {
                 subscriptions: subs,
-                extranonce1,
+                extranonce1: hvec!(u8, 8, &[0xe2, 0x6e, 0x19, 0x28]),
                 extranonce2_size: 4,
             })
         );
@@ -454,7 +447,7 @@ mod tests {
             parse_connect(resp),
             Err(Error::Pool {
                 code: 20,
-                message: "Other/Unknown".try_into().unwrap(),
+                message: hstring!(32, "Other/Unknown"),
                 detail: None
             })
         );
@@ -473,7 +466,7 @@ mod tests {
             parse_authorize(resp),
             Err(Error::Pool {
                 code: 25,
-                message: "Not subscribed".try_into().unwrap(),
+                message: hstring!(32, "Not subscribed"),
                 detail: None
             })
         );
@@ -485,8 +478,8 @@ mod tests {
             parse_authorize(resp),
             Err(Error::Pool {
                 code: 20,
-                message: "Authorization validation error".try_into().unwrap(),
-                detail: Some(", slush".try_into().unwrap()),
+                message: hstring!(32, "Authorization validation error"),
+                detail: Some(hstring!(32, ", slush")),
             })
         );
 
@@ -506,8 +499,8 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 23,
-                message: "Difficulty too low".try_into().unwrap(),
-                detail: Some("".try_into().unwrap())
+                message: hstring!(32, "Difficulty too low"),
+                detail: Some(hstring!(32, ""))
             })
         );
         let resp = br#"{"id":84,"result":null,"error":[21,"Job not found",""]}"#;
@@ -515,8 +508,8 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 21,
-                message: "Job not found".try_into().unwrap(),
-                detail: Some("".try_into().unwrap())
+                message: hstring!(32, "Job not found"),
+                detail: Some(hstring!(32, ""))
             })
         );
         // Philon Proxy
@@ -525,7 +518,7 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 23,
-                message: "Low difficulty share".try_into().unwrap(),
+                message: hstring!(32, "Low difficulty share"),
                 detail: None
             })
         );
@@ -534,7 +527,7 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: -32601,
-                message: "Method not found".try_into().unwrap(),
+                message: hstring!(32, "Method not found"),
                 detail: None
             })
         );
@@ -544,7 +537,7 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 30,
-                message: "SInvalidJobId".try_into().unwrap(),
+                message: hstring!(32, "SInvalidJobId"),
                 detail: None
             })
         );
@@ -553,7 +546,7 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 33,
-                message: "SInvalidVersion".try_into().unwrap(),
+                message: hstring!(32, "SInvalidVersion"),
                 detail: None
             })
         );
@@ -562,7 +555,7 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 34,
-                message: "SInvalidTime".try_into().unwrap(),
+                message: hstring!(32, "SInvalidTime"),
                 detail: None
             })
         );
@@ -571,7 +564,7 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 35,
-                message: "SInvalidExnSize".try_into().unwrap(),
+                message: hstring!(32, "SInvalidExnSize"),
                 detail: None
             })
         );
@@ -580,7 +573,7 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 38,
-                message: "STooLowDiff".try_into().unwrap(),
+                message: hstring!(32, "STooLowDiff"),
                 detail: None
             })
         );
@@ -589,7 +582,7 @@ mod tests {
             parse_submit(resp),
             Err(Error::Pool {
                 code: 39,
-                message: "SStaleJobNoSub".try_into().unwrap(),
+                message: hstring!(32, "SStaleJobNoSub"),
                 detail: None
             })
         );
