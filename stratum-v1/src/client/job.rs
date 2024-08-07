@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{Error, Result, Work};
+use super::notification::Work;
+use crate::{Error, Result};
 
 use bitcoin::{
     block::{Header, Version},
@@ -9,7 +10,7 @@ use bitcoin::{
     hashes::{sha256d::Hash as DHash, Hash},
     CompactTarget,
 };
-use heapless::{String, Vec};
+use heapless::Vec;
 
 #[derive(Debug)]
 pub struct Job {
@@ -42,7 +43,7 @@ impl defmt::Format for Job {
 #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub(crate) struct JobCreator {
     job_id: u64,
-    last_job_id: String<32>,
+    last_work: Option<Work>,
     version_mask: i32,
     pub(crate) version_rolling: bool,
     version_bits: u16,
@@ -50,24 +51,16 @@ pub(crate) struct JobCreator {
     extranonce2_size: usize,
     pub(crate) extranonce2_rolling: bool,
     extranonce2: Vec<u8, 8>,
+    pub(crate) ntime_rolling: bool,
+    ntime_bits: u32,
 }
 
 impl JobCreator {
-    // pub fn new() -> Self {
-    //     Self {
-    //         version_mask: 0,
-    //         version_bits: 0,
-    //         extranonce1: Vec::new(),
-    //         extranonce2: Vec::new(),
-    //         extranonce2_size: 0,
-    //     }
-    // }
-
-    pub fn set_version_mask(&mut self, mask: u32) {
+    pub(crate) fn set_version_mask(&mut self, mask: u32) {
         self.version_mask = mask as i32;
     }
 
-    pub fn set_extranonces(
+    pub(crate) fn set_extranonces(
         &mut self,
         extranonce1: Vec<u8, 8>,
         extranonce2_size: usize,
@@ -77,6 +70,16 @@ impl JobCreator {
         self.extranonce2
             .resize_default(extranonce2_size)
             .map_err(|_| Error::VecFull)
+    }
+
+    pub(crate) fn set_work(&mut self, work: Work) -> Result<()> {
+        self.last_work = Some(work);
+        self.version_bits = 0;
+        self.extranonce2
+            .resize_default(self.extranonce2_size)
+            .map_err(|_| Error::VecFull)?;
+        self.extranonce2.fill(0);
+        Ok(())
     }
 
     fn merkle_root(&self, work: &Work) -> Result<[u8; 32]> {
@@ -104,20 +107,13 @@ impl JobCreator {
         Ok(merkle_root)
     }
 
-    pub fn roll(&mut self, work: &Work) -> Result<Job> {
-        if self.last_job_id != work.job_id {
-            self.version_bits = 0;
-            self.extranonce2
-                .resize_default(self.extranonce2_size)
-                .map_err(|_| Error::VecFull)?;
-            self.extranonce2.fill(0);
-            self.last_job_id = work.job_id.clone();
-        }
+    pub(crate) fn roll(&mut self) -> Result<Job> {
+        let work = self.last_work.as_ref().ok_or(Error::NoWork)?;
         let rolled_version = if self.version_rolling {
             self.version_bits = self.version_bits.wrapping_add(1);
             (work.version & !self.version_mask)
                 | (((self.version_bits as i32) << self.version_mask.trailing_zeros())
-                    & self.version_mask)
+                    & self.version_mask) // TODO: test this
         } else {
             work.version
         };
@@ -132,6 +128,12 @@ impl JobCreator {
                 }
             }
         }
+        let rolled_ntime = if self.ntime_rolling {
+            self.ntime_bits = self.ntime_bits.wrapping_add(1);
+            work.ntime + self.ntime_bits
+        } else {
+            work.ntime
+        };
         self.job_id += self.job_id.wrapping_add(1);
         Ok(Job {
             job_id: self.job_id,
@@ -141,7 +143,7 @@ impl JobCreator {
                 version: Version::from_consensus(rolled_version),
                 prev_blockhash: BlockHash::from_byte_array(work.prev_hash),
                 merkle_root: TxMerkleNode::from_byte_array(self.merkle_root(work)?),
-                time: work.ntime,
+                time: rolled_ntime,
                 bits: CompactTarget::from_consensus(work.nbits),
                 nonce: 0,
             },

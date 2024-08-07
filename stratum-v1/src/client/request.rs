@@ -15,10 +15,6 @@ pub(crate) enum ReqKind {
     Submit,
 }
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
-pub(crate) struct ReqIdKind(pub(crate) u64, pub(crate) ReqKind);
-
 ///Request representation.
 ///
 ///Note that omitting `id` means that request is notification, rather than call, which expects

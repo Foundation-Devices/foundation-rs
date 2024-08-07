@@ -43,6 +43,8 @@ pub enum Error {
     /// Map is full
     MapFull,
 
+    NoWork,
+
     /// Pool reported an error
     Pool {
         code: isize,
@@ -56,11 +58,6 @@ pub enum Error {
     NetworkError,
 
     IdNotFound(u64),
-
-    LowDifficulty {
-        share_diff: f64,
-        pool_diff: f64,
-    },
 
     /// correspond to serde_json_core::ser:Error::BufferFull
     JsonBufferFull,

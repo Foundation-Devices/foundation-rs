@@ -15,5 +15,5 @@ pub(crate) mod fmt;
 mod client;
 mod error;
 
-pub use client::{Client, Extensions, Info, Notification, Share, VersionRolling, Work};
+pub use client::{Client, Extensions, Info, Job, Message, Share, VersionRolling};
 pub use error::{Error, Result};

@@ -162,6 +162,7 @@ pub(crate) fn parse_set_difficulty(resp: &[u8]) -> Result<f64> {
 
 #[cfg(test)]
 mod tests {
+    use core::str::FromStr;
     use heapless::Vec;
 
     use super::*;
@@ -182,7 +183,10 @@ mod tests {
             parse_set_version_mask(resp),
             Err(Error::JsonError(
                 serde_json_core::de::Error::CustomErrorWithMessage(
-                    "invalid length 9, expected a string no more than 8 bytes long".into()
+                    String::<64>::from_str(
+                        "invalid length 9, expected a string no more than 8 bytes long"
+                    )
+                    .unwrap()
                 )
             ))
         );

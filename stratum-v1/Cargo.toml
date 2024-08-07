@@ -25,7 +25,6 @@ serde = { workspace = true }
 serde-json-core = { features = ["custom-error-messages"], git = "https://github.com/rust-embedded-community/serde-json-core.git", branch = "master" }
 
 [features]
-default = []
 defmt-03 = [
     "dep:defmt",
     "embedded-io-async/defmt-03",
@@ -38,6 +37,7 @@ defmt-03 = [
 embedded-io = { workspace = true, features = ["std"] }
 env_logger = "0.11"
 inquire = "0.7"
+log = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 
 [[example]]
