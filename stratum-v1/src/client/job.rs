@@ -27,7 +27,6 @@ impl defmt::Format for Job {
             "Job {{ job_id: {}, extranonce2: {:?}, header: {{ version: {:x}, prev_block_hash: {:x}, merkle_root: {:x}, ntime: {:x}, nbits: {:x}, nonce: {:x} }} }}",
             self.job_id,
             self.extranonce2,
-            self.version_bits,
             self.header.version.to_consensus(),
             self.header.prev_blockhash.to_byte_array(),
             self.header.merkle_root.to_byte_array(),
