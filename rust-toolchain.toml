@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Keep this in sync. with the CI.
+#
+# Preferably should be the same version as GNU Guix to make packaging easier:
+#
+# <https://packages.guix.gnu.org/packages/rust/>
 [toolchain]
-channel = "1.74"
+channel = "1.77"
 profile = "default"
 targets = ["thumbv7em-none-eabihf"]
