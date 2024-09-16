@@ -8,7 +8,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Minimum Supported Rust Version (MSRV).
 
-The minimum supported version Rust version is `1.74`.
+The minimum supported version Rust version is `1.77`.
 
 ## Licensing
 
