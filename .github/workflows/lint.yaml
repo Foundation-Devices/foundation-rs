@@ -24,9 +24,12 @@ jobs:
       # requires a nightly Rust compiler for defining a global allocator and
       # the exception handler.
       #
-      # So, disable it for now.
+      # The stratum-v1 crate won't compile with all features enabled because
+      # if has 2 mutualy exclusive features: defmt and log.
+      #
+      # So, disable them for now.
       - run: cargo check --no-default-features --workspace --exclude foundation-ffi
-      - run: cargo check --all-features
+      - run: cargo check --all-features --workspace --exclude stratum-v1
 
   is-the-code-formatted:
     name: Is the code formatted?
@@ -63,4 +66,4 @@ jobs:
           toolchain: 1.77
       - run: cargo test
       - run: cargo test --no-default-features --workspace --exclude foundation-ffi
-      - run: cargo test --all-features
+      - run: cargo test --all-features --workspace --exclude stratum-v1
