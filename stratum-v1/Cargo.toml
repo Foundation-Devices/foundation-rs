@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+categories = ["embedded", "no-std"]
+description = """Stratum v1 client.
+
+This provides a `#[no_std]` library to implement a Stratum v1 client."""
+edition = "2021"
+homepage.workspace = true
+license = "GPL-3.0-or-later AND GPL-3.0-only"
+name = "stratum-v1"
+version = "0.1.0"
+
+[dependencies]
+bitcoin_hashes = { workspace = true }
+defmt = { workspace = true, optional = true }
+derive_more = { workspace = true, features = ["from"] }
+embedded-io-async = { workspace = true }
+faster-hex = { version = "0.10", default-features = false }
+heapless = { workspace = true, features = ["serde"] }
+log = { workspace = true, optional = true }
+serde = { workspace = true }
+serde-json-core = { workspace = true, features = ["custom-error-messages"] }
+
+[features]
+defmt-03 = [
+    "dep:defmt",
+    "embedded-io-async/defmt-03",
+    # "faster-hex/defmt-03", # will enable it after faster-hex publish PR#54
+    "heapless/defmt-03",
+    "serde-json-core/defmt",
+]
+
+[dev-dependencies]
+embedded-io = { workspace = true, features = ["std"] }
+env_logger = "0.11"
+inquire = "0.7"
+log = { workspace = true }
+tokio = { version = "1", features = ["full"] }
+
+[[example]]
+name = "stratum-v1-cli"
+path = "examples/tokio-cli.rs"
