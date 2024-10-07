@@ -73,9 +73,11 @@ pub enum Error {
     HexError(faster_hex::Error),
 }
 
-// impl core::error::Error for Error {}
+#[cfg(feature = "core-error")]
+impl<E: core::fmt::Debug> core::error::Error for Error<E> {}
 
-impl core::fmt::Display for Error {
+#[cfg(feature = "core-error")]
+impl<E: core::fmt::Debug> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{self:?}")
     }

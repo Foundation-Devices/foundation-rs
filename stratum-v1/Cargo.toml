@@ -24,10 +24,11 @@ serde = { workspace = true }
 serde-json-core = { workspace = true, features = ["custom-error-messages"] }
 
 [features]
+core-error = [] # bump MSRV to 1.81.0
 defmt-03 = [
     "dep:defmt",
     "embedded-io-async/defmt-03",
-    # "faster-hex/defmt-03", # will enable it after faster-hex publish PR#54
+    # "faster-hex/defmt-03", # will enable it after faster-hex publish 0.11
     "heapless/defmt-03",
     "serde-json-core/defmt",
 ]
