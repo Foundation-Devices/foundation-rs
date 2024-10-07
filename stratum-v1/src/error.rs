@@ -54,8 +54,8 @@ pub enum Error {
 
     /// Network error
     // #[from]
-    // NetworkError(embedded_io::ErrorKind),
-    NetworkError,
+    // Network(embedded_io::ErrorKind),
+    Network,
 
     IdNotFound(u64),
 
@@ -74,10 +74,10 @@ pub enum Error {
 }
 
 #[cfg(feature = "core-error")]
-impl<E: core::fmt::Debug> core::error::Error for Error<E> {}
+impl core::error::Error for Error {}
 
 #[cfg(feature = "core-error")]
-impl<E: core::fmt::Debug> core::fmt::Display for Error<E> {
+impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{self:?}")
     }
