@@ -6,6 +6,7 @@ resolver = "2"
 members = [
     "arena",
     "codecs",
+    "nom-embedded-storage",
     "ffi",
     "firmware",
     "stratum-v1",
@@ -33,11 +34,13 @@ defmt = "0.3"
 derive_more = { version = "1.0", default-features = false }
 embedded-io = "0.6"
 embedded-io-async = "0.6"
+embedded-storage = "0.3"
 faster-hex = { version = "0.9", default-features = false }
 heapless = { version = "0.8", default-features = false }
 itertools = { version = "0.10", default-features = false }
 libfuzzer-sys = "0.4"
 log = { version = "0.4" }
+memchr = { version = "2", default-features = false }
 minicbor = { version = "0.24", features = ["derive"] }
 nom = { version = "7", default-features = false }
 phf = { version = "0.11", features = ["macros"], default-features = false }
