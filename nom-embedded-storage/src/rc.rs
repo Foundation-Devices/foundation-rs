@@ -7,7 +7,7 @@
 //! `alloc::rc::Rc` pointer but without using the heap.
 //!
 //! This requires the user to create a [`NonNull`] [`RcInner`] type allocated
-//! by their own mean that won't be de-allocated, essentially leaking this
+//! by their own means that won't be de-allocated, essentially leaking this
 //! memory, or in other words, it should have a `'static` lifetime.
 //!
 //! For example by using [`Box::leak`] or by using a global mutable static
