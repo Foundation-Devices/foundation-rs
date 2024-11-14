@@ -19,7 +19,7 @@ impl<E> From<E> for HashEngine<E> {
 }
 
 impl<E> embedded_io::ErrorType for HashEngine<E> {
-    type Error = Error;
+    type Error = Infallible;
 }
 
 impl<E> embedded_io::Write for HashEngine<E>
@@ -38,11 +38,11 @@ where
 
 // This type can't be constructed as writing to a hash engine never fails.
 //
-// NOTE: Remove once ! (never type) is a thing in stable Rust.
+// TODO: Remove once ! (never type) is a thing in stable Rust.
 #[derive(Debug)]
-pub enum Error {}
+pub enum Infallible {}
 
-impl embedded_io::Error for Error {
+impl embedded_io::Error for Infallible {
     fn kind(&self) -> embedded_io::ErrorKind {
         unreachable!();
     }

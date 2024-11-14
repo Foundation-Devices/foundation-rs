@@ -25,7 +25,6 @@ pub fn output_map<Input, Error>(i: Input) -> IResult<Input, OutputMap<Input>, Er
 where
     Input: for<'a> Compare<&'a [u8]>
         + Clone
-        + Default // FIXME: Why is this needed?
         + PartialEq
         + InputTake
         + InputLength
@@ -91,7 +90,7 @@ where
     ))(i)
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct OutputMap<Input> {
     pub redeem_script: Option<Input>,
     pub witness_script: Option<Input>,
@@ -99,6 +98,19 @@ pub struct OutputMap<Input> {
     pub script: Option<Input>,
     pub tap_internal_key: Option<XOnlyPublicKey>,
     pub tap_tree: Option<Input>,
+}
+
+impl<Input> Default for OutputMap<Input> {
+    fn default() -> Self {
+        Self {
+            redeem_script: None,
+            witness_script: None,
+            amount: None,
+            script: None,
+            tap_internal_key: None,
+            tap_tree: None,
+        }
+    }
 }
 
 enum KeyPair<Input> {

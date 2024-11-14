@@ -7,19 +7,22 @@ use nom::Err;
 
 use secp256k1::PublicKey;
 
-use foundation_bip32::{Xpriv, KeySource, Fingerprint};
+use foundation_bip32::{Fingerprint, KeySource, Xpriv};
 
 use crate::{
     parser::{global, input, input::InputMap, output, output::OutputMap},
     transaction::SIGHASH_ALL,
 };
 
-pub fn validate<Input, C, E>(i: Input, secp: &mut secp256k1::Secp256k1<C>, master_key: Xpriv) -> Result<(), Error<E>>
+pub fn validate<Input, C, E>(
+    i: Input,
+    secp: &secp256k1::Secp256k1<C>,
+    master_key: Xpriv,
+) -> Result<(), Error<E>>
 where
     Input: for<'a> nom::Compare<&'a [u8]>
         + core::fmt::Debug
         + Clone
-        + Default // FIXME: This should not be needed.
         + PartialEq
         + nom::InputTake
         + nom::InputLength
@@ -129,7 +132,9 @@ where
     Ok(())
 }
 
-pub fn input_derivation_is_valid<Input>(wallet_fingerprint: Fingerprint) -> impl FnMut(PublicKey, KeySource<Input>) {
+pub fn input_derivation_is_valid<Input>(
+    wallet_fingerprint: Fingerprint,
+) -> impl FnMut(PublicKey, KeySource<Input>) {
     // FIXME(jeandudey): In the Passport code we only checked for the
     // fingerprint to be valid, we should also be checking for the
     // extended public key to match ours as well.
@@ -140,8 +145,7 @@ pub fn input_derivation_is_valid<Input>(wallet_fingerprint: Fingerprint) -> impl
     // I see this being reconsidered when the BIP-0032 code supports
     // hardware acceleration.
     move |_public_key, source| {
-        if source.fingerprint == wallet_fingerprint {
-        }
+        if source.fingerprint == wallet_fingerprint {}
     }
 }
 

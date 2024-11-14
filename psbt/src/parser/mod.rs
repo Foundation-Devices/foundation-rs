@@ -47,7 +47,6 @@ pub fn psbt<Input, GlobalXpubEvent, InputXpubEvent, Error>(
 where
     Input: for<'a> Compare<&'a [u8]>
         + Clone
-        + Default // FIXME: This should not be needed.
         + PartialEq
         + InputTake
         + InputLength

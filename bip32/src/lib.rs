@@ -67,7 +67,7 @@ pub struct InvalidFingerprintLen;
 
 /// The chain code.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ChainCode([u8; 32]);
+pub struct ChainCode(pub [u8; 32]);
 
 impl ChainCode {
     fn from_hmac(hmac: Hmac<sha512::Hash>) -> Self {

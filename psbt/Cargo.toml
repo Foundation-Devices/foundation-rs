@@ -6,21 +6,28 @@ name = "foundation-psbt"
 version = "0.1.0"
 edition = "2021"
 
+[[example]]
+name = "validate"
+required-features = ["std"]
+
 [dependencies]
 bitcoin_hashes = { workspace = true }
 bitflags = { workspace = true }
 either = { workspace = true }
 embedded-io = { workspace = true }
 foundation-bip32 = { workspace = true }
-hex = { workspace = true, features = ["std"] }  # TODO: removeme
+heapless = { workspace = true }
+#faster-hex = { workspace = true, features = ["std"] }  # TODO: removeme
 nom = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
+rand = { workspace = true, optional = true }
 secp256k1 = { workspace = true }
 
 [dev-dependencies]
 foundation-test-vectors = { workspace = true, features = ["psbt"] }
 
 [features]
-default = ["std"]
-std = ["nom/std"]
+default = ["std", "rand"]
+std = ["nom/std", "secp256k1/std", "secp256k1/global-context"]
+rand = ["dep:rand", "secp256k1/rand"]

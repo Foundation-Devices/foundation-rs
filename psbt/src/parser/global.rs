@@ -28,7 +28,6 @@ pub fn global_map<I, F, Error>(
 ) -> impl FnMut(I) -> IResult<I, GlobalMap<I>, Error>
 where
     I: for<'a> Compare<&'a [u8]>
-        + Default
         + PartialEq
         + Clone
         + InputTake
@@ -129,7 +128,7 @@ where
     map(nom::number::complete::u8, TxModifiable::from_bits_retain)(i)
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct GlobalMap<I> {
     pub transaction: Option<Transaction<I>>,
     pub input_count: Option<u64>,
@@ -158,6 +157,25 @@ impl<I> GlobalMap<I> {
             1 => None,
             // n >= 2
             _ => self.output_count,
+        }
+    }
+}
+
+// This has to be implemented manually because the automatic
+// derive would add a `I: Default` requirement when that is not
+// necessary.
+//
+// And we can't implement Default for the input.
+impl<I> Default for GlobalMap<I> {
+    fn default() -> Self {
+        Self {
+            transaction: None,
+            input_count: None,
+            output_count: None,
+            transaction_version: None,
+            fallback_locktime: None,
+            tx_modifiable: None,
+            version: 0,
         }
     }
 }

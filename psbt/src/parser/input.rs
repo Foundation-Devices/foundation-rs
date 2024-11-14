@@ -52,7 +52,6 @@ where
     B: FnMut(PublicKey, KeySource<Input>),
     Input: for<'a> Compare<&'a [u8]>
         + Clone
-        + Default // FIXME: This should not be needed.
         + PartialEq
         + InputTake
         + InputLength
@@ -243,7 +242,7 @@ where
     parser(i)
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct InputMap<Input> {
     pub non_witness_utxo: Option<Transaction<Input>>,
     pub witness_utxo: Option<WitnessUtxo<Input>>,
@@ -266,6 +265,29 @@ pub struct InputMap<Input> {
 impl<Input> InputMap<Input> {
     pub fn sighash_type(&self) -> u32 {
         self.sighash_type.unwrap_or(SIGHASH_ALL)
+    }
+}
+
+impl<Input> Default for InputMap<Input> {
+    fn default() -> Self {
+        Self {
+            non_witness_utxo: None,
+            witness_utxo: None,
+            sighash_type: None,
+            redeem_script: None,
+            witness_script: None,
+            final_scriptsig: None,
+            final_scriptwitness: None,
+            por_commitment: None,
+            previous_txid: None,
+            output_index: None,
+            sequence: None,
+            required_time_locktime: None,
+            required_height_locktime: None,
+            tap_key_sig: None,
+            tap_internal_key: None,
+            tap_merkle_root: None,
+        }
     }
 }
 
