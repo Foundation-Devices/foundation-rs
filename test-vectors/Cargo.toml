@@ -21,7 +21,7 @@ seedqr = ["bip39/serde", "faster-hex/serde"]
 blockchain-commons = ["bitcoin/serde", "faster-hex/serde"]
 
 [dependencies]
-bip39 = { workspace = true, optional = true }
+bip39 = { workspace = true, optional = true, features = ["std"] }
 bitcoin = { workspace = true, optional = true, features = ["std"] }
 bs58 = { workspace = true, optional = true }
 faster-hex = { workspace = true, optional = true }
