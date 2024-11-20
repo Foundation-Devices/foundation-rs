@@ -10,7 +10,7 @@ edition = "2021"
 homepage.workspace = true
 license = "GPL-3.0-or-later AND GPL-3.0-only"
 name = "stratum-v1"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies]
 bitcoin_hashes = { workspace = true }

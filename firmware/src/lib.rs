@@ -9,7 +9,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 
-use bitcoin_hashes::{sha256d, Hash};
+use bitcoin_hashes::sha256d;
 use heapless::{String, Vec};
 use nom::IResult;
 use secp256k1::{ecdsa, Message, PublicKey, Secp256k1, Verification};

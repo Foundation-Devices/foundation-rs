@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: © 2020 Dominik Spicher <dominikspicher@gmail.com>
 // SPDX-License-Identifier: MIT
 
-use bitcoin_hashes::Hash;
 use rand_xoshiro::{rand_core::RngCore, rand_core::SeedableRng, Xoshiro256StarStar};
 
 #[allow(clippy::module_name_repetitions)]

@@ -4,7 +4,7 @@
 use super::notification::Work;
 use crate::{Error, Result};
 
-use bitcoin_hashes::{sha256d::Hash as DHash, Hash};
+use bitcoin_hashes::sha256d::Hash as DHash;
 use heapless::{String, Vec};
 
 #[derive(Debug, PartialEq)]
