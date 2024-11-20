@@ -40,9 +40,10 @@ use secp256k1::PublicKey;
 use crate::transaction::Transaction;
 
 /// Parse a Partially Signed Bitcoin Transaction (PSBT).
-pub fn psbt<Input, GlobalXpubEvent, InputXpubEvent, Error>(
+pub fn psbt<Input, GlobalXpubEvent, InputXpubEvent, OutputXpubEvent, Error>(
     global_xpub_event: GlobalXpubEvent,
     input_xpub_event: InputXpubEvent,
+    output_xpub_event: OutputXpubEvent,
 ) -> impl FnMut(Input) -> IResult<Input, Psbt<Input>, Error>
 where
     Input: for<'a> Compare<&'a [u8]>
@@ -54,6 +55,7 @@ where
         + Slice<core::ops::RangeFrom<usize>>,
     GlobalXpubEvent: FnMut(Xpub, KeySource<Input>),
     InputXpubEvent: FnMut(PublicKey, KeySource<Input>) + Copy,
+    OutputXpubEvent: FnMut(PublicKey, KeySource<Input>) + Copy,
     Error: core::fmt::Debug
         + ContextError<Input>
         + ParseError<Input>
@@ -87,7 +89,7 @@ where
         for _ in 0..output_count {
             let input_ = input.clone();
 
-            match output::output_map(input_) {
+            match output::output_map(global_map.version, output_xpub_event)(input_) {
                 Ok((i, _o)) => {
                     input = i;
                 }

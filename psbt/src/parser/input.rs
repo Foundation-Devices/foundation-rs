@@ -6,9 +6,9 @@ use bitcoin_hashes::{hash160, ripemd160, sha256, sha256d};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{eof, map, rest};
-use nom::error::{ContextError, ErrorKind, FromExternalError, ParseError};
+use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError};
 use nom::multi::length_value;
-use nom::number::complete::le_u32;
+use nom::number::complete::{le_u32, le_u64};
 use nom::sequence::tuple;
 use nom::{Compare, Err, IResult, InputIter, InputLength, InputTake, Slice};
 
@@ -213,9 +213,13 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>,
     Error: ParseError<Input>,
+    Error: ContextError<Input>,
 {
-    let amount = compact_size;
-    let script_pubkey = length_value(compact_size, rest);
+    let amount = context("amount", le_u64);
+    let script_pubkey = context(
+        "script pubkey",
+        length_value(context("script pubkey length", compact_size), rest),
+    );
 
     map(tuple((amount, script_pubkey)), |(amount, script_pubkey)| {
         WitnessUtxo {

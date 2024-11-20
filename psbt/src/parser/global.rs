@@ -58,16 +58,16 @@ where
     );
 
     verify(
-        terminated(keypairs, context("separator", tag::<_, I, Error>(b"\x00"))),
+        terminated(
+            keypairs,
+            context("global separator", tag::<_, I, Error>(b"\x00")),
+        ),
         |map| {
             match map.version {
                 0 => map.transaction.is_some(),
                 // This doesn't exist, from BIP-174 to BIP-370 they jumped from 0 to 2,
-                // so just pass validation.
-                //
-                // We pass the validation in the case that (I hope really not) this
-                // version number is reused.
-                1 => true,
+                // so just fail validation.
+                1 => false,
                 // Make sure that these fields exist and make sure that version 0 fields
                 // are excluded.
                 2 => {
@@ -76,7 +76,7 @@ where
                         && map.output_count.is_some()
                 }
                 // Don't verify what we don't know.
-                _ => true,
+                _ => false,
             }
         },
     )

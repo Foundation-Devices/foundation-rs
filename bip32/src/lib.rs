@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-FileCopyrightText: © 2024 The Rust Bitcoin Developers
 // SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Based on the code from rust-bitcoin, adapted for no_std and zero-copy
+// parsers.
 
 //! Bitcoin BIP-32 implementation.
 //!
@@ -147,7 +150,7 @@ impl Xpriv {
     }
 
     /// Attempts to derive an extended private key from a path.
-    pub fn derive_priv<C: secp256k1::Signing, P: Iterator<Item = u32>>(
+    pub fn derive_xpriv<C: secp256k1::Verification, P: Iterator<Item = u32>>(
         &self,
         secp: &Secp256k1<C>,
         path: P,
@@ -160,7 +163,7 @@ impl Xpriv {
     }
 
     /// Private->Private child key derivation
-    fn ckd_priv<C: secp256k1::Signing>(&self, secp: &Secp256k1<C>, i: u32) -> Xpriv {
+    fn ckd_priv<C: secp256k1::Verification>(&self, secp: &Secp256k1<C>, i: u32) -> Xpriv {
         let mut hmac_engine: HmacEngine<sha512::Hash> = HmacEngine::new(&self.chain_code[..]);
 
         let is_hardened = i & (1 << 31) != 0;
@@ -236,6 +239,53 @@ impl Xpub {
             public_key: secp256k1::PublicKey::from_secret_key(secp, &sk.private_key),
             chain_code: sk.chain_code.clone(),
         }
+    }
+
+    /// Attempts to derive a extended public key.
+    pub fn derive_xpub<C: secp256k1::Verification, P: Iterator<Item = u32>>(
+        &self,
+        secp: &Secp256k1<C>,
+        path: P,
+    ) -> Xpub {
+    }
+
+    /// Compute the scalar tweak added to this key to get a child key
+    pub fn ckd_pub_tweak(
+        &self,
+        i: u32,
+    ) -> Result<(secp256k1::SecretKey, ChainCode), Error> {
+        if i >= 0x8000_0000 {
+            return Err(todo!());
+        }
+
+        let mut hmac_engine: HmacEngine<sha512::Hash> = HmacEngine::new(&self.chain_code[..]);
+        hmac_engine.input(&self.public_key.serialize()[..]);
+        hmac_engine.input(&i.to_be_bytes());
+
+        let hmac_result: Hmac<sha512::Hash> = Hmac::from_engine(hmac_engine);
+
+        let private_key = secp256k1::SecretKey::from_slice(&hmac_result[..32])?;
+        let chain_code = ChainCode::from_hmac(hmac_result);
+        Ok((private_key, chain_code))
+    }
+
+    /// Public->Public child key derivation
+    pub fn ckd_pub<C: secp256k1::Verification>(
+        &self,
+        secp: &Secp256k1<C>,
+        i: ChildNumber,
+    ) -> Result<Xpub, Error> {
+        let (sk, chain_code) = self.ckd_pub_tweak(i)?;
+        let tweaked = self.public_key.add_exp_tweak(secp, &sk.into())?;
+
+        Ok(Xpub {
+            network: self.network,
+            depth: self.depth + 1,
+            parent_fingerprint: self.fingerprint(),
+            child_number: i,
+            public_key: tweaked,
+            chain_code,
+        })
     }
 
     /// Returns the HASH160 of the chaincode

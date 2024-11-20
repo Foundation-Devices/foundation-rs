@@ -4,7 +4,10 @@
 //! Partially Signed Bitcoin Transaction (PSBT) library.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+// TODO(jeandudey): Remove this before PR.
+#![allow(dead_code)]
 
+pub mod address;
 pub mod encoder;
 pub mod hash_types;
 pub mod parser;

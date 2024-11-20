@@ -4,6 +4,7 @@
 use bitcoin_hashes::Hash;
 use embedded_io::Write;
 
+use crate::address::AddressType;
 use crate::encoder::{
     hash_engine::HashEngine,
     transaction::{encode_inputs, encode_outputs},
@@ -76,6 +77,72 @@ pub struct Output<I> {
     pub value: i64,
     /// Script with the conditions to spend this output.
     pub script_pubkey: I,
+}
+
+impl<I> Output<I>
+where
+    I: nom::InputLength,
+    I: nom::InputIter<Item = u8>,
+    I: nom::Slice<core::ops::Range<usize>>,
+    I: nom::Slice<core::ops::RangeFrom<usize>>,
+{
+    // NOTE: This procedure is written in this way as to reduce accesses to
+    // script_pubkey as much as possible as in Passport this means accessing
+    // the storage device.
+    //
+    // So, written for performance, not readability. That is also the reason
+    // of the nested ifs.
+    pub fn address(&self) -> Option<(AddressType, I)> {
+        let len = self.script_pubkey.input_len();
+        let mut iter = self.script_pubkey.iter_elements();
+        let b0 = iter.next();
+        let b1 = iter.next();
+
+        // P2WPKH (BIP-0141).
+        //
+        // 0x0014 and the rest is the RIPEMD-160 hash of the public key.
+        if len == 22 && b0 == Some(0x00) && b1 == Some(0x14) {
+            return Some((AddressType::P2WPKH, self.script_pubkey.slice(2..22)));
+        }
+
+        // P2WSH (BIP-0141).
+        //
+        // 0x0014 and the rest is the SHA-256 hash of the public key.
+        if len == 34 && b0 == Some(0x00) && b1 == Some(0x20) {
+            return Some((AddressType::P2WSH, self.script_pubkey.slice(2..34)));
+        }
+
+        // P2SH (BIP-16).
+        if len == 23 && b0 == Some(0xA9) && b1 == Some(0x14) {
+            let b22 = self.script_pubkey.slice(22..).iter_elements().nth(0);
+            if b22 == Some(0x87) {
+                return Some((AddressType::P2SH, self.script_pubkey.slice(2..22)));
+            }
+        }
+
+        // P2PK.
+        if (len == 25 || len == 67) && (b0 == Some(0x21) || b0 == Some(0x41)) {
+            let blast = self.script_pubkey.slice(len - 1..).iter_elements().nth(0);
+            if blast == Some(0xAC) {
+                return Some((AddressType::P2PK, self.script_pubkey.slice(2..35)));
+            }
+        }
+
+        let b2 = iter.next();
+
+        // P2PKH.
+        if len == 25 && b0 == Some(0x76) && b1 == Some(0xA9) && b2 == Some(0x14) {
+            let b23 = self.script_pubkey.slice(23..).iter_elements().nth(0);
+            if b23 == Some(0x88) {
+                let b24 = self.script_pubkey.slice(24..).iter_elements().nth(0);
+                if b24 == Some(0xAC) {
+                    return Some((AddressType::P2PKH, self.script_pubkey.slice(3..23)));
+                }
+            }
+        }
+
+        None
+    }
 }
 
 /// Points to the output of a transaction.

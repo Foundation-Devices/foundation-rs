@@ -8,6 +8,7 @@
 (specifications->manifest
   '("cmake"
     "gcc-toolchain"
+    "gdb"
     "guile"
     "jq"
     "make"

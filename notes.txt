@@ -1,0 +1,3 @@
+- Valid test vector 6 fails (not because of a bug but our rules).
+- Return error if outputmap does not contain the amount and script fields on version 2 of the PSBT.
+- Add method to return the `transaction::Output` from a PSBTv1 or v2.

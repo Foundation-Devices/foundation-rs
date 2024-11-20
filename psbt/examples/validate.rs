@@ -1,14 +1,16 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use foundation_bip32::{Xpriv, VERSION_XPRV, Fingerprint, ChainCode};
-use foundation_psbt::validation::validate;
+use foundation_bip32::{ChainCode, Fingerprint, Xpriv, VERSION_XPRV};
+use foundation_psbt::validation::{validate, Error};
 use foundation_test_vectors::psbt::TestVectors;
 use nom::error::VerboseError;
 use rand::rngs::OsRng;
 use secp256k1::{global::SECP256K1, Keypair};
 
 fn main() {
+    env_logger::init();
+
     let mut args = std::env::args();
     if args.len() != 2 {
         eprintln!("Usage: {} <psbt-index>", args.nth(0).unwrap());
@@ -43,9 +45,17 @@ fn main() {
     match validate::<_, _, VerboseError<_>>(test_vector.data.as_slice(), SECP256K1, xpriv) {
         Ok(_) => {
             println!("Succeed!");
-        },
-        Err(e) => {
-            println!("Error: {e:?}");
         }
+        Err(e) => match e {
+            Error::ParseError(e) => match e {
+                nom::Err::Incomplete(_) => println!("unexpected end of file"),
+                nom::Err::Error(e) | nom::Err::Failure(e) => {
+                    for (i, e) in e.errors.iter().enumerate() {
+                        println!("Error {i}: {e:?}");
+                    }
+                }
+            },
+            Error::ValidationError(e) => println!("{e}"),
+        },
     }
 }
