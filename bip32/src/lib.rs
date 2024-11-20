@@ -15,7 +15,7 @@
 
 use core::str::Split;
 
-use bitcoin_hashes::{hash160, hash_newtype, sha512, Hash, HashEngine, Hmac, HmacEngine};
+use bitcoin_hashes::{hash160, hash_newtype, sha512, GeneralHash, HashEngine, Hmac, HmacEngine};
 use nom::number::complete::le_u32;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
@@ -74,7 +74,7 @@ pub struct ChainCode(pub [u8; 32]);
 
 impl ChainCode {
     fn from_hmac(hmac: Hmac<sha512::Hash>) -> Self {
-        hmac[32..]
+        hmac.as_ref()[32..]
             .try_into()
             .expect("half of hmac is guaranteed to be 32 bytes")
     }
@@ -144,13 +144,13 @@ impl Xpriv {
             depth: 0,
             parent_fingerprint: Default::default(),
             child_number: 0,
-            private_key: secp256k1::SecretKey::from_slice(&hmac_result[..32])?,
+            private_key: secp256k1::SecretKey::from_slice(&hmac_result.as_ref()[..32])?,
             chain_code: ChainCode::from_hmac(hmac_result),
         })
     }
 
     /// Attempts to derive an extended private key from a path.
-    pub fn derive_xpriv<C: secp256k1::Verification, P: Iterator<Item = u32>>(
+    pub fn derive_xpriv<C: secp256k1::Signing, P: Iterator<Item = u32>>(
         &self,
         secp: &Secp256k1<C>,
         path: P,
@@ -163,7 +163,7 @@ impl Xpriv {
     }
 
     /// Private->Private child key derivation
-    fn ckd_priv<C: secp256k1::Verification>(&self, secp: &Secp256k1<C>, i: u32) -> Xpriv {
+    fn ckd_priv<C: secp256k1::Signing>(&self, secp: &Secp256k1<C>, i: u32) -> Xpriv {
         let mut hmac_engine: HmacEngine<sha512::Hash> = HmacEngine::new(&self.chain_code[..]);
 
         let is_hardened = i & (1 << 31) != 0;
@@ -180,7 +180,7 @@ impl Xpriv {
 
         hmac_engine.input(&u32::to_be_bytes(i));
         let hmac_result: Hmac<sha512::Hash> = Hmac::from_engine(hmac_engine);
-        let sk = secp256k1::SecretKey::from_slice(&hmac_result[..32])
+        let sk = secp256k1::SecretKey::from_slice(&hmac_result.as_ref()[..32])
             .expect("statistically impossible to hit");
         let tweaked = sk
             .add_tweak(&self.private_key.into())
@@ -203,9 +203,12 @@ impl Xpriv {
 
     /// Returns the first four bytes of the identifier
     pub fn fingerprint<C: secp256k1::Signing>(&self, secp: &Secp256k1<C>) -> Fingerprint {
+        /*
         self.identifier(secp)[0..4]
             .try_into()
             .expect("4 is the fingerprint length")
+            */
+        todo!()
     }
 }
 
@@ -241,6 +244,7 @@ impl Xpub {
         }
     }
 
+    /*
     /// Attempts to derive a extended public key.
     pub fn derive_xpub<C: secp256k1::Verification, P: Iterator<Item = u32>>(
         &self,
@@ -286,13 +290,16 @@ impl Xpub {
             public_key: tweaked,
             chain_code,
         })
-    }
+    }*/
 
     /// Returns the HASH160 of the chaincode
     pub fn identifier(&self) -> XKeyIdentifier {
+        /*
         let mut engine = XKeyIdentifier::engine();
         engine.input(&self.public_key.serialize());
         XKeyIdentifier::from_engine(engine)
+        */
+        todo!()
     }
 }
 

@@ -92,7 +92,7 @@ fn derivations() {
                 xprv::<_, nom::error::Error<_>>(chain.extended_private_key.as_slice())
                     .map(|(_, v)| v)
                     .expect("test vector extended private key should be valid");
-            let xprv = master_key.derive_priv(&secp, derivation_path.iter());
+            let xprv = master_key.derive_xpriv(&secp, derivation_path.iter());
             assert_eq!(xprv.private_key, expected_xprv.private_key);
         }
     }
