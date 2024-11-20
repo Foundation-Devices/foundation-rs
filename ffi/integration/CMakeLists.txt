@@ -31,7 +31,7 @@ add_executable(integration-codecs codecs.cpp)
 target_include_directories(integration-codecs PUBLIC ../include)
 target_link_libraries(
         integration-codecs
-        PUBLIC foundation-ffi
+        PUBLIC foundation_ffi
         PRIVATE GTest::gtest_main nlohmann_json::nlohmann_json
 )
 include(GoogleTest)
