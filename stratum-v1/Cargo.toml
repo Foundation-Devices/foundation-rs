@@ -20,11 +20,11 @@ embedded-io-async = { workspace = true }
 faster-hex = { version = "0.10", default-features = false }
 heapless = { workspace = true, features = ["serde"] }
 log = { workspace = true, optional = true }
+rustversion = { workspace = true }
 serde = { workspace = true }
 serde-json-core = { workspace = true, features = ["custom-error-messages"] }
 
 [features]
-core-error = [] # bump MSRV to 1.81.0
 defmt-03 = [
     "dep:defmt",
     "embedded-io-async/defmt-03",

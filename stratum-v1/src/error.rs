@@ -73,10 +73,10 @@ pub enum Error {
     HexError(faster_hex::Error),
 }
 
-#[cfg(feature = "core-error")]
+#[rustversion::since(1.81)]
 impl core::error::Error for Error {}
 
-#[cfg(feature = "core-error")]
+#[rustversion::since(1.81)]
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{self:?}")
