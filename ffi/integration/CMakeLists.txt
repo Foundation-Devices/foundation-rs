@@ -11,12 +11,12 @@ set(CMAKE_CXX_STANDARD 14)
 FetchContent_Declare(
         Corrosion
         GIT_REPOSITORY https://github.com/corrosion-rs/corrosion
-        GIT_TAG v0.4.9
+        GIT_TAG v0.5.0
 )
 FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest
-        GIT_TAG v1.13.0
+        GIT_TAG v1.15.2
 )
 
 FetchContent_MakeAvailable(Corrosion)
