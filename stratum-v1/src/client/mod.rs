@@ -206,16 +206,12 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         } else if start == self.rx_free_pos {
             self.rx_free_pos = 0;
         }
-        if self
-            .network_conn
-            .read_ready()
-            .map_err(|_| Error::NetworkError)?
-        {
+        if self.network_conn.read_ready().map_err(|_| Error::Network)? {
             let n = self
                 .network_conn
                 .read(self.rx_buf[self.rx_free_pos..].as_mut())
                 .await
-                .map_err(|_| Error::NetworkError)?;
+                .map_err(|_| Error::Network)?;
             debug!("read {} bytes @{}", n, self.rx_free_pos);
             trace!(
                 "read content {:?}",
@@ -244,7 +240,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.network_conn
             .write_all(&self.tx_buf[..req_len + 1])
             .await
-            .map_err(|_| Error::NetworkError)
+            .map_err(|_| Error::Network)
     }
 
     /// # Configure Client

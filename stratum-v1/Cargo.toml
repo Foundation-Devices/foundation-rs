@@ -10,7 +10,7 @@ edition = "2021"
 homepage.workspace = true
 license = "GPL-3.0-or-later AND GPL-3.0-only"
 name = "stratum-v1"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies]
 bitcoin_hashes = { workspace = true }
@@ -20,6 +20,7 @@ embedded-io-async = { workspace = true }
 faster-hex = { version = "0.10", default-features = false }
 heapless = { workspace = true, features = ["serde"] }
 log = { workspace = true, optional = true }
+rustversion = { workspace = true }
 serde = { workspace = true }
 serde-json-core = { workspace = true, features = ["custom-error-messages"] }
 
@@ -27,7 +28,7 @@ serde-json-core = { workspace = true, features = ["custom-error-messages"] }
 defmt-03 = [
     "dep:defmt",
     "embedded-io-async/defmt-03",
-    # "faster-hex/defmt-03", # will enable it after faster-hex publish PR#54
+    # "faster-hex/defmt-03", # will enable it after faster-hex publish 0.11
     "heapless/defmt-03",
     "serde-json-core/defmt",
 ]

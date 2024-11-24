@@ -54,8 +54,8 @@ pub enum Error {
 
     /// Network error
     // #[from]
-    // NetworkError(embedded_io::ErrorKind),
-    NetworkError,
+    // Network(embedded_io::ErrorKind),
+    Network,
 
     IdNotFound(u64),
 
@@ -73,8 +73,10 @@ pub enum Error {
     HexError(faster_hex::Error),
 }
 
-// impl core::error::Error for Error {}
+#[rustversion::since(1.81)]
+impl core::error::Error for Error {}
 
+#[rustversion::since(1.81)]
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{self:?}")

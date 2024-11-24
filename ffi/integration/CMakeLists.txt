@@ -11,12 +11,12 @@ set(CMAKE_CXX_STANDARD 14)
 FetchContent_Declare(
         Corrosion
         GIT_REPOSITORY https://github.com/corrosion-rs/corrosion
-        GIT_TAG v0.4.9
+        GIT_TAG v0.5.0
 )
 FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest
-        GIT_TAG v1.13.0
+        GIT_TAG v1.15.2
 )
 
 FetchContent_MakeAvailable(Corrosion)
@@ -31,7 +31,7 @@ add_executable(integration-codecs codecs.cpp)
 target_include_directories(integration-codecs PUBLIC ../include)
 target_link_libraries(
         integration-codecs
-        PUBLIC foundation-ffi
+        PUBLIC foundation_ffi
         PRIVATE GTest::gtest_main nlohmann_json::nlohmann_json
 )
 include(GoogleTest)

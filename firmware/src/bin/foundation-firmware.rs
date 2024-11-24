@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{anyhow, bail, Context, Result};
-use bitcoin_hashes::{sha256, sha256d, Hash, HashEngine};
+use bitcoin_hashes::{sha256, sha256d, HashEngine};
 use clap::{command, value_parser, Arg, ArgAction};
 use faster_hex::hex_string;
 use foundation_firmware::{header, Header, Information, HEADER_LEN};
