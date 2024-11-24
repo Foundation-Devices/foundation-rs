@@ -7,12 +7,17 @@ use heapless::{String, Vec};
 use serde::{Deserialize, Deserializer};
 
 pub(crate) fn parse_id(resp: &[u8]) -> Result<Option<u64>> {
+    trace!(
+        "Parsing id from response: {:#?}",
+        core::str::from_utf8(resp).unwrap()
+    );
     #[derive(Debug, Deserialize)]
     #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
     struct IdOnly {
         id: Option<u64>,
     }
     let id = serde_json_core::from_slice::<IdOnly>(resp)?.0.id;
+    trace!("Parsed id: {:?}", id);
     match id {
         None => Ok(None),
         Some(id) => Ok(Some(id)),
