@@ -31,6 +31,7 @@ defmt-03 = [
     "heapless/defmt-03",
     "serde-json-core/defmt",
 ]
+log = ["dep:log"]
 
 [dev-dependencies]
 embedded-io = { workspace = true, features = ["std"] }

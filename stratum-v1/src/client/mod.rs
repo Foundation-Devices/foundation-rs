@@ -91,16 +91,23 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
     pub async fn poll_message(&mut self) -> Result<Option<Message>> {
         let mut msg = None;
         let mut start = 0;
-        while let Some(stop) = self.rx_buf[start..self.rx_free_pos]
+
+        while let Some(mut stop) = self.rx_buf[start..self.rx_free_pos]
             .iter()
             .position(|&c| c == b'\n')
         {
+            stop += start;
+            trace!("Buffer start: {:?}", &self.rx_buf[..start]);
+            trace!("Current : {:?}", &self.rx_buf[start..stop]);
+            trace!("Buffer end: {:?}", &self.rx_buf[stop..]);
             let line = &self.rx_buf[start..stop];
+            trace!("Start: {}, Stop: {}", start, stop);
             debug!(
                 "Received Message [{}..{}], free pos: {}",
                 start, stop, self.rx_free_pos
             );
             trace!("{:?}", line);
+            trace!("Self.reqs: {:?}", self.reqs);
             if let Some(id) = response::parse_id(line)? {
                 // it's a Response
                 match self.reqs.get(&id) {
@@ -128,6 +135,10 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                             msg = Some(Message::Authorized);
                         }
                     }
+                    Some(ReqKind::SuggestDifficulty) => {
+                        self.reqs.remove(&id);
+                        info!("Suggested Difficulty Accepted");
+                    }
                     Some(ReqKind::Submit) => {
                         match response::parse_submit(line) {
                             Ok(_) => {
@@ -138,14 +149,14 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                                 );
                             }
                             Err(Error::Pool {
-                                code: _c, // TODO: use this code to differentiate why share has been rejected
+                                code: c, // TODO: use this code to differentiate why share has been rejected
                                 message: _,
                                 detail: _,
                             }) => {
                                 self.shares_rejected += 1;
                                 info!(
-                                    "Share #{} Rejected, count: {}/{}",
-                                    id, self.shares_accepted, self.shares_rejected
+                                    "Share #{} Rejected, count: {}/{}, code: {}",
+                                    id, self.shares_accepted, self.shares_rejected, c
                                 );
                             }
                             Err(e) => return Err(e),
@@ -183,11 +194,17 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 }
             }
             start = stop + 1;
+            if msg.is_some() {
+                break;
+            }
         }
+        trace!("start: {}, free pos: {}", start, self.rx_free_pos);
         if start > 0 && self.rx_free_pos > start {
             debug!("copy {} bytes @0", self.rx_free_pos - start);
             self.rx_buf.copy_within(start..self.rx_free_pos, 0);
             self.rx_free_pos -= start;
+        } else if start == self.rx_free_pos {
+            self.rx_free_pos = 0;
         }
         if self
             .network_conn
@@ -200,7 +217,14 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 .await
                 .map_err(|_| Error::NetworkError)?;
             debug!("read {} bytes @{}", n, self.rx_free_pos);
-            trace!("{:?}", &self.rx_buf[self.rx_free_pos..self.rx_free_pos + n]);
+            trace!(
+                "read content {:?}",
+                &self.rx_buf[self.rx_free_pos..self.rx_free_pos + n]
+            );
+            trace!(
+                "read content as string {:?}",
+                core::str::from_utf8(&self.rx_buf[self.rx_free_pos..self.rx_free_pos + n])
+            );
             self.rx_free_pos += n;
         }
         Ok(msg)
@@ -236,6 +260,15 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.prepare_req(ReqKind::Configure)?;
         let n = request::configure(self.req_id, exts, self.tx_buf.as_mut_slice())?;
         debug!("Send Configure: {} bytes, id = {}", n, self.req_id);
+        self.send_req(n).await
+    }
+    pub async fn send_suggest_difficulty(&mut self, difficulty: u32) -> Result<()> {
+        if self.configuration.is_none() {
+            return Err(Error::NotConfigured);
+        }
+        self.prepare_req(ReqKind::SuggestDifficulty)?;
+        let n = request::suggest_difficulty(self.req_id, difficulty, self.tx_buf.as_mut_slice())?;
+        debug!("Send Suggest Difficulty: {} bytes, id = {}", n, self.req_id);
         self.send_req(n).await
     }
 
