@@ -16,7 +16,7 @@ bitcoin-primitives = { workspace = true }
 bitflags = { workspace = true }
 either = { workspace = true }
 embedded-io = { workspace = true }
-env_logger = { workspace = true }
+env_logger = { workspace = true, optional = true }
 foundation-bip32 = { workspace = true }
 heapless = { workspace = true }
 log = { workspace = true }
@@ -35,4 +35,5 @@ sign-example = [
     "foundation-bip32/base58ck",
     "secp256k1/global-context",
     "std",
+    "env_logger",
 ]
