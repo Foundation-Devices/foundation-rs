@@ -6,38 +6,19 @@ use nom::{
 };
 
 use bitcoin_hashes::Hash;
-
-use crate::{hash_types, taproot};
+use bitcoin_primitives::{TapLeafHash, TapNodeHash, Txid};
 
 /// Parses a [`bitcoin_hashes::Hash`].
-///
-/// # Why N instead of [`bitcoin_hashes::Hash::LEN`].
-///
-/// NOTE(jeandudey): Using `N` because on Rust 1.70.0 it somehow can't use the
-/// associated constant `LEN` of `bitcoin_hashes::Hash`` trait and shows the
-/// following error:
-///
-/// ```text
-/// error: generic parameters may not be used in const operations
-///
-///     let mut buf = [0; Hash::LEN];
-/// ```
-///
-/// Maybe a bug, perhaps report this upstream, I think rustc is broken in
-/// this edge case.
-///
-/// Ideally one would use fill with the aforementioned `buf` variable to
-/// avoid this verbose loop.
 pub fn hash<Input, Hash, Error, const N: usize>(i: Input) -> IResult<Input, Hash, Error>
 where
     Input:
         Clone + PartialEq + InputLength + InputIter<Item = u8> + Slice<core::ops::RangeFrom<usize>>,
-    Hash: bitcoin_hashes::Hash,
+    Hash: bitcoin_hashes::Hash<Bytes = [u8; N]>,
     Error: ParseError<Input>,
 {
     let mut buf = [0; N];
     let (next_i, ()) = fill(u8, &mut buf)(i)?;
-    let hash = Hash::from_slice(&buf).expect("should have the correct length");
+    let hash = Hash::from_byte_array(buf);
     Ok((next_i, hash))
 }
 
@@ -70,29 +51,29 @@ define_hash_aliases! {
     hash160,
 }
 
-pub fn taproot_leaf_hash<Input, Error>(i: Input) -> IResult<Input, taproot::LeafHash, Error>
+pub fn taproot_leaf_hash<Input, Error>(i: Input) -> IResult<Input, TapLeafHash, Error>
 where
     Input:
         Clone + PartialEq + InputLength + InputIter<Item = u8> + Slice<core::ops::RangeFrom<usize>>,
     Error: ParseError<Input>,
 {
-    hash::<_, taproot::LeafHash, Error, { taproot::LeafHash::LEN }>(i)
+    hash::<_, TapLeafHash, Error, { TapLeafHash::LEN }>(i)
 }
 
-pub fn taproot_node_hash<Input, Error>(i: Input) -> IResult<Input, taproot::TapNodeHash, Error>
+pub fn taproot_node_hash<Input, Error>(i: Input) -> IResult<Input, TapNodeHash, Error>
 where
     Input:
         Clone + PartialEq + InputLength + InputIter<Item = u8> + Slice<core::ops::RangeFrom<usize>>,
     Error: ParseError<Input>,
 {
-    hash::<_, taproot::TapNodeHash, Error, { taproot::TapNodeHash::LEN }>(i)
+    hash::<_, TapNodeHash, Error, { TapNodeHash::LEN }>(i)
 }
 
-pub fn txid<Input, Error>(i: Input) -> IResult<Input, hash_types::Txid, Error>
+pub fn txid<Input, Error>(i: Input) -> IResult<Input, Txid, Error>
 where
     Input:
         Clone + PartialEq + InputLength + InputIter<Item = u8> + Slice<core::ops::RangeFrom<usize>>,
     Error: ParseError<Input>,
 {
-    hash::<_, hash_types::Txid, Error, { hash_types::Txid::LEN }>(i)
+    hash::<_, Txid, Error, { Txid::LEN }>(i)
 }

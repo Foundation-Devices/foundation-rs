@@ -1,28 +1,52 @@
-// SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+// SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use core::fmt;
+use core::{cmp::Ordering, fmt};
 
 use nom::bytes::complete::tag;
 use nom::error::ErrorKind;
 use nom::Err;
 
-use secp256k1::PublicKey;
+use secp256k1::{PublicKey, Scalar, XOnlyPublicKey};
 
 use foundation_bip32::{Fingerprint, KeySource, Xpriv};
 
 use crate::{
+    address::AddressType,
     parser::{global, global::GlobalMap, input, input::InputMap, output, output::OutputMap},
     transaction::SIGHASH_ALL,
 };
 
+use bitcoin_hashes::{hash160, sha256t, HashEngine};
+use bitcoin_primitives::{TapTweakHash, TapTweakTag};
+
 use heapless::Vec;
 
-pub fn validate<Input, C, E>(
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransactionDetails {
+    pub total_with_change: i64,
+    pub total_change: i64,
+}
+
+impl TransactionDetails {
+    /// Total amount sent to external wallets.
+    pub fn total(&self) -> i64 {
+        // This operation should always yield a positive number or zero as
+        // total_change is less than or equal to total_with_change.
+        (self.total_with_change - self.total_change).max(0)
+    }
+
+    /// Returns true if total amount spent is all change.
+    pub fn is_self_send(&self) -> bool {
+        self.total() == 0
+    }
+}
+
+pub fn validate<Input, C, E, const N: usize>(
     i: Input,
     secp: &secp256k1::Secp256k1<C>,
     master_key: Xpriv,
-) -> Result<(), Error<E>>
+) -> Result<TransactionDetails, Error<E>>
 where
     Input: for<'a> nom::Compare<&'a [u8]>
         + core::fmt::Debug
@@ -33,7 +57,7 @@ where
         + nom::InputIter<Item = u8>
         + nom::Slice<core::ops::Range<usize>>
         + nom::Slice<core::ops::RangeFrom<usize>>,
-    C: secp256k1::Signing,
+    C: secp256k1::Signing + secp256k1::Verification,
     E: core::fmt::Debug
         + nom::error::ContextError<Input>
         + nom::error::ParseError<Input>
@@ -70,31 +94,87 @@ where
     }
 
     log::debug!("validating outputs");
+    let mut total_with_change = 0;
+    let mut total_change = 0;
     for output_index in 0..output_count {
         let input_ = input.clone();
 
-        let mut output_keys: Vec<PublicKey, 10> = Vec::new();
+        let master_key = master_key.clone();
+        let mut output_keys: Vec<PublicKey, N> = Vec::new();
+        let mut key_count = 0;
+        let mut keys_error = Ok(());
 
-        let collect_keys = move |key, source: KeySource<Input>| {
-            log::debug!("collecting key (fingerprint {:?})", source.fingerprint);
+        let result = {
+            let output_keys = &mut output_keys;
+            let key_count = &mut key_count;
+            let keys_error = &mut keys_error;
 
-            if source.fingerprint == wallet_fingerprint {
-                output_keys.push(key).ok();
-            }
+            let collect_keys = move |key, source: KeySource<Input>| {
+                log::debug!("collecting key {:?}", source.fingerprint);
+
+                if keys_error.is_err() {
+                    log::debug!("we failed to validate a previous key");
+                    return;
+                }
+
+                if source.fingerprint == wallet_fingerprint {
+                    log::debug!("matches our key");
+
+                    let our_xpriv = master_key.derive_xpriv(secp, source.path.iter());
+                    let our_public_key = PublicKey::from_secret_key(secp, &our_xpriv.private_key);
+                    if key == our_public_key {
+                        if let Err(_) = output_keys.push(key) {
+                            *keys_error = Err(ValidationError::TooManyOutputKeys {
+                                index: output_index,
+                            });
+                        }
+
+                        *key_count += 1;
+                    } else {
+                        *keys_error = Err(ValidationError::FraudulentOutputPublicKey {
+                            index: output_index,
+                        });
+                    }
+                }
+            };
+
+            output::output_map(global_map.version, collect_keys, |_, _| {})(input_)
         };
 
-        match output::output_map(global_map.version, collect_keys)(input_) {
+        match result {
             Ok((i, txout)) => {
-                output_is_valid(&global_map, &txout, output_index)?;
+                if let Err(e) = keys_error {
+                    return Err(Error::Validation(e));
+                }
+
+                let output_details = output_is_valid(
+                    secp,
+                    &global_map,
+                    &txout,
+                    &output_keys,
+                    key_count,
+                    output_index,
+                )?;
+
+                total_with_change += output_details.amount;
+                if output_details.is_change {
+                    total_change += output_details.amount;
+                }
 
                 input = i;
             }
             Err(Err::Error(e)) => return Err(Err::Error(E::append(i, ErrorKind::Count, e)).into()),
             Err(e) => return Err(e.into()),
-        }
+        };
     }
 
-    Ok(())
+    log::debug!("total with total_change: {total_with_change} sats");
+    log::debug!("total change: {total_change} sats");
+
+    Ok(TransactionDetails {
+        total_with_change,
+        total_change,
+    })
 }
 
 pub fn input_is_valid<Input>(
@@ -112,14 +192,6 @@ where
         + nom::Slice<core::ops::RangeFrom<usize>>,
 {
     log::debug!("validating input");
-
-    // TODO(jeandudey): For the future, we should not be doing any script
-    // validation here, this instead should be parsed properly and validated
-    // properly at parsing time.
-    //
-    // We do this because this was the way we did it in Passport.
-    //
-    // Doing validation would require using libbitcoinscript though.
 
     if let Some(ref script) = map.witness_script {
         if script.iter_elements().nth(1).filter(|&v| v >= 30).is_none() {
@@ -186,12 +258,29 @@ pub fn input_derivation_is_valid<Input>(
     }
 }
 
-pub fn output_is_valid<Input>(
+pub struct OutputDetails {
+    /// The output amount, in satoshis.
+    pub amount: i64,
+    /// Is this a change output?
+    pub is_change: bool,
+}
+
+/// Validate the output.
+///
+/// # Return
+///
+/// This function returns the `Ok()` if validation succeeds with
+/// `amount` being the value in satoshis of this output.
+pub fn output_is_valid<C, Input>(
+    secp: &secp256k1::Secp256k1<C>,
     global_map: &GlobalMap<Input>,
     output_map: &OutputMap<Input>,
+    our_keys: &[PublicKey],
+    key_count: usize,
     index: u64,
-) -> Result<(), ValidationError>
+) -> Result<OutputDetails, ValidationError>
 where
+    C: secp256k1::Verification,
     Input: for<'a> nom::Compare<&'a [u8]>
         + Clone
         + PartialEq
@@ -202,6 +291,11 @@ where
         + nom::Slice<core::ops::Range<usize>>
         + nom::Slice<core::ops::RangeFrom<usize>>,
 {
+    // This should be unreachable, make sure the code calling this is aware.
+    if our_keys.len() < key_count {
+        return Err(ValidationError::InternalError);
+    }
+
     log::debug!("validating output #{index}");
 
     // Make sure we can convert u64 to usize, if not then we can't really
@@ -213,8 +307,8 @@ where
         Err(_) => return Err(ValidationError::TooManyOutputs),
     };
 
-    // Retrieve the output from the unserialized transaction or craft it
-    // on PSBTv2 from the available data.
+    // Retrieve the output from the already deserialized transaction or craft
+    // it on PSBTv2 from the available data.
     //
     // This should never return None as the global_map and output_map parsers
     // make sure of it, but return an error in any case.
@@ -223,72 +317,275 @@ where
         None => return Err(ValidationError::MissingOutput { index }),
     };
 
+    log::debug!("output amount: {} sats", txout.value);
+
+    // A normal spend, we can't really validate anything else.
+    if our_keys.len() == 0 {
+        return Ok(OutputDetails {
+            amount: txout.value,
+            is_change: false,
+        });
+    }
+
     // Validate the address of the output, so, parse the scriptPubKey and
     // determine the type, this allows us to check that the scriptPubKey
     // matches our keys, so we need to determine the script type.
-    let _ = match txout.address() {
+    let (address_type, key) = match txout.address() {
         Some(v) => v,
         None => {
             return Err(ValidationError::UnknownOutputScript { index });
         }
     };
 
-    // TODO: Verify here that it matches our keys.
+    log::debug!("output address type {:?}", address_type);
 
-    Ok(())
+    match address_type {
+        // Pay to Witness Public Key Hash.
+        //
+        // Public Key is always compressed.
+        AddressType::P2WPKH => {
+            if key_count != 1 {
+                return Err(ValidationError::MultipleKeysNotExpected { index });
+            }
+
+            let pk = our_keys[0].serialize();
+            let pkh = hash160::Hash::hash(&pk);
+            if key.compare(pkh.as_ref()) != nom::CompareResult::Ok {
+                return Err(ValidationError::FraudulentOutputPublicKey { index });
+            }
+
+            log::debug!("public key hash matches");
+        }
+        // Pay to Public Key.
+        //
+        // Can be a compressed or uncompressed public key, not hashed.
+        AddressType::P2PK => {
+            if key_count != 1 {
+                return Err(ValidationError::MultipleKeysNotExpected { index });
+            }
+
+            match key.input_len() {
+                33 => {
+                    let pk = our_keys[0].serialize();
+                    if key.compare(&pk) != nom::CompareResult::Ok {
+                        return Err(ValidationError::FraudulentOutputPublicKey { index });
+                    }
+                }
+                65 => {
+                    let pk = our_keys[0].serialize_uncompressed();
+                    if key.compare(&pk) != nom::CompareResult::Ok {
+                        return Err(ValidationError::FraudulentOutputPublicKey { index });
+                    }
+                }
+                // This should be unreachable as the Output::address function constraints
+                // the length.
+                _ => {
+                    return Err(ValidationError::InternalError);
+                }
+            }
+        }
+        AddressType::P2TR => {
+            if key_count != 1 {
+                return Err(ValidationError::MultipleKeysNotExpected { index });
+            }
+
+            // The tweaked key from the taproot output.
+            let psbt_tweaked = {
+                // Output::address already makes sure of this.
+                debug_assert!(key.input_len() == 32);
+
+                let mut psbt_tweaked_buf = [0; 32];
+                for (i, b) in key.iter_indices() {
+                    psbt_tweaked_buf[i] = b;
+                }
+
+                match XOnlyPublicKey::from_byte_array(&psbt_tweaked_buf) {
+                    Ok(v) => v,
+                    Err(_) => return Err(ValidationError::TaprootOutputInvalidPublicKey { index }),
+                }
+            };
+
+            // Our derived internal key.
+            let internal_key = our_keys[0].x_only_public_key().0;
+
+            // Verify that PSBT provided internal key is the same as ours.
+            if let Some(psbt_internal_key) = output_map.tap_internal_key {
+                if internal_key.cmp(&psbt_internal_key) != Ordering::Equal {
+                    return Err(ValidationError::FraudulentOutputPublicKey { index });
+                }
+            }
+
+
+            // Calculate the tweak.
+            let tweak = {
+                let mut eng = sha256t::Hash::<TapTweakTag>::engine();
+                eng.input(&internal_key.serialize());
+                let inner = sha256t::Hash::<TapTweakTag>::from_engine(eng);
+                let hash = TapTweakHash::from_byte_array(inner.to_byte_array());
+
+                // Is the hash is out of range we can't do anything here.
+                //
+                // Should not happen, statistically.
+                match Scalar::from_be_bytes(hash.to_byte_array()) {
+                    Ok(v) => v,
+                    Err(_) => return Err(ValidationError::InternalError),
+                }
+            };
+
+            let tweaked = match internal_key.add_tweak(secp, &tweak) {
+                Ok(v) => v.0,
+                // The resulting key is invalid after adding the tweak.
+                //
+                // Should not happen, statistically.
+                Err(_) => return Err(ValidationError::InternalError),
+            };
+
+            if psbt_tweaked.cmp(&tweaked) != Ordering::Equal {
+                return Err(ValidationError::FraudulentOutputPublicKey { index });
+            }
+        }
+        AddressType::P2SH => {
+            let redeem_script = match &output_map.redeem_script {
+                Some(v) => v,
+                None => return Err(ValidationError::MissingRedeemWitnessScript { index }),
+            };
+
+            // Handle P2WPKH nested in P2SH.
+            if redeem_script.input_len() == 22 {
+                let mut iter = redeem_script.iter_elements();
+                let b0 = iter.next();
+                let b1 = iter.next();
+                if b0 == Some(0x00) && b1 == Some(0x14) {
+                    if key_count != 1 {
+                        return Err(ValidationError::MultipleKeysNotExpected { index });
+                    }
+
+                    let nested_pkh = redeem_script.slice(2..22);
+
+                    let pk = our_keys[0].serialize();
+                    let pkh = hash160::Hash::hash(&pk);
+                    if nested_pkh.compare(pkh.as_ref()) != nom::CompareResult::Ok {
+                        return Err(ValidationError::FraudulentOutputPublicKey { index });
+                    }
+
+                    // TODO: HASH160 of redeem script and compare with key.
+                }
+            }
+
+            // TODO: Multisig
+        }
+        // TODO: Other address types.
+        _ => {
+            return Err(ValidationError::UnknownOutputScript { index });
+        }
+    }
+
+    Ok(OutputDetails {
+        amount: txout.value,
+        is_change: true,
+    })
 }
 
 #[derive(Debug, Clone)]
 pub enum Error<E> {
-    ParseError(nom::Err<E>),
-    ValidationError(ValidationError),
+    Parse(nom::Err<E>),
+    Validation(ValidationError),
 }
 
 impl<E> From<nom::Err<E>> for Error<E> {
     fn from(value: nom::Err<E>) -> Self {
-        Self::ParseError(value)
+        Self::Parse(value)
     }
 }
 
 impl<E> From<ValidationError> for Error<E> {
     fn from(value: ValidationError) -> Self {
-        Self::ValidationError(value)
+        Self::Validation(value)
     }
 }
 
 impl<E: fmt::Debug> fmt::Display for Error<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::ParseError(e) => fmt::Display::fmt(e, f),
-            Error::ValidationError(e) => write!(f, "validation error: {e}"),
+            Error::Parse(e) => fmt::Display::fmt(e, f),
+            Error::Validation(e) => write!(f, "validation error: {e}"),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum ValidationError {
+    InternalError,
     InvalidWitnessScript,
     InvalidRedeemScript,
     UnsupportedSighash,
     TxidMismatch,
     MissingPreviousTxid,
+    /// Redeem/Witness script missing for P2SH output.
+    MissingRedeemWitnessScript {
+        index: u64,
+    },
+    /// The x-only public key of the taproot output `{index}` is not valid.
+    TaprootOutputInvalidPublicKey {
+        index: u64,
+    },
     TooManyOutputs,
-    MissingOutput { index: u64 },
-    UnknownOutputScript { index: u64 },
+    TooManyOutputKeys {
+        index: u64,
+    },
+    /// The PSBT output `{index}` specified more keys than necessary for a
+    /// given output script.
+    ///
+    /// For example, providing 2 keys in the PSBT output while the
+    /// scriptPubKey is actually P2PK, P2PKH, P2WPKH, etc.
+    MultipleKeysNotExpected {
+        index: u64,
+    },
+    /// The output number `{index}` contains a fraudulent public key.
+    ///
+    /// For example, uses our fingerprint but the public key we calculate
+    /// does not match the one provided by the PSBT.
+    FraudulentOutputPublicKey {
+        index: u64,
+    },
+    MissingOutput {
+        index: u64,
+    },
+    UnknownOutputScript {
+        index: u64,
+    },
 }
 
 impl fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ValidationError::InternalError => write!(f, "internal error"),
             ValidationError::InvalidWitnessScript => write!(f, "invalid witness script"),
             ValidationError::InvalidRedeemScript => write!(f, "invalid redeem script"),
             ValidationError::UnsupportedSighash => write!(f, "unsupported sighash"),
             ValidationError::TxidMismatch => write!(f, "TXID mismatch"),
             ValidationError::MissingPreviousTxid => write!(f, "missing previous TXID"),
+            ValidationError::MissingRedeemWitnessScript { index } => {
+                write!(f, "missing redeem/witness script for output {index}")
+            }
+            ValidationError::TaprootOutputInvalidPublicKey { index } => {
+                write!(f, "x-only public key of taproot output {index} is invalid")
+            }
             ValidationError::TooManyOutputs => write!(
                 f,
                 "there's more outputs in this transaction than the system can handle"
             ),
+            ValidationError::TooManyOutputKeys { index } => write!(
+                f,
+                "there's more keys in output {index} in this transaction than the system can handle"
+            ),
+            ValidationError::MultipleKeysNotExpected { index } => write!(
+                f,
+                "there's more keys in output {index} than the descriptor specifies"
+            ),
+            ValidationError::FraudulentOutputPublicKey { index } => {
+                write!(f, "output {index} is fraudulent, public keys don't match",)
+            }
             ValidationError::MissingOutput { index } => write!(f, "missing output {index}"),
             ValidationError::UnknownOutputScript { index } => write!(
                 f,

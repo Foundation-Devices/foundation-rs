@@ -7,13 +7,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+base58ck = { workspace = true, optional = true }
 bitcoin_hashes = { workspace = true }
 nom = { workspace = true }
 secp256k1 = { workspace = true }
 
 [features]
 default = ["std"]
-std = []
+alloc = ["nom/alloc"]
+std = ["alloc"]
+base58ck = ["dep:base58ck", "alloc"]
 
 [dev-dependencies]
 secp256k1 = { workspace = true, features= ["std"] }

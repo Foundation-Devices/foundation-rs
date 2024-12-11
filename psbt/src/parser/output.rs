@@ -23,9 +23,14 @@ use crate::parser::secp::x_only_public_key;
 use crate::transaction;
 
 #[rustfmt::skip]
-pub fn output_map<B, Input, Error>(version: u32, mut bip32_derivation: B) -> impl FnMut(Input) -> IResult<Input, OutputMap<Input>, Error>
+pub fn output_map<B, C, Input, Error>(
+    version: u32,
+    mut bip32_derivation: B,
+    mut tap_bip32_derivation: C,
+) -> impl FnMut(Input) -> IResult<Input, OutputMap<Input>, Error>
 where
     B: FnMut(PublicKey, KeySource<Input>),
+    C: FnMut(XOnlyPublicKey, Input),
     Input: for<'a> Compare<&'a [u8]>
         + Clone
         + PartialEq
@@ -48,7 +53,7 @@ where
                 KeyPair::Script(v)                => map.script = Some(v),
                 KeyPair::TapInternalKey(v)        => map.tap_internal_key = Some(v),
                 KeyPair::TapTree(v)               => map.tap_tree = Some(v),
-                KeyPair::TapBip32Derivation(_, _) => (), // TODO
+                KeyPair::TapBip32Derivation(p, s) => tap_bip32_derivation(p, s),
             };
 
             map

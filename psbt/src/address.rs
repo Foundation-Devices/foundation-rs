@@ -10,3 +10,13 @@ pub enum AddressType {
     P2SH,
     P2PK,
 }
+
+impl AddressType {
+    /// Is address type post segregated witness standards?
+    pub fn is_segwit(&self) -> bool {
+        match self {
+            AddressType::P2WPKH | AddressType::P2WSH | AddressType::P2TR => true,
+            _ => false,
+        }
+    }
+}

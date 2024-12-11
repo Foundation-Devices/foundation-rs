@@ -26,12 +26,13 @@ homepage = "https://github.com/Foundation-Devices/foundation-rs"
 [workspace.dependencies]
 anyhow = { version = "1.0.83", default-features = false }
 arbitrary = { version = "1", features = ["derive"] }
+base58ck = { version = "0.1", default-features = false }
 bech32 = { version = "0.9", default-features = false }
 bip39 = { version = "2.1", default-features = false }
 bitcoin = { version = "0.31", default-features = false }
+bitcoin-primitives = { version = "0.101", default-features = false }
 bitcoin_hashes = { version = "0.15", default-features = false }
 bitflags = { version = "2", default-features = false }
-bs58 = "0.5"
 clap = { version = "4", features = ["cargo"] }
 crc = "3"
 criterion = { version = "0.4" }

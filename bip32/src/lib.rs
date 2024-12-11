@@ -13,6 +13,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 use core::str::Split;
 
 use bitcoin_hashes::{hash160, hash_newtype, sha512, GeneralHash, HashEngine, Hmac, HmacEngine};
@@ -198,17 +201,35 @@ impl Xpriv {
 
     /// Returns the HASH160 of the public key belonging to the xpriv
     pub fn identifier<C: secp256k1::Signing>(&self, secp: &Secp256k1<C>) -> XKeyIdentifier {
-        Xpub::from_priv(secp, self).identifier()
+        Xpub::from_xpriv(secp, self).identifier()
     }
 
     /// Returns the first four bytes of the identifier
     pub fn fingerprint<C: secp256k1::Signing>(&self, secp: &Secp256k1<C>) -> Fingerprint {
-        /*
-        self.identifier(secp)[0..4]
+        <XKeyIdentifier as AsRef<[u8]>>::as_ref(&self.identifier(secp))[0..4]
             .try_into()
             .expect("4 is the fingerprint length")
-            */
-        todo!()
+    }
+}
+
+#[cfg(feature = "base58ck")]
+impl core::str::FromStr for Xpriv {
+    type Err = ParseExtendedKeyError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use nom::Finish;
+
+        let payload = base58ck::decode_check(s)?;
+
+        if payload.len() != 78 {
+            return Err(ParseExtendedKeyError::InvalidLength);
+        }
+
+        let (i, xprv) =
+            parser::xprv::<_, nom::error::VerboseError<_>>(payload.as_slice()).finish()?;
+        debug_assert!(i.is_empty(), "parser must consume the entire 78 bytes");
+
+        Ok(xprv)
     }
 }
 
@@ -233,7 +254,7 @@ pub struct Xpub {
 
 impl Xpub {
     /// Derives a public key from a private key
-    pub fn from_priv<C: secp256k1::Signing>(secp: &Secp256k1<C>, sk: &Xpriv) -> Xpub {
+    pub fn from_xpriv<C: secp256k1::Signing>(secp: &Secp256k1<C>, sk: &Xpriv) -> Xpub {
         Xpub {
             version: sk.version,
             depth: sk.depth,
@@ -244,22 +265,13 @@ impl Xpub {
         }
     }
 
-    /*
-    /// Attempts to derive a extended public key.
-    pub fn derive_xpub<C: secp256k1::Verification, P: Iterator<Item = u32>>(
-        &self,
-        secp: &Secp256k1<C>,
-        path: P,
-    ) -> Xpub {
-    }
-
     /// Compute the scalar tweak added to this key to get a child key
     pub fn ckd_pub_tweak(
         &self,
         i: u32,
-    ) -> Result<(secp256k1::SecretKey, ChainCode), Error> {
+    ) -> Result<(secp256k1::SecretKey, ChainCode), DeriveXpubError> {
         if i >= 0x8000_0000 {
-            return Err(todo!());
+            return Err(DeriveXpubError::HardenedIndex);
         }
 
         let mut hmac_engine: HmacEngine<sha512::Hash> = HmacEngine::new(&self.chain_code[..]);
@@ -268,7 +280,7 @@ impl Xpub {
 
         let hmac_result: Hmac<sha512::Hash> = Hmac::from_engine(hmac_engine);
 
-        let private_key = secp256k1::SecretKey::from_slice(&hmac_result[..32])?;
+        let private_key = secp256k1::SecretKey::from_slice(&hmac_result.as_ref()[..32])?;
         let chain_code = ChainCode::from_hmac(hmac_result);
         Ok((private_key, chain_code))
     }
@@ -277,29 +289,110 @@ impl Xpub {
     pub fn ckd_pub<C: secp256k1::Verification>(
         &self,
         secp: &Secp256k1<C>,
-        i: ChildNumber,
-    ) -> Result<Xpub, Error> {
+        i: u32,
+    ) -> Result<Xpub, DeriveXpubError> {
         let (sk, chain_code) = self.ckd_pub_tweak(i)?;
         let tweaked = self.public_key.add_exp_tweak(secp, &sk.into())?;
 
         Ok(Xpub {
-            network: self.network,
+            version: self.version,
             depth: self.depth + 1,
             parent_fingerprint: self.fingerprint(),
             child_number: i,
             public_key: tweaked,
             chain_code,
         })
-    }*/
+    }
+
+    /// Attempts to derive a extended public key.
+    pub fn derive_xpub<C: secp256k1::Verification, P: Iterator<Item = u32>>(
+        &self,
+        secp: &Secp256k1<C>,
+        path: P,
+    ) -> Result<Xpub, DeriveXpubError> {
+        let mut sk: Xpub = self.clone();
+        for cnum in path {
+            sk = sk.ckd_pub(secp, cnum)?;
+        }
+        Ok(sk)
+    }
 
     /// Returns the HASH160 of the chaincode
     pub fn identifier(&self) -> XKeyIdentifier {
-        /*
-        let mut engine = XKeyIdentifier::engine();
-        engine.input(&self.public_key.serialize());
-        XKeyIdentifier::from_engine(engine)
-        */
-        todo!()
+        XKeyIdentifier(hash160::Hash::hash(&self.public_key.serialize()))
+    }
+
+    /// Returns the first four bytes of the identifier
+    pub fn fingerprint(&self) -> Fingerprint {
+        <XKeyIdentifier as AsRef<[u8]>>::as_ref(&self.identifier())[0..4]
+            .try_into()
+            .expect("4 is the fingerprint length")
+    }
+}
+
+#[cfg(feature = "base58ck")]
+impl core::str::FromStr for Xpub {
+    type Err = ParseExtendedKeyError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use nom::Finish;
+
+        let payload = base58ck::decode_check(s)?;
+
+        if payload.len() != 78 {
+            return Err(ParseExtendedKeyError::InvalidLength);
+        }
+
+        let (i, xpub) =
+            parser::xpub::<_, nom::error::VerboseError<_>>(payload.as_slice()).finish()?;
+        debug_assert!(i.is_empty(), "parser must consume the entire 78 bytes");
+
+        Ok(xpub)
+    }
+}
+
+/// Errors that can occur when deriving a extended public key.
+#[derive(Debug)]
+pub enum DeriveXpubError {
+    /// Occurs when deriving a extended public key from a extended public key
+    /// using a hardened index.
+    HardenedIndex,
+    /// Secp256k1 error.
+    Secp256k1(secp256k1::Error),
+}
+
+
+impl From<secp256k1::Error> for DeriveXpubError {
+    fn from(e: secp256k1::Error) -> Self {
+        Self::Secp256k1(e)
+    }
+}
+
+/// Errors that can occur when parsing a extended key from the Base58Check
+/// representation.
+#[cfg(feature = "base58ck")]
+#[derive(Debug)]
+pub enum ParseExtendedKeyError {
+    /// The string is not valid Base58Check.
+    Base58(base58ck::Error),
+    /// The parser failed.
+    Parser(nom::error::VerboseError<alloc::vec::Vec<u8>>),
+    /// The length of the key is invalid.
+    InvalidLength,
+}
+
+#[cfg(feature = "base58ck")]
+impl From<base58ck::Error> for ParseExtendedKeyError {
+    fn from(e: base58ck::Error) -> Self {
+        Self::Base58(e)
+    }
+}
+
+#[cfg(feature = "base58ck")]
+impl From<nom::error::VerboseError<&[u8]>> for ParseExtendedKeyError {
+    fn from(e: nom::error::VerboseError<&[u8]>) -> Self {
+        let errors = e.errors.iter().map(|v| (v.0.to_owned(), v.1.clone())).collect();
+        Self::Parser(nom::error::VerboseError { errors })
     }
 }
 
@@ -412,6 +505,7 @@ where
         let (buf, item) = le_u32::<_, nom::error::Error<_>>(self.buf.clone())
             .expect("element should be valid at this point");
         self.buf = buf;
+        self.count += 1;
 
         Some(item)
     }

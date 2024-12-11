@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use bitcoin_hashes::Hash;
+use bitcoin_hashes::sha256d;
+use bitcoin_primitives::Txid;
 use embedded_io::Write;
 
 use crate::address::AddressType;
@@ -9,7 +10,6 @@ use crate::encoder::{
     hash_engine::HashEngine,
     transaction::{encode_inputs, encode_outputs},
 };
-use crate::hash_types::Txid;
 
 /// A raw segwit bitcoin transaction.
 #[derive(Debug, Clone)]
@@ -51,14 +51,14 @@ impl<I> Transaction<I> {
             + nom::InputLength
             + nom::Slice<core::ops::RangeFrom<usize>>,
     {
-        let mut enc = HashEngine::from(Txid::engine());
+        let mut enc = HashEngine::from(sha256d::Hash::engine());
 
         enc.write(&self.version.to_le_bytes()).unwrap();
         encode_inputs(&mut enc, &self.inputs).unwrap();
         encode_outputs(&mut enc, &self.outputs).unwrap();
         enc.write(&self.lock_time.to_le_bytes()).unwrap();
 
-        Txid::from_engine(enc.into_inner())
+        Txid::from(sha256d::Hash::from_engine(enc.into_inner()))
     }
 }
 
@@ -86,12 +86,12 @@ where
     I: nom::Slice<core::ops::Range<usize>>,
     I: nom::Slice<core::ops::RangeFrom<usize>>,
 {
-    // NOTE: This procedure is written in this way as to reduce accesses to
-    // script_pubkey as much as possible as in Passport this means accessing
-    // the storage device.
-    //
-    // So, written for performance, not readability. That is also the reason
-    // of the nested ifs.
+    /// NOTE: This procedure is written in this way as to reduce accesses to
+    /// script_pubkey as much as possible as in Passport this means accessing
+    /// the storage device.
+    ///
+    /// So, written for performance, not readability. That is also the reason
+    /// of the nested ifs.
     pub fn address(&self) -> Option<(AddressType, I)> {
         let len = self.script_pubkey.input_len();
         let mut iter = self.script_pubkey.iter_elements();
@@ -112,6 +112,13 @@ where
             return Some((AddressType::P2WSH, self.script_pubkey.slice(2..34)));
         }
 
+        // P2TR (BIP-0341).
+        //
+        // 0x5120 and the rest if the output public key.
+        if len == 34 && b0 == Some(0x51) && b1 == Some(0x20) {
+            return Some((AddressType::P2TR, self.script_pubkey.slice(2..34)));
+        }
+
         // P2SH (BIP-16).
         if len == 23 && b0 == Some(0xA9) && b1 == Some(0x14) {
             let b22 = self.script_pubkey.slice(22..).iter_elements().nth(0);
@@ -121,9 +128,9 @@ where
         }
 
         // P2PK.
-        if (len == 25 || len == 67) && (b0 == Some(0x21) || b0 == Some(0x41)) {
-            let blast = self.script_pubkey.slice(len - 1..).iter_elements().nth(0);
-            if blast == Some(0xAC) {
+        if (len == 35 || len == 67) && (b0 == Some(0x21) || b0 == Some(0x41)) {
+            let last = self.script_pubkey.slice(len - 1..).iter_elements().nth(0);
+            if last == Some(0xAC) {
                 return Some((AddressType::P2PK, self.script_pubkey.slice(2..35)));
             }
         }

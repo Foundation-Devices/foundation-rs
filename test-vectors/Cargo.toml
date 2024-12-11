@@ -13,7 +13,7 @@ edition = "2021"
 [features]
 default = ["std"]
 std = ["faster-hex/std", "serde/std"]
-bip32 = ["bs58", "faster-hex/serde"]
+bip32 = ["base58ck/std", "faster-hex/serde"]
 firmware = []
 nostr = ["faster-hex/serde"]
 psbt = ["faster-hex/serde"]
@@ -21,9 +21,9 @@ seedqr = ["bip39/serde", "faster-hex/serde"]
 blockchain-commons = ["bitcoin/serde", "faster-hex/serde"]
 
 [dependencies]
+base58ck = { workspace = true, optional = true }
 bip39 = { workspace = true, optional = true, features = ["std"] }
 bitcoin = { workspace = true, optional = true, features = ["std"] }
-bs58 = { workspace = true, optional = true }
 faster-hex = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

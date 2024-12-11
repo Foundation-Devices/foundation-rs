@@ -39,7 +39,7 @@ pub struct InvalidTestVector {
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub struct ExtendedKey(#[serde(with = "base58")] pub Vec<u8>);
+pub struct ExtendedKey(#[serde(with = "base58_check")] pub Vec<u8>);
 
 impl ExtendedKey {
     pub fn as_slice(&self) -> &[u8] {
@@ -47,27 +47,21 @@ impl ExtendedKey {
     }
 }
 
-mod base58 {
-    use bs58::decode::DecodeTarget;
+mod base58_check {
     use std::fmt::Formatter;
-    use std::marker::PhantomData;
 
     use serde::{
         de::{Error, Visitor},
         Deserializer,
     };
 
-    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
     where
-        D: Deserializer<'de>,
-        T: DecodeTarget + Default,
+        D: Deserializer<'de>
     {
-        struct Base58Visitor<T>(PhantomData<T>);
-        impl<'de, T> Visitor<'de> for Base58Visitor<T>
-        where
-            T: DecodeTarget + Default,
-        {
-            type Value = T;
+        struct Base58Visitor;
+        impl<'de> Visitor<'de> for Base58Visitor {
+            type Value = Vec<u8>;
 
             fn expecting(&self, f: &mut Formatter) -> std::fmt::Result {
                 f.write_str("Base58 encoded string")
@@ -77,9 +71,7 @@ mod base58 {
             where
                 E: Error,
             {
-                let mut target = T::default();
-                bs58::decode(v).onto(&mut target).map_err(E::custom)?;
-                Ok(target)
+                base58ck::decode(v).map_err(E::custom)
             }
 
             fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
@@ -90,6 +82,6 @@ mod base58 {
             }
         }
 
-        deserializer.deserialize_str(Base58Visitor(PhantomData))
+        deserializer.deserialize_str(Base58Visitor)
     }
 }

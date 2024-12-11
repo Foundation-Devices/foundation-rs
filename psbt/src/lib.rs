@@ -9,7 +9,6 @@
 
 pub mod address;
 pub mod encoder;
-pub mod hash_types;
 pub mod parser;
 pub mod taproot;
 pub mod transaction;

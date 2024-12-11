@@ -19,7 +19,8 @@ use foundation_bip32::{
     KeySource,
 };
 
-use crate::hash_types::Txid;
+use bitcoin_primitives::{TapNodeHash, Txid};
+
 use crate::parser::compact_size::compact_size;
 use crate::parser::hash::{
     hash160, ripemd160, sha256, sha256d, taproot_leaf_hash, taproot_node_hash, txid,
@@ -27,7 +28,7 @@ use crate::parser::hash::{
 use crate::parser::keypair::key_pair;
 use crate::parser::secp::{schnorr_signature, x_only_public_key};
 use crate::parser::transaction::transaction;
-use crate::taproot::{TapNodeHash, TaprootScriptSignature};
+use crate::taproot::TaprootScriptSignature;
 use crate::transaction::{Transaction, SIGHASH_ALL};
 
 /// Insert `value` into `option` if it's not set already, if already set

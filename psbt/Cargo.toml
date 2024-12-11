@@ -7,30 +7,32 @@ version = "0.1.0"
 edition = "2021"
 
 [[example]]
-name = "validate"
-required-features = ["validate-binary"]
+name = "sign"
+required-features = ["sign-example"]
 
 [dependencies]
 bitcoin_hashes = { workspace = true }
+bitcoin-primitives = { workspace = true }
 bitflags = { workspace = true }
 either = { workspace = true }
 embedded-io = { workspace = true }
 env_logger = { workspace = true }
 foundation-bip32 = { workspace = true }
 heapless = { workspace = true }
-#faster-hex = { workspace = true, features = ["std"] }  # TODO: removeme
 log = { workspace = true }
 nom = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
-rand = { workspace = true, optional = true }
 secp256k1 = { workspace = true }
 
 [dev-dependencies]
 foundation-test-vectors = { workspace = true, features = ["psbt"] }
 
 [features]
-default = ["std", "rand", "validate-binary"]
+default = ["std", "sign-example"]
 std = ["nom/std", "secp256k1/std", ]
-rand = ["dep:rand", "secp256k1/rand"]
-validate-binary = ["rand", "secp256k1/global-context", "std"]
+sign-example = [
+    "foundation-bip32/base58ck",
+    "secp256k1/global-context",
+    "std",
+]

@@ -89,7 +89,7 @@ where
         for _ in 0..output_count {
             let input_ = input.clone();
 
-            match output::output_map(global_map.version, output_xpub_event)(input_) {
+            match output::output_map(global_map.version, output_xpub_event, |_, _| ())(input_) {
                 Ok((i, _o)) => {
                     input = i;
                 }
