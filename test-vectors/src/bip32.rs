@@ -57,7 +57,7 @@ mod base58_check {
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
     where
-        D: Deserializer<'de>
+        D: Deserializer<'de>,
     {
         struct Base58Visitor;
         impl<'de> Visitor<'de> for Base58Visitor {
