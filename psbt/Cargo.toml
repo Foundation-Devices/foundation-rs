@@ -30,7 +30,7 @@ foundation-test-vectors = { workspace = true, features = ["psbt"] }
 
 [features]
 default = ["std", "sign-example"]
-std = ["nom/std", "secp256k1/std", ]
+std = ["nom/std", "secp256k1/std", "foundation-bip32/std"]
 sign-example = [
     "foundation-bip32/base58ck",
     "secp256k1/global-context",

@@ -101,8 +101,6 @@ where
         + FromExternalError<I, secp256k1::Error>
         + FromExternalError<I, TryFromIntError>,
 {
-    // println!("global key pair");
-
     let unsigned_tx = context("utx", key_pair(0x00, eof, transaction));
     let xpub = key_pair(0x01, xpub, key_source);
     let xpub = context(
