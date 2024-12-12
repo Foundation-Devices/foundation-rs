@@ -14,9 +14,11 @@
 //!
 //! Can be an interesting optimization approach once this code is in prod.
 
+use core::num::TryFromIntError;
+
 use nom::{
-    combinator::map,
-    error::{ErrorKind, ParseError},
+    combinator::{map, map_res},
+    error::{ErrorKind, FromExternalError, ParseError},
     multi::length_data,
     number::complete::{le_i32, le_i64, le_u32},
     sequence::tuple,
@@ -37,7 +39,7 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>
         + InputTake,
-    E: ParseError<I>,
+    E: ParseError<I> + FromExternalError<I, TryFromIntError>,
 {
     map(
         tuple((le_i32, inputs, outputs, le_u32)),
@@ -59,7 +61,7 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>
         + InputTake,
-    E: ParseError<I>,
+    E: ParseError<I> + FromExternalError<I, TryFromIntError>,
 {
     let (inputs_start, len) = compact_size(i)?;
 
@@ -95,10 +97,10 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>
         + InputTake,
-    E: ParseError<I>,
+    E: ParseError<I> + FromExternalError<I, TryFromIntError>,
 {
     let previous_output = output_point;
-    let script_sig = length_data(compact_size);
+    let script_sig = length_data(map_res(compact_size, usize::try_from));
     let sequence = le_u32;
     let fields = tuple((previous_output, script_sig, sequence));
 
