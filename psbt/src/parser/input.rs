@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use core::num::TryFromIntError;
+
 use bitcoin_hashes::{hash160, ripemd160, sha256, sha256d};
 
 use nom::branch::alt;
@@ -62,6 +64,7 @@ where
     Error: ContextError<Input>,
     Error: ParseError<Input>,
     Error: FromExternalError<Input, secp256k1::Error>,
+    Error: FromExternalError<Input, TryFromIntError>,
 {
     move |i: Input| {
         let mut map = InputMap::default();
@@ -139,6 +142,7 @@ where
     Error: ContextError<Input>,
     Error: ParseError<Input>,
     Error: FromExternalError<Input, secp256k1::Error>,
+    Error: FromExternalError<Input, TryFromIntError>,
 {
     let non_witness_utxo = key_pair(0x00, eof, transaction);
     let witness_utxo = key_pair(0x01, eof, witness_utxo);

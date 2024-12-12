@@ -62,7 +62,8 @@ where
         + nom::error::ContextError<Input>
         + nom::error::ParseError<Input>
         + nom::error::FromExternalError<Input, secp256k1::Error>
-        + nom::error::FromExternalError<Input, bitcoin_hashes::FromSliceError>,
+        + nom::error::FromExternalError<Input, bitcoin_hashes::FromSliceError>
+        + nom::error::FromExternalError<Input, core::num::TryFromIntError>,
 {
     log::debug!("validating PSBT");
 
@@ -414,7 +415,6 @@ where
                     return Err(ValidationError::FraudulentOutputPublicKey { index });
                 }
             }
-
 
             // Calculate the tweak.
             let tweak = {

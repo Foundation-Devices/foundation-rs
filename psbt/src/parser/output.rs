@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use core::num::TryFromIntError;
+
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{eof, map, rest, verify};
@@ -39,7 +41,7 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>,
     Error: ContextError<Input>,
-    Error: ParseError<Input> + FromExternalError<Input, secp256k1::Error>,
+    Error: ParseError<Input> + FromExternalError<Input, secp256k1::Error> + FromExternalError<Input, TryFromIntError>,
 {
     let keypairs = fold_many0(
         output_key_pair,
@@ -88,6 +90,7 @@ where
     Error: ContextError<Input>,
     Error: ParseError<Input>,
     Error: FromExternalError<Input, secp256k1::Error>,
+    Error: FromExternalError<Input, TryFromIntError>,
 {
     let redeem_script        = context("redeem script", key_pair(0x00, eof, rest));
     let witness_script       = context("witness script", key_pair(0x01, eof, rest));

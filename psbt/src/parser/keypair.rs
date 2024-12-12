@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use nom::combinator::{map, verify};
+use core::num::TryFromIntError;
+
+use nom::combinator::{map, map_res, verify};
 use nom::error::context;
-use nom::error::{ContextError, ParseError};
+use nom::error::{ContextError, FromExternalError, ParseError};
 use nom::multi::length_value;
 use nom::sequence::tuple;
 use nom::{Compare, IResult, InputIter, InputLength, InputTake, Parser, Slice};
@@ -28,15 +30,10 @@ where
         + Slice<core::ops::RangeFrom<usize>>,
     F: Parser<I, K, E>,
     G: Parser<I, V, E>,
-    E: ParseError<I> + ContextError<I>,
+    E: ParseError<I> + ContextError<I> + FromExternalError<I, TryFromIntError>,
 {
-    //println!("key pair: {key_type}");
-
     let value = length_value(
-        verify(compact_size, |_v| {
-            //println!("length {v}");
-            true
-        }),
+        map_res(compact_size, |v| usize::try_from(v)),
         context("when parsing value", value),
     );
 
@@ -53,18 +50,12 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>,
     F: Parser<I, K, E>,
-    E: ParseError<I>,
+    E: ParseError<I> + FromExternalError<I, TryFromIntError>,
 {
-    let key_type = verify(compact_size, move |&k| {
-        //println!("key_type {k}");
-        k == key_type
-    });
+    let key_type = verify(compact_size, move |&k| k == key_type);
 
     // This verification makes sure that the length is not a separator of a map.
-    let length = verify(compact_size, |&v| {
-        //println!("key_len {v}");
-        v != 0x00
-    });
+    let length = map_res(verify(compact_size, |&v| v != 0x00), |v| usize::try_from(v));
 
     let fields = tuple((key_type, key_data));
     map(length_value(length, fields), |(_, o)| o)

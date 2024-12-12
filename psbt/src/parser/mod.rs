@@ -28,6 +28,8 @@ pub mod output;
 pub mod secp;
 pub mod transaction;
 
+use core::num::TryFromIntError;
+
 use nom::{
     bytes::complete::tag,
     error::{context, ContextError, ErrorKind, FromExternalError, ParseError},
@@ -60,7 +62,8 @@ where
         + ContextError<Input>
         + ParseError<Input>
         + FromExternalError<Input, secp256k1::Error>
-        + FromExternalError<Input, bitcoin_hashes::FromSliceError>,
+        + FromExternalError<Input, bitcoin_hashes::FromSliceError>
+        + FromExternalError<Input, TryFromIntError>,
 {
     let mut magic = context("magic bytes", tag::<_, Input, Error>(b"psbt\xff"));
     let mut global_map = global::global_map(global_xpub_event);

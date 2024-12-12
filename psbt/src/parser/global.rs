@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use core::num::TryFromIntError;
+
 use bitflags::bitflags;
 use nom::{
     branch::alt,
@@ -35,7 +37,10 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>,
     F: FnMut(Xpub, KeySource<I>),
-    Error: ContextError<I> + ParseError<I> + FromExternalError<I, secp256k1::Error>,
+    Error: ContextError<I>
+        + ParseError<I>
+        + FromExternalError<I, secp256k1::Error>
+        + FromExternalError<I, TryFromIntError>,
 {
     // println!("global map");
     let keypairs = fold_many0(
@@ -91,7 +96,10 @@ where
         + InputLength
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>,
-    Error: ContextError<I> + ParseError<I> + FromExternalError<I, secp256k1::Error>,
+    Error: ContextError<I>
+        + ParseError<I>
+        + FromExternalError<I, secp256k1::Error>
+        + FromExternalError<I, TryFromIntError>,
 {
     // println!("global key pair");
 
