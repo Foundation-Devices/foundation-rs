@@ -361,7 +361,6 @@ pub enum DeriveXpubError {
     Secp256k1(secp256k1::Error),
 }
 
-
 impl From<secp256k1::Error> for DeriveXpubError {
     fn from(e: secp256k1::Error) -> Self {
         Self::Secp256k1(e)
@@ -391,7 +390,11 @@ impl From<base58ck::Error> for ParseExtendedKeyError {
 #[cfg(feature = "base58ck")]
 impl From<nom::error::VerboseError<&[u8]>> for ParseExtendedKeyError {
     fn from(e: nom::error::VerboseError<&[u8]>) -> Self {
-        let errors = e.errors.iter().map(|v| (v.0.to_owned(), v.1.clone())).collect();
+        let errors = e
+            .errors
+            .iter()
+            .map(|v| (v.0.to_owned(), v.1.clone()))
+            .collect();
         Self::Parser(nom::error::VerboseError { errors })
     }
 }
