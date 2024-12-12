@@ -14,6 +14,7 @@
 use core::{
     cell::RefCell,
     iter::Enumerate,
+    ops::Deref,
     ops::{Range, RangeFrom, RangeFull, RangeTo},
 };
 use embedded_storage::nor_flash::ReadNorFlash;
@@ -139,6 +140,66 @@ impl<S, const N: usize> Clone for Bytes<S, N> {
             storage: Rc::clone(&self.storage),
             buffer: RefCell::new(Vec::new()),
         }
+    }
+}
+
+impl<S, const N: usize> PartialEq for Bytes<S, N>
+where
+    S: ReadNorFlash,
+{
+    fn eq(&self, other: &Self) -> bool {
+        if other.len() != self.len() {
+            return false;
+        }
+
+        if other.is_empty() != self.is_empty() {
+            return false;
+        }
+
+        let mut pos = 0;
+        while pos < self.len() {
+            let offset0 = match u32::try_from(self.offset + pos) {
+                Ok(v) => v,
+                Err(_) => return false,
+            };
+
+            let offset1 = match u32::try_from(other.offset + pos) {
+                Ok(v) => v,
+                Err(_) => return false,
+            };
+
+            let len = self.len().min(N);
+
+            let mut buffer0 = self.buffer.borrow_mut();
+            buffer0.clear();
+            buffer0
+                .resize(len, 0)
+                .expect("chunk size should be less than or equal to N");
+
+            // NOTE: We can't use other.buffer here because the user can
+            // pass &self as other, and we already borrowed that one.
+            let mut buffer1 = Vec::<u8, N>::new();
+            buffer1.clear();
+            buffer1
+                .resize(len, 0)
+                .expect("chunk size should be less than or equal to N");
+
+            if let Err(_) = self.storage.borrow_mut().read(offset0, &mut buffer0) {
+                return false;
+            }
+
+            if let Err(_) = self.storage.borrow_mut().read(offset1, &mut buffer1) {
+                return false;
+            }
+
+            pos += self.len().min(N);
+
+            if buffer0.deref() != buffer1.deref() {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -669,5 +730,32 @@ mod tests {
             CompareResult::Ok,
             "case-insensitive comparison should succeed"
         );
+    }
+
+    #[test]
+    fn test_partial_eq() {
+        let original = b"abcd123";
+        let storage = NonNull::from(Box::leak(Box::new(RcInner::new(RefCell::new(Storage(
+            original,
+        ))))));
+        let storage = unsafe { Rc::from_inner(storage) };
+        let s0 = Bytes::<_, 16>::new(0, original.len(), storage).unwrap();
+
+        let original = b"abcd123";
+        let storage = NonNull::from(Box::leak(Box::new(RcInner::new(RefCell::new(Storage(
+            original,
+        ))))));
+        let storage = unsafe { Rc::from_inner(storage) };
+        let s1 = Bytes::<_, 16>::new(0, original.len(), storage).unwrap();
+
+        assert_eq!(s0, s0, "same bytes should be equal");
+        assert_eq!(s1, s1, "same bytes should be equal");
+        assert_eq!(s0, s1);
+        assert_eq!(s0.slice(2..), s1.slice(2..));
+        assert_ne!(s0.slice(3..), s1.slice(2..));
+        assert_ne!(s0.slice(2..), s1.slice(3..));
+        assert_eq!(s0.slice(2..4).len(), 2);
+        assert_eq!(s1.slice(2..4).len(), 2);
+        assert_ne!(s0.slice(2..4), s1.slice(4..6));
     }
 }
