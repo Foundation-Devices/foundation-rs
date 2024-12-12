@@ -122,6 +122,7 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>,
     E: ParseError<I>,
+    E: FromExternalError<I, TryFromIntError>,
 {
     let (outputs_start, len) = compact_size(i)?;
 
@@ -159,9 +160,10 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>,
     E: ParseError<I>,
+    E: FromExternalError<I, TryFromIntError>,
 {
     let value = le_i64;
-    let script_pubkey = length_data(compact_size);
+    let script_pubkey = length_data(map_res(compact_size, usize::try_from));
     let fields = tuple((value, script_pubkey));
     let mut parser = map(fields, |(value, script_pubkey)| Output {
         value,
