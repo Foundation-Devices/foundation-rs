@@ -7,7 +7,7 @@ use bitcoin_hashes::{hash160, ripemd160, sha256, sha256d};
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{eof, map, rest};
+use nom::combinator::{eof, map, map_res, rest};
 use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError};
 use nom::multi::length_value;
 use nom::number::complete::{le_u32, le_u64};
@@ -219,11 +219,18 @@ where
         + Slice<core::ops::RangeFrom<usize>>,
     Error: ParseError<Input>,
     Error: ContextError<Input>,
+    Error: FromExternalError<Input, TryFromIntError>,
 {
     let amount = context("amount", le_u64);
     let script_pubkey = context(
         "script pubkey",
-        length_value(context("script pubkey length", compact_size), rest),
+        length_value(
+            context(
+                "script pubkey length",
+                map_res(compact_size, usize::try_from),
+            ),
+            rest,
+        ),
     );
 
     map(tuple((amount, script_pubkey)), |(amount, script_pubkey)| {

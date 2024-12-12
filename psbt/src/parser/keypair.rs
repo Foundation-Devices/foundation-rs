@@ -33,7 +33,7 @@ where
     E: ParseError<I> + ContextError<I> + FromExternalError<I, TryFromIntError>,
 {
     let value = length_value(
-        map_res(compact_size, |v| usize::try_from(v)),
+        map_res(compact_size, usize::try_from),
         context("when parsing value", value),
     );
 
