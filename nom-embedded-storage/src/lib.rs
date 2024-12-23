@@ -357,7 +357,7 @@ impl<S, const N: usize> Slice<Range<usize>> for Bytes<S, N> {
         let new_offset = self.offset + range.start;
 
         log::trace!(
-            "slice bytes (RangeTo): {range:?} old_len={} old_offset={} new_len={} new_offset={}",
+            "slice bytes (Range): {range:?} old_len={} old_offset={} new_len={} new_offset={}",
             self.len,
             self.offset,
             new_len,
@@ -476,6 +476,8 @@ where
                 return CompareResult::Error;
             }
         }
+
+        log::trace!("comparing {t:?} succeed");
 
         CompareResult::Ok
     }
