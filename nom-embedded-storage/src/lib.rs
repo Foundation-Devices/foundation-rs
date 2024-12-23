@@ -354,8 +354,18 @@ impl<S, const N: usize> Slice<Range<usize>> for Bytes<S, N> {
             );
         }
 
+        let new_offset = self.offset + range.start;
+
+        log::trace!(
+            "slice bytes (RangeTo): {range:?} old_len={} old_offset={} new_len={} new_offset={}",
+            self.len,
+            self.offset,
+            new_len,
+            new_offset,
+        );
+
         Self {
-            offset: self.offset + range.start,
+            offset: new_offset,
             len: new_len,
             storage: Rc::clone(&self.storage),
             buffer: RefCell::new(Vec::new()),
@@ -372,6 +382,12 @@ impl<S, const N: usize> Slice<RangeTo<usize>> for Bytes<S, N> {
                 self.len()
             );
         }
+
+        log::trace!(
+            "slice bytes (RangeTo): {range:?} old_len={} new_len={}",
+            self.len,
+            range.end,
+        );
 
         Self {
             offset: self.offset,
