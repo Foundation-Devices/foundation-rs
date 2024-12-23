@@ -77,7 +77,7 @@ where
 
     /// Find `needle` in haystack (self), returning the position of the found
     /// byte or None if not found.
-    pub fn memchr(&self, needle: u8) -> Option<usize> {
+    pub fn memchr(&self, needle: u8) -> Result<usize, FindTokenError<S::Error>> {
         let mut pos = 0;
 
         while pos < self.len() {
@@ -89,23 +89,23 @@ where
 
             let offset = match u32::try_from(self.offset + pos) {
                 Ok(v) => v,
-                Err(_) => return None,
+                Err(_) => return Err(FindTokenError::OffsetOverflow),
             };
 
-            if let Err(_) = self.storage.borrow_mut().read(offset, &mut buffer) {
-                return None;
+            if let Err(e) = self.storage.borrow_mut().read(offset, &mut buffer) {
+                return Err(FindTokenError::Io(e));
             }
 
             // We found the needle in this chunk, so return the found
             // position inside of the chunk plus the current offset.
             if let Some(byte_position) = memchr::memchr(needle, &buffer[..]) {
-                return Some(pos + byte_position);
+                return Ok(pos + byte_position);
             }
 
             pos += self.len().min(N);
         }
 
-        None
+        Err(FindTokenError::NotFound)
     }
 }
 
@@ -184,11 +184,13 @@ where
                 .resize(len, 0)
                 .expect("chunk size should be less than or equal to N");
 
-            if let Err(_) = self.storage.borrow_mut().read(offset0, &mut buffer0) {
+            if let Err(e) = self.storage.borrow_mut().read(offset0, &mut buffer0) {
+                log::error!("failed to compare bytes (self): {e:?}");
                 return false;
             }
 
-            if let Err(_) = self.storage.borrow_mut().read(offset1, &mut buffer1) {
+            if let Err(e) = self.storage.borrow_mut().read(offset1, &mut buffer1) {
+                log::error!("failed to compare bytes (other): {e:?}");
                 return false;
             }
 
@@ -230,11 +232,14 @@ where
         };
 
         match storage.read(offset, &mut buf) {
-            Ok(_) => {
+            Ok(()) => {
                 self.pos += 1;
                 Some(buf[0])
             }
-            Err(_) => None,
+            Err(e) => {
+                log::error!("failed to iterate over bytes: {e:?}");
+                return None;
+            }
         }
     }
 }
@@ -440,7 +445,8 @@ where
                 Err(_) => return CompareResult::Error,
             };
 
-            if let Err(_) = self.storage.borrow_mut().read(offset, &mut buffer) {
+            if let Err(e) = self.storage.borrow_mut().read(offset, &mut buffer) {
+                log::error!("failed compare bytes: {e:?}");
                 return CompareResult::Error;
             }
             pos += chunk.len();
@@ -475,7 +481,8 @@ where
                 Err(_) => return CompareResult::Error,
             };
 
-            if let Err(_) = self.storage.borrow_mut().read(offset, &mut buffer) {
+            if let Err(e) = self.storage.borrow_mut().read(offset, &mut buffer) {
+                log::error!("failed compare bytes (no case): {e:?}");
                 return CompareResult::Error;
             }
             pos += chunk.len();
@@ -527,13 +534,27 @@ where
         };
 
         if substr_rest.is_empty() {
-            return self.memchr(substr_first);
+            match self.memchr(substr_first) {
+                Ok(v) => return Some(v),
+                Err(e) => {
+                    log::error!("failed to find token: {e:?}");
+                    return None;
+                }
+            }
         }
 
         let mut offset = 0;
         let haystack = self.slice(..self.len() - substr_rest.len());
 
-        while let Some(position) = haystack.slice(offset..).memchr(substr_first) {
+        loop {
+            let position = match haystack.slice(offset..).memchr(substr_first) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!("failed to find substring: {e:?}");
+                    break;
+                }
+            };
+
             offset += position;
             let next_offset = offset + 1;
             let maybe_substr_rest = self.slice(next_offset..).slice(..substr_rest.len());
@@ -554,8 +575,15 @@ where
     S: ReadNorFlash,
 {
     fn find_token(&self, token: u8) -> bool {
-        self.memchr(token).is_some()
+        self.memchr(token).is_ok()
     }
+}
+
+#[derive(Debug)]
+pub enum FindTokenError<E> {
+    NotFound,
+    OffsetOverflow,
+    Io(E),
 }
 
 #[cfg(all(test, feature = "std"))]

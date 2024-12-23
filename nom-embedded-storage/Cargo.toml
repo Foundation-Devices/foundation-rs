@@ -16,3 +16,4 @@ embedded-storage = { workspace = true }
 heapless = { workspace = true }
 memchr = { workspace = true }
 nom = { workspace = true }
+log = { workspace = true }
