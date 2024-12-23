@@ -54,6 +54,10 @@ impl<T> RcInner<T> {
 
 impl<T> Rc<T> {
     /// Construct a [`Rc`] from the inner value.
+    ///
+    /// # Safety
+    ///
+    /// The inner value must not be accessed mutably by other threads.
     pub unsafe fn from_inner(inner: NonNull<RcInner<T>>) -> Self {
         Self {
             ptr: inner,
@@ -77,7 +81,7 @@ impl<T> Deref for Rc<T> {
 
 impl<T> AsRef<T> for Rc<T> {
     fn as_ref(&self) -> &T {
-        &**self
+        self
     }
 }
 

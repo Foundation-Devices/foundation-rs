@@ -220,6 +220,7 @@ where
 
     // TODO: Optimize this by pre-fetching N bytes when needed.
     fn next(&mut self) -> Option<Self::Item> {
+        log::trace!("next byte: pos={}", self.pos);
         if self.pos >= self.inner.len() {
             return None;
         }
@@ -234,11 +235,12 @@ where
         match storage.read(offset, &mut buf) {
             Ok(()) => {
                 self.pos += 1;
+                log::trace!("next byte: value={}", buf[0]);
                 Some(buf[0])
             }
             Err(e) => {
                 log::error!("failed to iterate over bytes: {e:?}");
-                return None;
+                None
             }
         }
     }
@@ -398,6 +400,8 @@ where
         if new_len > self.len {
             panic!("tried to take {new_len}, but the length is {}", self.len());
         }
+
+        log::trace!("slice bytes (RangeFrom): {range:?} new_offset={new_offset} new_len={new_len}");
 
         Self {
             offset: new_offset,
