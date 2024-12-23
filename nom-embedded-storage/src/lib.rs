@@ -401,6 +401,7 @@ where
             panic!("tried to take {new_len}, but the length is {}", self.len());
         }
 
+        log::trace!("old_offset={} old_len={}", self.offset, self.len);
         log::trace!("slice bytes (RangeFrom): {range:?} new_offset={new_offset} new_len={new_len}");
 
         Self {
