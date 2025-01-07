@@ -266,6 +266,8 @@ impl<S, const N: usize> InputLength for Bytes<S, N> {
 
 impl<S, const N: usize> InputTake for Bytes<S, N> {
     fn take(&self, count: usize) -> Self {
+        log::trace!("take {count} bytes, length is {}", self.len());
+
         if count > self.len() {
             panic!("tried to take {count}, but the length is {}", self.len());
         }
@@ -279,6 +281,8 @@ impl<S, const N: usize> InputTake for Bytes<S, N> {
     }
 
     fn take_split(&self, count: usize) -> (Self, Self) {
+        log::trace!("split {count} bytes, length is {}", self.len());
+
         if count > self.len() {
             panic!("tried to take {count}, but the length is {}", self.len());
         }
@@ -296,6 +300,8 @@ impl<S, const N: usize> InputTake for Bytes<S, N> {
             storage: Rc::clone(&self.storage),
             buffer: RefCell::new(Vec::new()),
         };
+
+        log::trace!("prefix length {}, suffix length {}", prefix.len(), suffix.len());
 
         (prefix, suffix)
     }
@@ -325,6 +331,8 @@ where
     }
 
     fn slice_index(&self, count: usize) -> Result<usize, Needed> {
+        log::trace!("slice index {count}");
+
         if self.len() >= count {
             Ok(count)
         } else {
