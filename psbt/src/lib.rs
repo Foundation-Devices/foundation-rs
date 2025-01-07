@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
+// SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Partially Signed Bitcoin Transaction (PSBT) library.
@@ -10,6 +10,7 @@
 pub mod address;
 pub mod encoder;
 pub mod parser;
+pub mod signing;
 pub mod taproot;
 pub mod transaction;
 pub mod validation;

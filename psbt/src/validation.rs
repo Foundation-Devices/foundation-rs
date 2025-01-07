@@ -68,6 +68,9 @@ where
     log::debug!("validating PSBT");
 
     let (i, _) = tag::<_, Input, E>(b"psbt\xff")(i)?;
+
+    log::trace!("parsing global map");
+
     let (i, global_map) = global::global_map(|_, _| ())(i)?;
 
     let input_count = global_map.input_count().unwrap_or(0);
