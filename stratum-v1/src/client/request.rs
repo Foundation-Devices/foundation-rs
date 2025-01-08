@@ -13,6 +13,7 @@ pub(crate) enum ReqKind {
     Connect,
     Authorize,
     Submit,
+    SuggestDifficulty,
 }
 
 ///Request representation.
@@ -42,6 +43,13 @@ pub struct Request<P> {
     #[serde(skip_serializing_if = "Option::is_none")]
     ///A Structured value that holds the parameter values to be used during the invocation of the method
     pub params: Option<P>,
+}
+
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+pub struct SuggestDifficulty {
+    /// Suggested minimum difficulty for the pool.
+    pub difficulty: Option<u32>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -211,6 +219,19 @@ pub(crate) fn authorize(
     vec.push(pass).map_err(|_| Error::VecFull)?;
     let params = Some(vec);
     let req = Request::<Vec<String<64>, 2>> {
+        method,
+        params,
+        id: Some(id),
+    };
+    serde_json_core::to_slice(&req, buf).map_err(|_| Error::JsonBufferFull)
+}
+
+pub(crate) fn suggest_difficulty(id: u64, difficulty: u32, buf: &mut [u8]) -> Result<usize> {
+    let method = "mining.suggest_difficulty".try_into().unwrap();
+    let mut vec = Vec::<u32, 1>::new();
+    vec.push(difficulty).map_err(|_| Error::VecFull)?;
+    let params = Some(vec);
+    let req = Request::<Vec<u32, 1>> {
         method,
         params,
         id: Some(id),
