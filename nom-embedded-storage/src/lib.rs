@@ -232,9 +232,9 @@ where
             Err(_) => return None,
         };
 
+        self.pos += 1;
         match storage.read(offset, &mut buf) {
             Ok(()) => {
-                self.pos += 1;
                 log::trace!("next byte: value={}", buf[0]);
                 Some(buf[0])
             }
@@ -303,7 +303,7 @@ impl<S, const N: usize> InputTake for Bytes<S, N> {
 
         log::trace!("prefix length {}, suffix length {}", prefix.len(), suffix.len());
 
-        (prefix, suffix)
+        (suffix, prefix)
     }
 }
 
