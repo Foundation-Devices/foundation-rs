@@ -42,10 +42,17 @@ impl TransactionDetails {
     }
 }
 
-pub fn validate<Input, C, E, const N: usize>(
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValidationEvent {
+    /// Validation progress percentage update.
+    Progress(u64),
+}
+
+pub fn validate<Input, C, F, E, const N: usize>(
     i: Input,
     secp: &secp256k1::Secp256k1<C>,
     master_key: Xpriv,
+    mut handle_event: F,
 ) -> Result<TransactionDetails, Error<E>>
 where
     Input: for<'a> nom::Compare<&'a [u8]>
@@ -58,6 +65,7 @@ where
         + nom::Slice<core::ops::Range<usize>>
         + nom::Slice<core::ops::RangeFrom<usize>>,
     C: secp256k1::Signing + secp256k1::Verification,
+    F: FnMut(ValidationEvent),
     E: core::fmt::Debug
         + nom::error::ContextError<Input>
         + nom::error::ParseError<Input>
@@ -65,6 +73,8 @@ where
         + nom::error::FromExternalError<Input, bitcoin_hashes::FromSliceError>
         + nom::error::FromExternalError<Input, core::num::TryFromIntError>,
 {
+    handle_event(ValidationEvent::Progress(0));
+
     log::debug!("validating PSBT");
 
     let (i, _) = tag::<_, Input, E>(b"psbt\xff")(i)?;
@@ -81,6 +91,9 @@ where
     let wallet_fingerprint = master_key.fingerprint(secp);
     log::debug!("wallet fingerprint {:?}", wallet_fingerprint);
 
+    let total_items = input_count + output_count;
+    let mut processed_items = 0;
+
     log::debug!("validating inputs");
     let mut input = i.clone();
     for _ in 0..input_count {
@@ -95,6 +108,11 @@ where
             Err(Err::Error(e)) => return Err(Err::Error(E::append(i, ErrorKind::Count, e)).into()),
             Err(e) => return Err(e.into()),
         }
+
+        processed_items += 1;
+        handle_event(ValidationEvent::Progress(
+            (processed_items * 100) / total_items,
+        ));
     }
 
     log::debug!("validating outputs");
@@ -170,6 +188,11 @@ where
             Err(Err::Error(e)) => return Err(Err::Error(E::append(i, ErrorKind::Count, e)).into()),
             Err(e) => return Err(e.into()),
         };
+
+        processed_items += 1;
+        handle_event(ValidationEvent::Progress(
+            (processed_items * 100) / total_items,
+        ));
     }
 
     log::debug!("total with total_change: {total_with_change} sats");

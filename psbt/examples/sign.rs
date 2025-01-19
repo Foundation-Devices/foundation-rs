@@ -22,24 +22,25 @@ fn main() {
     let file = std::fs::read(file).unwrap();
     let xpriv = Xpriv::from_str(&xpriv).unwrap();
 
-    let details = match validate::<_, _, VerboseError<_>, 10>(file.as_slice(), SECP256K1, xpriv) {
-        Ok(v) => v,
-        Err(e) => {
-            match e {
-                Error::Parse(e) => match e {
-                    nom::Err::Incomplete(_) => println!("unexpected end of file"),
-                    nom::Err::Error(e) | nom::Err::Failure(e) => {
-                        for (i, e) in e.errors.iter().enumerate() {
-                            println!("Error {i}: {e:?}");
+    let details =
+        match validate::<_, _, VerboseError<_>, 10>(file.as_slice(), SECP256K1, xpriv | _ | ()) {
+            Ok(v) => v,
+            Err(e) => {
+                match e {
+                    Error::Parse(e) => match e {
+                        nom::Err::Incomplete(_) => println!("unexpected end of file"),
+                        nom::Err::Error(e) | nom::Err::Failure(e) => {
+                            for (i, e) in e.errors.iter().enumerate() {
+                                println!("Error {i}: {e:?}");
+                            }
                         }
-                    }
-                },
-                Error::Validation(e) => println!("{e}"),
-            }
+                    },
+                    Error::Validation(e) => println!("{e}"),
+                }
 
-            std::process::exit(1);
-        }
-    };
+                std::process::exit(1);
+            }
+        };
 
     println!("Transaction details:");
     if details.is_self_send() {
