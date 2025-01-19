@@ -43,7 +43,7 @@ impl TransactionDetails {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ValidationEvent {
+pub enum Event {
     /// Validation progress percentage update.
     Progress(u64),
 }
@@ -65,7 +65,7 @@ where
         + nom::Slice<core::ops::Range<usize>>
         + nom::Slice<core::ops::RangeFrom<usize>>,
     C: secp256k1::Signing + secp256k1::Verification,
-    F: FnMut(ValidationEvent),
+    F: FnMut(Event),
     E: core::fmt::Debug
         + nom::error::ContextError<Input>
         + nom::error::ParseError<Input>
@@ -73,7 +73,7 @@ where
         + nom::error::FromExternalError<Input, bitcoin_hashes::FromSliceError>
         + nom::error::FromExternalError<Input, core::num::TryFromIntError>,
 {
-    handle_event(ValidationEvent::Progress(0));
+    handle_event(Event::Progress(0));
 
     log::debug!("validating PSBT");
 
@@ -110,9 +110,7 @@ where
         }
 
         processed_items += 1;
-        handle_event(ValidationEvent::Progress(
-            (processed_items * 100) / total_items,
-        ));
+        handle_event(Event::Progress((processed_items * 100) / total_items));
     }
 
     log::debug!("validating outputs");
@@ -190,9 +188,7 @@ where
         };
 
         processed_items += 1;
-        handle_event(ValidationEvent::Progress(
-            (processed_items * 100) / total_items,
-        ));
+        handle_event(Event::Progress((processed_items * 100) / total_items));
     }
 
     log::debug!("total with total_change: {total_with_change} sats");
