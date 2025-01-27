@@ -5,7 +5,6 @@ use super::notification::Work;
 use crate::{Error, Result};
 
 use bitcoin_hashes::sha256d::Hash as DHash;
-use heapless::{String, Vec};
 
 #[derive(Debug, PartialEq)]
 pub struct Header {
@@ -19,8 +18,8 @@ pub struct Header {
 
 #[derive(Debug, PartialEq)]
 pub struct Job {
-    pub job_id: String<32>,
-    pub extranonce2: Vec<u8, 8>,
+    pub job_id: tstring!(32),
+    pub extranonce2: tvec!(u8, 8),
     pub header: Header,
 }
 
@@ -49,10 +48,10 @@ pub(crate) struct JobCreator {
     version_mask: i32,
     pub(crate) version_rolling: bool,
     version_bits: u16,
-    extranonce1: Vec<u8, 8>,
+    extranonce1: tvec!(u8, 8),
     extranonce2_size: usize,
     pub(crate) extranonce2_rolling: bool,
-    extranonce2: Vec<u8, 8>,
+    extranonce2: tvec!(u8, 8),
     pub(crate) ntime_rolling: bool,
     ntime_bits: u32,
 }
@@ -62,9 +61,16 @@ impl JobCreator {
         self.version_mask = mask as i32;
     }
 
+    #[cfg(feature = "alloc")]
+    pub(crate) fn set_extranonces(&mut self, extranonce1: tvec!(u8, 8), extranonce2_size: usize) {
+        self.extranonce1 = extranonce1;
+        self.extranonce2_size = extranonce2_size;
+        self.extranonce2.resize(extranonce2_size, 0);
+    }
+    #[cfg(not(feature = "alloc"))]
     pub(crate) fn set_extranonces(
         &mut self,
-        extranonce1: Vec<u8, 8>,
+        extranonce1: tvec!(u8, 8),
         extranonce2_size: usize,
     ) -> Result<()> {
         self.extranonce1 = extranonce1;
@@ -74,6 +80,15 @@ impl JobCreator {
             .map_err(|_| Error::VecFull)
     }
 
+    #[cfg(feature = "alloc")]
+    pub(crate) fn set_work(&mut self, work: Work) {
+        self.last_work = Some(work);
+        self.version_bits = 0;
+        self.extranonce2.resize(self.extranonce2_size, 0);
+        self.extranonce2.fill(0);
+        self.ntime_bits = 0;
+    }
+    #[cfg(not(feature = "alloc"))]
     pub(crate) fn set_work(&mut self, work: Work) -> Result<()> {
         self.last_work = Some(work);
         self.version_bits = 0;
@@ -86,16 +101,31 @@ impl JobCreator {
     }
 
     fn merkle_root(&self, work: &Work) -> Result<[u8; 32]> {
-        let mut coinbase = Vec::<u8, 1024>::new();
+        #[cfg(feature = "alloc")]
+        let mut coinbase = alloc::vec::Vec::<u8>::new();
+        #[cfg(not(feature = "alloc"))]
+        let mut coinbase = heapless::Vec::<u8, 1024>::new();
+        #[cfg(feature = "alloc")]
+        coinbase.extend_from_slice(work.coinb1.as_slice());
+        #[cfg(not(feature = "alloc"))]
         coinbase
             .extend_from_slice(work.coinb1.as_slice())
             .map_err(|_| Error::VecFull)?;
+        #[cfg(feature = "alloc")]
+        coinbase.extend_from_slice(self.extranonce1.as_slice());
+        #[cfg(not(feature = "alloc"))]
         coinbase
             .extend_from_slice(self.extranonce1.as_slice())
             .map_err(|_| Error::VecFull)?;
+        #[cfg(feature = "alloc")]
+        coinbase.extend_from_slice(self.extranonce2.as_slice());
+        #[cfg(not(feature = "alloc"))]
         coinbase
             .extend_from_slice(self.extranonce2.as_slice())
             .map_err(|_| Error::VecFull)?;
+        #[cfg(feature = "alloc")]
+        coinbase.extend_from_slice(work.coinb2.as_slice());
+        #[cfg(not(feature = "alloc"))]
         coinbase
             .extend_from_slice(work.coinb2.as_slice())
             .map_err(|_| Error::VecFull)?;
@@ -154,7 +184,12 @@ impl JobCreator {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
+    #[cfg(not(feature = "alloc"))]
     use core::str::FromStr;
+    #[cfg(not(feature = "alloc"))]
+    use heapless::Vec;
 
     use super::*;
 
@@ -163,6 +198,19 @@ mod tests {
         let mut job_creator = JobCreator::default();
         assert_eq!(job_creator.roll(), Err(Error::NoWork));
         let job_id = hstring!(32, "1234");
+        #[cfg(feature = "alloc")]
+        job_creator.set_work(Work {
+            job_id: job_id.clone(),
+            prev_hash: [0; 32],
+            coinb1: Vec::new(),
+            coinb2: Vec::new(),
+            merkle_branch: Vec::new(),
+            version: 0x2000_0000,
+            nbits: 0x1234_5678,
+            ntime: 0,
+            clean_jobs: false,
+        });
+        #[cfg(not(feature = "alloc"))]
         job_creator
             .set_work(Work {
                 job_id: job_id.clone(),
@@ -177,12 +225,15 @@ mod tests {
             })
             .unwrap();
         job_creator.set_version_mask(0x1fff_e000);
+        #[cfg(feature = "alloc")]
+        job_creator.set_extranonces(Vec::new(), 1);
+        #[cfg(not(feature = "alloc"))]
         job_creator.set_extranonces(Vec::new(), 1).unwrap();
         assert_eq!(
             job_creator.roll(),
             Ok(Job {
                 job_id: job_id.clone(),
-                extranonce2: hvec!(u8, 8, &[0]),
+                extranonce2: hvec!(u8, 8, [0]),
                 header: Header {
                     version: 0x2000_0000,
                     prev_blockhash: [0; 32],
@@ -202,7 +253,7 @@ mod tests {
             job_creator.roll(),
             Ok(Job {
                 job_id: job_id.clone(),
-                extranonce2: hvec!(u8, 8, &[0]),
+                extranonce2: hvec!(u8, 8, [0]),
                 header: Header {
                     version: 0x2000_2000,
                     prev_blockhash: [0; 32],
@@ -222,7 +273,7 @@ mod tests {
             job_creator.roll(),
             Ok(Job {
                 job_id: job_id.clone(),
-                extranonce2: hvec!(u8, 8, &[0]),
+                extranonce2: hvec!(u8, 8, [0]),
                 header: Header {
                     version: 0x2000_4000,
                     prev_blockhash: [0; 32],
@@ -242,7 +293,7 @@ mod tests {
             job_creator.roll(),
             Ok(Job {
                 job_id: job_id.clone(),
-                extranonce2: hvec!(u8, 8, &[1]),
+                extranonce2: hvec!(u8, 8, [1]),
                 header: Header {
                     version: 0x2000_6000,
                     prev_blockhash: [0; 32],
@@ -257,6 +308,19 @@ mod tests {
                 }
             })
         );
+        #[cfg(feature = "alloc")]
+        job_creator.set_work(Work {
+            job_id: job_id.clone(),
+            prev_hash: [0; 32],
+            coinb1: Vec::new(),
+            coinb2: Vec::new(),
+            merkle_branch: Vec::new(),
+            version: 0x2000_0000,
+            nbits: 0x1234_5678,
+            ntime: 0,
+            clean_jobs: false,
+        });
+        #[cfg(not(feature = "alloc"))]
         job_creator
             .set_work(Work {
                 job_id: job_id.clone(),
@@ -274,7 +338,7 @@ mod tests {
             job_creator.roll(),
             Ok(Job {
                 job_id: job_id.clone(),
-                extranonce2: hvec!(u8, 8, &[1]),
+                extranonce2: hvec!(u8, 8, [1]),
                 header: Header {
                     version: 0x2000_2000,
                     prev_blockhash: [0; 32],
@@ -295,8 +359,11 @@ mod tests {
     fn test_merkle_root() {
         // example from https://github.com/stratum-mining/stratum/pull/305/files
         let mut job_creator = JobCreator::default();
+        #[cfg(feature = "alloc")]
+        job_creator.set_extranonces(hvec!(u8, 8, [120, 55, 179, 37]), 4);
+        #[cfg(not(feature = "alloc"))]
         job_creator
-            .set_extranonces(hvec!(u8, 8, &[120, 55, 179, 37]), 4)
+            .set_extranonces(hvec!(u8, 8, [120, 55, 179, 37]), 4)
             .unwrap();
         assert_eq!(
             job_creator.merkle_root(&Work {
@@ -309,7 +376,7 @@ mod tests {
                 coinb1: hvec!(
                     u8,
                     128,
-                    &[
+                    [
                         1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 75, 3, 63, 146, 11,
                         250, 190, 109, 109, 86, 6, 110, 64, 228, 218, 247, 203, 127, 75, 141, 53,
@@ -322,7 +389,7 @@ mod tests {
                 coinb2: hvec!(
                     u8,
                     130,
-                    &[
+                    [
                         25, 118, 169, 20, 124, 21, 78, 209, 220, 89, 96, 158, 61, 38, 171, 178,
                         223, 46, 163, 213, 135, 205, 140, 65, 136, 172, 0, 0, 0, 0, 0, 0, 0, 0, 44,
                         106, 76, 41, 82, 83, 75, 66, 76, 79, 67, 75, 58, 216, 82, 49, 182, 148,
@@ -337,7 +404,7 @@ mod tests {
                     u8,
                     32,
                     16,
-                    &[
+                    [
                         [
                             122, 97, 64, 124, 164, 158, 164, 14, 87, 119, 226, 169, 34, 196, 251,
                             51, 31, 131, 109, 250, 13, 54, 94, 6, 177, 27, 156, 154, 101, 30, 123,

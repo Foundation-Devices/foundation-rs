@@ -14,7 +14,10 @@ use request::ReqKind;
 pub use request::{Extensions, Info, Share, VersionRolling};
 use response::Subscription;
 
+#[cfg(feature = "alloc")]
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use embedded_io_async::{Read, ReadReady, Write};
+#[cfg(not(feature = "alloc"))]
 use heapless::{FnvIndexMap, String, Vec};
 
 #[derive(Debug)]
@@ -24,15 +27,24 @@ pub struct Client<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const T
     rx_buf: [u8; RX_BUF_SIZE],
     rx_free_pos: usize,
     tx_buf: [u8; TX_BUF_SIZE],
+    #[cfg(feature = "alloc")]
+    reqs: BTreeMap<u64, ReqKind>,
+    #[cfg(not(feature = "alloc"))]
     reqs: FnvIndexMap<u64, ReqKind, 16>,
     job_creator: JobCreator,
     configuration: Option<Extensions>,
-    subscriptions: Vec<Subscription, 2>,
+    #[cfg(feature = "alloc")]
+    subscriptions: Vec<Subscription>,
+    #[cfg(not(feature = "alloc"))]
+    subscriptions: heapless::Vec<Subscription, 2>,
     shares_accepted: u64,
     shares_rejected: u64,
     req_id: u64,
     connected: bool,
     authorized: bool,
+    #[cfg(feature = "alloc")]
+    user: String,
+    #[cfg(not(feature = "alloc"))]
     user: String<64>,
 }
 
@@ -57,6 +69,9 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
             rx_buf: [0; RX_BUF_SIZE],
             rx_free_pos: 0,
             tx_buf: [0; TX_BUF_SIZE],
+            #[cfg(feature = "alloc")]
+            reqs: BTreeMap::new(),
+            #[cfg(not(feature = "alloc"))]
             reqs: FnvIndexMap::new(),
             job_creator: JobCreator::default(),
             configuration: None,
@@ -113,6 +128,10 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                     Some(ReqKind::Connect) => {
                         let conn = response::parse_connect(line)?;
                         self.subscriptions = conn.subscriptions;
+                        #[cfg(feature = "alloc")]
+                        self.job_creator
+                            .set_extranonces(conn.extranonce1, conn.extranonce2_size);
+                        #[cfg(not(feature = "alloc"))]
                         self.job_creator
                             .set_extranonces(conn.extranonce1, conn.extranonce2_size)?;
                         self.connected = true;
@@ -178,6 +197,9 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                             msg = Some(Message::CleanJobs);
                         }
                         info!("New Work: {:?}", work);
+                        #[cfg(feature = "alloc")]
+                        self.job_creator.set_work(work);
+                        #[cfg(not(feature = "alloc"))]
                         self.job_creator.set_work(work)?;
                     }
                 }
@@ -202,6 +224,12 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         Ok(msg)
     }
 
+    #[cfg(feature = "alloc")]
+    fn prepare_req(&mut self, req_kind: ReqKind) {
+        self.req_id += 1;
+        self.reqs.insert(self.req_id, req_kind);
+    }
+    #[cfg(not(feature = "alloc"))]
     fn prepare_req(&mut self, req_kind: ReqKind) -> Result<()> {
         self.req_id += 1;
         self.reqs
@@ -229,6 +257,9 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         if self.configuration.is_some() {
             return Err(Error::AlreadyConfigured);
         }
+        #[cfg(feature = "alloc")]
+        self.prepare_req(ReqKind::Configure);
+        #[cfg(not(feature = "alloc"))]
         self.prepare_req(ReqKind::Configure)?;
         let n = request::configure(self.req_id, exts, self.tx_buf.as_mut_slice())?;
         debug!("Send Configure: {} bytes, id = {}", n, self.req_id);
@@ -241,7 +272,21 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
     ///
     /// identifier: a string to identify the client to the pool.
     ///
-    pub async fn send_connect(&mut self, identifier: Option<String<32>>) -> Result<()> {
+    #[cfg(feature = "alloc")]
+    pub async fn send_connect(&mut self, identifier: Option<String>) -> Result<()> {
+        if self.configuration.is_none() {
+            return Err(Error::NotConfigured);
+        }
+        if self.connected {
+            return Err(Error::AlreadyConnected);
+        }
+        self.prepare_req(ReqKind::Connect);
+        let n = request::connect(self.req_id, identifier, self.tx_buf.as_mut_slice())?;
+        debug!("Send Connect: {} bytes, id = {}", n, self.req_id);
+        self.send_req(n).await
+    }
+    #[cfg(not(feature = "alloc"))]
+    pub async fn send_connect(&mut self, identifier: Option<tstring!(32)>) -> Result<()> {
         if self.configuration.is_none() {
             return Err(Error::NotConfigured);
         }
@@ -263,13 +308,16 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
     ///
     /// pass: a string with user password.
     ///
-    pub async fn send_authorize(&mut self, user: String<64>, pass: String<64>) -> Result<()> {
+    pub async fn send_authorize(&mut self, user: tstring!(64), pass: tstring!(64)) -> Result<()> {
         if !self.connected {
             return Err(Error::NotConnected);
         }
         if self.authorized {
             return Err(Error::AlreadyAuthorized);
         }
+        #[cfg(feature = "alloc")]
+        self.prepare_req(ReqKind::Authorize);
+        #[cfg(not(feature = "alloc"))]
         self.prepare_req(ReqKind::Authorize)?;
         self.user = user.clone();
         let n = request::authorize(self.req_id, user, pass, self.tx_buf.as_mut_slice())?;
@@ -295,6 +343,9 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         if !self.authorized {
             return Err(Error::Unauthorized);
         }
+        #[cfg(feature = "alloc")]
+        self.prepare_req(ReqKind::Submit);
+        #[cfg(not(feature = "alloc"))]
         self.prepare_req(ReqKind::Submit)?;
         let n = request::submit(
             self.req_id,

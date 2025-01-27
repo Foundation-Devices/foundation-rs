@@ -5,12 +5,14 @@
 
 use stratum_v1::{Client, Extensions, Message, Share, VersionRolling};
 
+#[cfg(not(feature = "alloc"))]
 use heapless::{String, Vec};
 use inquire::Select;
 use log::error;
+#[cfg(not(feature = "alloc"))]
+use std::str::FromStr;
 use std::{
     net::{Ipv4Addr, SocketAddr},
-    str::FromStr,
     sync::Arc,
     time::Duration,
 };
@@ -50,11 +52,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match c.poll_message().await {
                 Ok(msg) => match msg {
                     Some(Message::Configured) => {
+                        #[cfg(feature = "alloc")]
+                        c.send_connect(Some("demo".to_string())).await.unwrap();
+                        #[cfg(not(feature = "alloc"))]
                         c.send_connect(Some(String::<32>::from_str("demo").unwrap()))
                             .await
                             .unwrap();
                     }
                     Some(Message::Connected) => {
+                        #[cfg(feature = "alloc")]
+                        c.send_authorize(
+                            match pool {
+                                "Public-Pool" => {
+                                    "1HLQGxzAQWnLore3fWHc2W8UP1CgMv1GKQ.miner1".to_string()
+                                }
+                                "Braiins" => "slush.miner1".to_string(),
+                                _ => unreachable!(),
+                            },
+                            "x".to_string(),
+                        )
+                        .await
+                        .unwrap();
+                        #[cfg(not(feature = "alloc"))]
                         c.send_authorize(
                             match pool {
                                 "Public-Pool" => String::<64>::from_str(
@@ -114,14 +133,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(Duration::from_millis(5000)).await;
         {
             let mut c = client_tx.lock().await;
-            let mut extranonce2 = Vec::new();
-            extranonce2.resize(4, 0).unwrap();
-            extranonce2[3] = 0x01;
+            #[cfg(feature = "alloc")]
+            let extranonce2 = vec![0, 0, 0, 1];
+            #[cfg(not(feature = "alloc"))]
+            let extranonce2 = {
+                let mut extranonce2 = Vec::new();
+                extranonce2.resize(4, 0).unwrap();
+                extranonce2[3] = 0x01;
+                extranonce2
+            };
             let fake_share = Share {
+                #[cfg(feature = "alloc")]
+                job_id: "01".to_string(), // TODO will come from the Job
+                #[cfg(not(feature = "alloc"))]
                 job_id: String::<64>::from_str("01").unwrap(), // TODO will come from the Job
-                extranonce2,                                   // TODO will come from the Job
-                ntime: 1722789905,                             // TODO will come from the Job
-                nonce: 0,                                      // TODO will come from the ASIC hit
+                extranonce2,        // TODO will come from the Job
+                ntime: 1722789905,  // TODO will come from the Job
+                nonce: 0,           // TODO will come from the ASIC hit
                 version_bits: None, // TODO will come from the ASIC hit if hardware version rolling is enabled
             };
             c.send_submit(fake_share).await.unwrap();

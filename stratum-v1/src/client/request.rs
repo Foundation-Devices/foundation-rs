@@ -2,7 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::{Error, Result};
+#[cfg(feature = "alloc")]
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 use faster_hex::hex_string;
+#[cfg(not(feature = "alloc"))]
 use heapless::{String, Vec};
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +45,10 @@ pub struct Request<P> {
     ///A String containing the name of the method to be invoked
     ///
     ///By default is static buffer of 32 bytes.
-    pub method: String<32>,
+    #[cfg(feature = "alloc")]
+    pub method: alloc::string::String,
+    #[cfg(not(feature = "alloc"))]
+    pub method: heapless::String<32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ///A Structured value that holds the parameter values to be used during the invocation of the method
     pub params: Option<P>,
@@ -58,13 +68,13 @@ pub struct VersionRolling {
 #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct Info {
     /// Exact URL used by the mining software to connect to the stratum server.
-    pub connection_url: Option<String<32>>,
+    pub connection_url: Option<tstring!(32)>,
     /// Manufacturer specific hardware revision string.
-    pub hw_version: Option<String<32>>,
+    pub hw_version: Option<tstring!(32)>,
     /// Manufacturer specific software version.
-    pub sw_version: Option<String<32>>,
+    pub sw_version: Option<tstring!(32)>,
     /// Unique identifier of the mining device.
-    pub hw_id: Option<String<32>>,
+    pub hw_id: Option<tstring!(32)>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -86,20 +96,26 @@ pub struct Extensions {
 }
 
 pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usize> {
+    #[cfg(feature = "alloc")]
+    let method = "mining.configure".to_string();
+    #[cfg(not(feature = "alloc"))]
     let method = "mining.configure".try_into().unwrap();
 
-    type ExtList = Vec<String<32>, 4>;
+    #[cfg(feature = "alloc")]
+    type ExtList = Vec<String>;
+    #[cfg(not(feature = "alloc"))]
+    type ExtList = Vec<tstring!(32), 4>;
 
     #[derive(Debug, Serialize)]
     #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
     struct ExtParams {
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "version-rolling.mask")]
-        version_rolling_mask: Option<String<8>>,
+        version_rolling_mask: Option<tstring!(8)>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "version-rolling.min-bit-count")]
-        version_rolling_min_bit_count: Option<String<8>>,
+        version_rolling_min_bit_count: Option<tstring!(8)>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "minimum-difficulty.value")]
@@ -107,19 +123,19 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
 
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "info.connection-url")]
-        info_connection_url: Option<String<32>>,
+        info_connection_url: Option<tstring!(32)>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "info.hw-version")]
-        info_hw_version: Option<String<32>>,
+        info_hw_version: Option<tstring!(32)>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "info.sw-version")]
-        info_sw_version: Option<String<32>>,
+        info_sw_version: Option<tstring!(32)>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "info.hw-id")]
-        info_hw_id: Option<String<32>>,
+        info_hw_id: Option<tstring!(32)>,
     }
 
     #[derive(Debug, Serialize)]
@@ -137,12 +153,27 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
         info_hw_id: None,
     };
     if let Some(version_rolling) = &exts.version_rolling {
+        #[cfg(feature = "alloc")]
+        ext_list.push("version-rolling".to_string());
+        #[cfg(not(feature = "alloc"))]
         ext_list
             .push("version-rolling".try_into().unwrap())
             .unwrap();
+        #[cfg(feature = "alloc")]
+        if let Some(mask) = version_rolling.mask {
+            ext_params.version_rolling_mask = Some(hex_string(&mask.to_be_bytes()));
+        }
+        #[cfg(not(feature = "alloc"))]
         if let Some(mask) = version_rolling.mask {
             ext_params.version_rolling_mask = Some(hex_string::<8>(&mask.to_be_bytes()));
         }
+        #[cfg(feature = "alloc")]
+        if let Some(min_bit_count) = version_rolling.min_bit_count {
+            let min_bit_count = min_bit_count as u32;
+            ext_params.version_rolling_min_bit_count =
+                Some(hex_string(&min_bit_count.to_be_bytes()));
+        }
+        #[cfg(not(feature = "alloc"))]
         if let Some(min_bit_count) = version_rolling.min_bit_count {
             let min_bit_count = min_bit_count as u32;
             ext_params.version_rolling_min_bit_count =
@@ -150,17 +181,26 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
         }
     }
     if let Some(minimum_difficulty) = &exts.minimum_difficulty {
+        #[cfg(feature = "alloc")]
+        ext_list.push("minimum-difficulty".to_string());
+        #[cfg(not(feature = "alloc"))]
         ext_list
             .push("minimum-difficulty".try_into().unwrap())
             .unwrap();
         ext_params.minimum_difficulty_value = Some(*minimum_difficulty);
     }
     if let Some(()) = &exts.subscribe_extranonce {
+        #[cfg(feature = "alloc")]
+        ext_list.push("subscribe-extranonce".to_string());
+        #[cfg(not(feature = "alloc"))]
         ext_list
             .push("subscribe-extranonce".try_into().unwrap())
             .unwrap();
     }
     if let Some(info) = &exts.info {
+        #[cfg(feature = "alloc")]
+        ext_list.push("info".to_string());
+        #[cfg(not(feature = "alloc"))]
         ext_list.push("info".try_into().unwrap()).unwrap();
         if let Some(connection_url) = &info.connection_url {
             ext_params.info_connection_url = Some(connection_url.clone());
@@ -184,14 +224,23 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
     serde_json_core::to_slice(&req, buf).map_err(|_| Error::JsonBufferFull)
 }
 
-pub(crate) fn connect(id: u64, identifier: Option<String<32>>, buf: &mut [u8]) -> Result<usize> {
+pub(crate) fn connect(id: u64, identifier: Option<tstring!(32)>, buf: &mut [u8]) -> Result<usize> {
+    #[cfg(feature = "alloc")]
+    let method = "mining.subscribe".to_string();
+    #[cfg(not(feature = "alloc"))]
     let method = "mining.subscribe".try_into().unwrap();
-    let mut vec = Vec::<String<32>, 1>::new();
+    #[cfg(feature = "alloc")]
+    let mut vec = Vec::new();
+    #[cfg(not(feature = "alloc"))]
+    let mut vec = Vec::<tstring!(32), 1>::new();
     if let Some(identifier) = identifier {
+        #[cfg(feature = "alloc")]
+        vec.push(identifier);
+        #[cfg(not(feature = "alloc"))]
         vec.push(identifier).map_err(|_| Error::VecFull)?;
     }
     let params = Some(vec);
-    let req = Request::<Vec<String<32>, 1>> {
+    let req = Request::<tvecstring!(32, 1)> {
         method,
         params,
         id: Some(id),
@@ -201,16 +250,24 @@ pub(crate) fn connect(id: u64, identifier: Option<String<32>>, buf: &mut [u8]) -
 
 pub(crate) fn authorize(
     id: u64,
-    user: String<64>,
-    pass: String<64>,
+    user: tstring!(64),
+    pass: tstring!(64),
     buf: &mut [u8],
 ) -> Result<usize> {
+    #[cfg(feature = "alloc")]
+    let method = "mining.authorize".to_string();
+    #[cfg(not(feature = "alloc"))]
     let method = "mining.authorize".try_into().unwrap();
-    let mut vec = Vec::<String<64>, 2>::new();
+    #[cfg(feature = "alloc")]
+    let vec = vec![user, pass];
+    #[cfg(not(feature = "alloc"))]
+    let mut vec = Vec::<tstring!(64), 2>::new();
+    #[cfg(not(feature = "alloc"))]
     vec.push(user).map_err(|_| Error::VecFull)?;
+    #[cfg(not(feature = "alloc"))]
     vec.push(pass).map_err(|_| Error::VecFull)?;
     let params = Some(vec);
-    let req = Request::<Vec<String<64>, 2>> {
+    let req = Request::<tvecstring!(64, 2)> {
         method,
         params,
         id: Some(id),
@@ -221,30 +278,52 @@ pub(crate) fn authorize(
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct Share {
-    pub job_id: String<64>,
-    pub extranonce2: Vec<u8, 8>,
+    pub job_id: tstring!(64),
+    pub extranonce2: tvec!(u8, 8),
     pub ntime: u32,
     pub nonce: u32,
     pub version_bits: Option<u32>,
 }
 
-pub(crate) fn submit(id: u64, user: String<64>, share: Share, buf: &mut [u8]) -> Result<usize> {
+pub(crate) fn submit(id: u64, user: tstring!(64), share: Share, buf: &mut [u8]) -> Result<usize> {
+    #[cfg(feature = "alloc")]
+    let method = "mining.submit".to_string();
+    #[cfg(not(feature = "alloc"))]
     let method = "mining.submit".try_into().unwrap();
-    let mut vec = Vec::<String<64>, 6>::new();
-    vec.push(user).map_err(|_| Error::VecFull)?;
-    vec.push(share.job_id).map_err(|_| Error::VecFull)?;
-    vec.push(hex_string::<64>(share.extranonce2.as_slice()))
-        .map_err(|_| Error::VecFull)?;
-    vec.push(hex_string::<64>(&share.ntime.to_be_bytes()))
-        .map_err(|_| Error::VecFull)?;
-    vec.push(hex_string::<64>(&share.nonce.to_be_bytes()))
-        .map_err(|_| Error::VecFull)?;
+    #[cfg(feature = "alloc")]
+    let mut params = vec![
+        user,
+        share.job_id,
+        hex_string(share.extranonce2.as_slice()),
+        hex_string(&share.ntime.to_be_bytes()),
+        hex_string(&share.nonce.to_be_bytes()),
+    ];
+    #[cfg(not(feature = "alloc"))]
+    let mut params = {
+        let mut params = Vec::<String<64>, 6>::new();
+        params.push(user).map_err(|_| Error::VecFull)?;
+        params.push(share.job_id).map_err(|_| Error::VecFull)?;
+        params
+            .push(hex_string::<64>(share.extranonce2.as_slice()))
+            .map_err(|_| Error::VecFull)?;
+        params
+            .push(hex_string::<64>(&share.ntime.to_be_bytes()))
+            .map_err(|_| Error::VecFull)?;
+        params
+            .push(hex_string::<64>(&share.nonce.to_be_bytes()))
+            .map_err(|_| Error::VecFull)?;
+        params
+    };
     if let Some(v) = share.version_bits {
-        vec.push(hex_string::<64>(&v.to_be_bytes()))
+        #[cfg(feature = "alloc")]
+        params.push(hex_string(&v.to_be_bytes()));
+        #[cfg(not(feature = "alloc"))]
+        params
+            .push(hex_string::<64>(&v.to_be_bytes()))
             .map_err(|_| Error::VecFull)?;
     }
-    let params = Some(vec);
-    let req = Request::<Vec<String<64>, 6>> {
+    let params = Some(params);
+    let req = Request::<tvecstring!(64, 6)> {
         method,
         params,
         id: Some(id),
@@ -351,7 +430,7 @@ mod tests {
         let mut buf = [0u8; 1024];
         let share = Share {
             job_id: "bf".try_into().unwrap(),
-            extranonce2: hvec!(u8, 8, &[0, 0, 0, 1]),
+            extranonce2: hvec!(u8, 8, [0, 0, 0, 1]),
             ntime: 1347323629,
             nonce: 0xb295_7c02,
             version_bits: None,
