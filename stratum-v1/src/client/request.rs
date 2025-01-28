@@ -20,6 +20,8 @@ pub(crate) enum ReqKind {
     Connect,
     Authorize,
     Submit,
+    #[cfg(feature = "suggest-difficulty-request")]
+    SuggestDifficulty(u32),
 }
 
 ///Request representation.
@@ -261,17 +263,44 @@ pub(crate) fn authorize(
     #[cfg(feature = "alloc")]
     let vec = vec![user, pass];
     #[cfg(not(feature = "alloc"))]
-    let mut vec = Vec::<tstring!(64), 2>::new();
-    #[cfg(not(feature = "alloc"))]
-    vec.push(user).map_err(|_| Error::VecFull)?;
-    #[cfg(not(feature = "alloc"))]
-    vec.push(pass).map_err(|_| Error::VecFull)?;
+    let vec = {
+        let mut vec = Vec::<tstring!(64), 2>::new();
+        vec.push(user).map_err(|_| Error::VecFull)?;
+        vec.push(pass).map_err(|_| Error::VecFull)?;
+        vec
+    };
     let params = Some(vec);
     let req = Request::<tvecstring!(64, 2)> {
         method,
         params,
         id: Some(id),
     };
+    serde_json_core::to_slice(&req, buf).map_err(|_| Error::JsonBufferFull)
+}
+
+#[cfg(any(
+    feature = "suggest-difficulty-notification",
+    feature = "suggest-difficulty-request",
+))]
+pub(crate) fn suggest_difficulty(
+    id: Option<u64>,
+    difficulty: u32,
+    buf: &mut [u8],
+) -> Result<usize> {
+    #[cfg(feature = "alloc")]
+    let method = "mining.suggest_difficulty".to_string();
+    #[cfg(not(feature = "alloc"))]
+    let method = "mining.suggest_difficulty".try_into().unwrap();
+    #[cfg(feature = "alloc")]
+    let vec = vec![difficulty];
+    #[cfg(not(feature = "alloc"))]
+    let vec = {
+        let mut vec = Vec::<u32, 1>::new();
+        vec.push(difficulty).map_err(|_| Error::VecFull)?;
+        vec
+    };
+    let params = Some(vec);
+    let req = Request::<tvec!(u32, 1)> { method, params, id };
     serde_json_core::to_slice(&req, buf).map_err(|_| Error::JsonBufferFull)
 }
 
@@ -422,6 +451,31 @@ mod tests {
         assert_eq!(
             &buf[..53],
             br#"{"id":2,"method":"mining.authorize","params":["",""]}"#
+        );
+    }
+
+    #[test]
+    #[cfg(any(
+        feature = "suggest-difficulty-notification",
+        feature = "suggest-difficulty-request",
+    ))]
+    fn test_suggest_difficulty() {
+        let mut buf = [0u8; 1024];
+        let len = suggest_difficulty(Some(1), 256, buf.as_mut_slice());
+        assert!(len.is_ok());
+        assert_eq!(len.unwrap(), 60);
+        assert_eq!(
+            &buf[..60],
+            br#"{"id":1,"method":"mining.suggest_difficulty","params":[256]}"#
+        );
+
+        let len = suggest_difficulty(None, 256, buf.as_mut_slice());
+        assert!(len.is_ok());
+        assert_eq!(len.unwrap(), 53);
+        assert_eq!(
+            &buf[..53],
+            // br#"{"id":null,"method":"mining.suggest_difficulty","params":[256]}"#
+            br#"{"method":"mining.suggest_difficulty","params":[256]}"#
         );
     }
 

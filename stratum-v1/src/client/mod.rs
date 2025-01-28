@@ -20,6 +20,12 @@ use embedded_io_async::{Read, ReadReady, Write};
 #[cfg(not(feature = "alloc"))]
 use heapless::{FnvIndexMap, String, Vec};
 
+#[cfg(all(
+    feature = "suggest-difficulty-notification",
+    feature = "suggest-difficulty-request"
+))]
+compile_error!("You have to choose if mining.suggest_difficulty is sent as a notification or as a request. Can't be both!");
+
 #[derive(Debug)]
 // #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct Client<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize> {
@@ -147,6 +153,14 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                             msg = Some(Message::Authorized);
                         }
                     }
+                    #[cfg(feature = "suggest-difficulty-request")]
+                    Some(ReqKind::SuggestDifficulty(diff)) => {
+                        let diff = *diff;
+                        self.reqs.remove(&id);
+                        info!("Suggested Difficulty Accepted");
+                        warn!("This should never happen !!! Server should send a set_difficulty notification instead.");
+                        msg = Some(Message::Difficulty(diff as f64));
+                    }
                     Some(ReqKind::Submit) => {
                         match response::parse_submit(line) {
                             Ok(_) => {
@@ -238,11 +252,11 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         Ok(())
     }
 
-    async fn send_req(&mut self, req_len: usize) -> Result<()> {
-        self.tx_buf[req_len] = 0x0a;
-        trace!("{:?}", &self.tx_buf[..req_len + 1]);
+    async fn send(&mut self, len: usize) -> Result<()> {
+        self.tx_buf[len] = 0x0a;
+        trace!("{:?}", &self.tx_buf[..len + 1]);
         self.network_conn
-            .write_all(&self.tx_buf[..req_len + 1])
+            .write_all(&self.tx_buf[..len + 1])
             .await
             .map_err(|_| Error::Network)
     }
@@ -263,7 +277,36 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.prepare_req(ReqKind::Configure)?;
         let n = request::configure(self.req_id, exts, self.tx_buf.as_mut_slice())?;
         debug!("Send Configure: {} bytes, id = {}", n, self.req_id);
-        self.send_req(n).await
+        self.send(n).await
+    }
+
+    /// # Suggest Difficulty to Server
+    ///
+    /// ## Parameters
+    ///
+    /// difficulty: the suggested difficulty.
+    ///
+    #[cfg(any(
+        feature = "suggest-difficulty-notification",
+        feature = "suggest-difficulty-request",
+    ))]
+    pub async fn send_suggest_difficulty(&mut self, difficulty: u32) -> Result<()> {
+        if self.configuration.is_none() {
+            return Err(Error::NotConfigured);
+        }
+        #[cfg(feature = "suggest-difficulty-request")]
+        #[cfg(feature = "alloc")]
+        self.prepare_req(ReqKind::SuggestDifficulty(difficulty));
+        #[cfg(feature = "suggest-difficulty-request")]
+        #[cfg(not(feature = "alloc"))]
+        self.prepare_req(ReqKind::SuggestDifficulty(difficulty))?;
+        #[cfg(feature = "suggest-difficulty-request")]
+        let id = Some(self.req_id);
+        #[cfg(feature = "suggest-difficulty-notification")]
+        let id = None;
+        let n = request::suggest_difficulty(id, difficulty, self.tx_buf.as_mut_slice())?;
+        debug!("Send Suggest Difficulty: {} bytes, id = {}", n, self.req_id);
+        self.send(n).await
     }
 
     /// # Connect Client
@@ -272,20 +315,6 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
     ///
     /// identifier: a string to identify the client to the pool.
     ///
-    #[cfg(feature = "alloc")]
-    pub async fn send_connect(&mut self, identifier: Option<String>) -> Result<()> {
-        if self.configuration.is_none() {
-            return Err(Error::NotConfigured);
-        }
-        if self.connected {
-            return Err(Error::AlreadyConnected);
-        }
-        self.prepare_req(ReqKind::Connect);
-        let n = request::connect(self.req_id, identifier, self.tx_buf.as_mut_slice())?;
-        debug!("Send Connect: {} bytes, id = {}", n, self.req_id);
-        self.send_req(n).await
-    }
-    #[cfg(not(feature = "alloc"))]
     pub async fn send_connect(&mut self, identifier: Option<tstring!(32)>) -> Result<()> {
         if self.configuration.is_none() {
             return Err(Error::NotConfigured);
@@ -293,10 +322,13 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         if self.connected {
             return Err(Error::AlreadyConnected);
         }
+        #[cfg(feature = "alloc")]
+        self.prepare_req(ReqKind::Connect);
+        #[cfg(not(feature = "alloc"))]
         self.prepare_req(ReqKind::Connect)?;
         let n = request::connect(self.req_id, identifier, self.tx_buf.as_mut_slice())?;
         debug!("Send Connect: {} bytes, id = {}", n, self.req_id);
-        self.send_req(n).await
+        self.send(n).await
     }
 
     /// # Authorize Client
@@ -322,7 +354,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.user = user.clone();
         let n = request::authorize(self.req_id, user, pass, self.tx_buf.as_mut_slice())?;
         debug!("Send Authorize: {} bytes, id = {}", n, self.req_id);
-        self.send_req(n).await
+        self.send(n).await
     }
 
     /// # Submit a Share
@@ -354,6 +386,6 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
             self.tx_buf.as_mut_slice(),
         )?;
         debug!("Send Submit: {} bytes, id = {}", n, self.req_id);
-        self.send_req(n).await
+        self.send(n).await
     }
 }

@@ -17,7 +17,7 @@ bitcoin_hashes = { workspace = true }
 defmt = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["from"] }
 embedded-io-async = { workspace = true }
-faster-hex = { version = "0.10", default-features = false }
+faster-hex = { version = "0.10", default-features = false, git = "https://github.com/nervosnetwork/faster-hex.git", rev = "4acf38e2404d87cce6f91526c15600af89ef7e72" } # use git waiting for 0.11 publish
 log = { workspace = true, optional = true }
 rustversion = { workspace = true }
 serde = { workspace = true }
@@ -37,10 +37,13 @@ alloc = [
 defmt-03 = [
     "dep:defmt",
     "embedded-io-async/defmt-03",
-    # "faster-hex/defmt-03", # will enable it after faster-hex publish 0.11
+    "faster-hex/defmt-03",
     "heapless/defmt-03",
     "serde-json-core/defmt",
 ]
+
+suggest-difficulty-notification = [] # should be the correct way of doing it
+suggest-difficulty-request = []
 
 [dev-dependencies]
 embedded-io = { workspace = true, features = ["std"] }
