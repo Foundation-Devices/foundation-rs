@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use derive_more::From;
-use heapless::String;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -25,6 +24,7 @@ pub enum Error {
     UnknownNotification,
 
     /// One of the fixed size Vec or String si to small to contain the data
+    #[cfg(not(feature = "alloc"))]
     FixedSizeTooSmall {
         fixed: usize,
         needed: usize,
@@ -41,6 +41,7 @@ pub enum Error {
     QueueFull,
 
     /// Map is full
+    #[cfg(not(feature = "alloc"))]
     MapFull,
 
     NoWork,
@@ -48,8 +49,8 @@ pub enum Error {
     /// Pool reported an error
     Pool {
         code: isize,
-        message: String<32>,
-        detail: Option<String<32>>,
+        message: tstring!(32),
+        detail: Option<tstring!(32)>,
     },
 
     /// Network error
@@ -67,6 +68,7 @@ pub enum Error {
     /// correspond to all json_rpc_types::Error
     RpcOther,
     /// correspond to heapless::Vec::push()
+    #[cfg(not(feature = "alloc"))]
     VecFull,
     /// correspond to all faster_hex::Error
     #[from]

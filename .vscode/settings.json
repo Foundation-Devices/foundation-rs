@@ -1,5 +1,11 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 {
-    "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix"
+    "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix",
+    "rust-analyzer.cargo.features": [
+        // "alloc"
+    ],
+    "rust-analyzer.check.features": [
+        // "alloc"
+    ],
 }

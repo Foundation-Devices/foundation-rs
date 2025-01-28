@@ -228,20 +228,84 @@ impl<T, E> Try for Result<T, E> {
     }
 }
 
+#[cfg(feature = "alloc")]
+macro_rules! tstring {
+    ($l:expr) => {
+        alloc::string::String
+    };
+}
+#[cfg(not(feature = "alloc"))]
+macro_rules! tstring {
+    ($l:expr) => {
+        heapless::String::<$l>
+    };
+}
+
+#[cfg(feature = "alloc")]
+macro_rules! hstring {
+    ($l:expr, $s:expr) => {
+        alloc::string::String::from($s)
+    };
+}
+#[cfg(not(feature = "alloc"))]
 macro_rules! hstring {
     ($l:expr, $s:expr) => {
         heapless::String::<$l>::from_str($s).unwrap()
     };
 }
 
-macro_rules! hvec {
-    ($t:ident, $l:expr, $s:expr) => {
-        heapless::Vec::<$t, $l>::from_slice($s).unwrap()
+#[cfg(feature = "alloc")]
+macro_rules! tvecstring {
+    ($ls:expr, $lv:expr) => {
+        alloc::vec::Vec<alloc::string::String>
     };
 }
 
+#[cfg(not(feature = "alloc"))]
+macro_rules! tvecstring {
+    ($ls:expr, $lv:expr) => {
+        heapless::Vec::<heapless::String<$ls>, $lv>
+    };
+}
+
+#[cfg(feature = "alloc")]
+macro_rules! tvec {
+    ($t:ident, $l:expr) => {
+        alloc::vec::Vec<$t>
+    };
+}
+
+#[cfg(not(feature = "alloc"))]
+macro_rules! tvec {
+    ($t:ident, $l:expr) => {
+        heapless::Vec::<$t, $l>
+    };
+}
+
+#[cfg(feature = "alloc")]
+macro_rules! hvec {
+    ($t:ident, $l:expr, $s:expr) => {
+        alloc::vec::Vec::<$t>::from($s)
+    };
+}
+
+#[cfg(not(feature = "alloc"))]
+macro_rules! hvec {
+    ($t:ident, $l:expr, $s:expr) => {
+        heapless::Vec::<$t, $l>::from_slice(&$s).unwrap()
+    };
+}
+
+#[cfg(feature = "alloc")]
 macro_rules! hveca {
     ($t:ident, $la:expr, $l:expr, $s:expr) => {
-        heapless::Vec::<[$t; $la], $l>::from_slice($s).unwrap()
+        alloc::vec::Vec::<[$t; $la]>::from($s)
+    };
+}
+
+#[cfg(not(feature = "alloc"))]
+macro_rules! hveca {
+    ($t:ident, $la:expr, $l:expr, $s:expr) => {
+        heapless::Vec::<[$t; $la], $l>::from_slice(&$s).unwrap()
     };
 }

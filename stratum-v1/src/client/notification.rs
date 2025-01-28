@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::{Error, Result};
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 use faster_hex::hex_decode;
-use heapless::{String, Vec};
+#[cfg(not(feature = "alloc"))]
+use heapless::Vec;
 use serde::Deserialize;
 
 use super::request::Request;
@@ -11,10 +14,13 @@ use super::request::Request;
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub struct Work {
-    pub job_id: String<32>,
+    pub job_id: tstring!(32),
     pub prev_hash: [u8; 32],
-    pub coinb1: Vec<u8, 128>,
-    pub coinb2: Vec<u8, 130>,
+    pub coinb1: tvec!(u8, 128),
+    pub coinb2: tvec!(u8, 130),
+    #[cfg(feature = "alloc")]
+    pub merkle_branch: Vec<[u8; 32]>,
+    #[cfg(not(feature = "alloc"))]
     pub merkle_branch: Vec<[u8; 32], 16>,
     pub version: i32,
     pub nbits: u32,
@@ -34,7 +40,7 @@ pub(crate) fn parse_method(resp: &[u8]) -> Result<Notification> {
     #[derive(Debug, Deserialize)]
     #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
     struct MethodOnly {
-        method: String<32>,
+        method: tstring!(32),
     }
     match serde_json_core::from_slice::<MethodOnly>(resp)?
         .0
@@ -51,7 +57,7 @@ pub(crate) fn parse_method(resp: &[u8]) -> Result<Notification> {
 pub(crate) fn parse_set_version_mask(resp: &[u8]) -> Result<u32> {
     let mut v = [0; 4];
     hex_decode(
-        serde_json_core::from_slice::<Request<Vec<String<8>, 1>>>(resp)?
+        serde_json_core::from_slice::<Request<tvecstring!(8, 1)>>(resp)?
             .0
             .params
             .ok_or(Error::RpcBadRequest)?
@@ -68,21 +74,21 @@ pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
     #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
     struct WorkRaw(
         // Job ID. This is included when miners submit a results so work can be matched with proper transactions.
-        String<32>,
+        tstring!(32),
         // Hash of previous block. Used to build the header.
-        String<64>,
+        tstring!(64),
         // Generation transaction (part 1). The miner inserts ExtraNonce1 and ExtraNonce2 after this section of the transaction data.
-        String<256>,
+        tstring!(256),
         // Generation transaction (part 2). The miner appends this after the first part of the transaction data and the two ExtraNonce values.
-        String<260>,
+        tstring!(260),
         // List of merkle branches. The generation transaction is hashed against the merkle branches to build the final merkle root.
-        Vec<String<64>, 16>,
+        tvecstring!(64, 16),
         // Bitcoin block version. Used in the block header.
-        String<8>,
+        tstring!(8),
         // nBits. The encoded network difficulty. Used in the block header.
-        String<8>,
+        tstring!(8),
         // nTime. The current time. nTime rolling should be supported, but should not increase faster than actual time.
-        String<8>,
+        tstring!(8),
         // Clean Jobs. If true, miners should abort their current work and immediately use the new job, even if it degrades hashrate in the short term.
         // If false, they can still use the current job, but should move to the new one as soon as possible without impacting hashrate.
         bool,
@@ -109,6 +115,9 @@ pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
                     &mut work.prev_hash[32 - 4 * (i + 1)..32 - 4 * i],
                 )?;
             }
+            #[cfg(feature = "alloc")]
+            work.coinb1.resize(raw.2.len() / 2, 0);
+            #[cfg(not(feature = "alloc"))]
             work.coinb1
                 .resize(raw.2.len() / 2, 0)
                 .map_err(|_| Error::FixedSizeTooSmall {
@@ -116,6 +125,9 @@ pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
                     needed: raw.2.len() / 2,
                 })?;
             hex_decode(raw.2.as_bytes(), &mut work.coinb1)?;
+            #[cfg(feature = "alloc")]
+            work.coinb2.resize(raw.3.len() / 2, 0);
+            #[cfg(not(feature = "alloc"))]
             work.coinb2
                 .resize(raw.3.len() / 2, 0)
                 .map_err(|_| Error::FixedSizeTooSmall {
@@ -123,14 +135,17 @@ pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
                     needed: raw.3.len() / 2,
                 })?;
             hex_decode(raw.3.as_bytes(), &mut work.coinb2)?;
-            for (i, b) in raw.4.iter().enumerate() {
+            for (_i, b) in raw.4.iter().enumerate() {
                 let mut buf = [0; 32];
                 hex_decode(b.as_bytes(), &mut buf)?;
+                #[cfg(feature = "alloc")]
+                work.merkle_branch.push(buf);
+                #[cfg(not(feature = "alloc"))]
                 work.merkle_branch
                     .push(buf)
                     .map_err(|_| Error::FixedSizeTooSmall {
                         fixed: 16,
-                        needed: i,
+                        needed: _i,
                     })?;
             }
             let mut v = [0; 4];
@@ -152,7 +167,7 @@ pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
 }
 
 pub(crate) fn parse_set_difficulty(resp: &[u8]) -> Result<f64> {
-    serde_json_core::from_slice::<Request<Vec<f64, 1>>>(resp)?
+    serde_json_core::from_slice::<Request<tvec!(f64, 1)>>(resp)?
         .0
         .params
         .ok_or(Error::RpcBadRequest)?
@@ -162,7 +177,11 @@ pub(crate) fn parse_set_difficulty(resp: &[u8]) -> Result<f64> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
+    #[cfg(not(feature = "alloc"))]
     use core::str::FromStr;
+    #[cfg(not(feature = "alloc"))]
     use heapless::Vec;
 
     use super::*;
@@ -179,6 +198,7 @@ mod tests {
         );
 
         let resp = br#"{"params":["1fffe0000"], "id":null, "method": "mining.set_version_mask"}"#;
+        #[cfg(not(feature = "alloc"))]
         assert_eq!(
             parse_set_version_mask(resp),
             Err(Error::JsonError(
@@ -187,6 +207,11 @@ mod tests {
                     "invalid length 9, expected a string no more than 8 bytes long"
                 ))
             ))
+        );
+        #[cfg(feature = "alloc")]
+        assert_eq!(
+            parse_set_version_mask(resp),
+            Err(Error::HexError(faster_hex::Error::InvalidLength(8)))
         );
 
         let resp = br#"{"params":["1fffe00"], "id":null, "method": "mining.set_version_mask"}"#;
@@ -211,7 +236,7 @@ mod tests {
                 coinb1: hvec!(
                     u8,
                     128,
-                    &[
+                    [
                         0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -222,7 +247,7 @@ mod tests {
                 coinb2: hvec!(
                     u8,
                     130,
-                    &[
+                    [
                         0x07, 0x2f, 0x73, 0x6c, 0x75, 0x73, 0x68, 0x2f, 0x00, 0x00, 0x00, 0x00,
                         0x01, 0x00, 0xf2, 0x05, 0x2a, 0x01, 0x00, 0x00, 0x00, 0x19, 0x76, 0xa9,
                         0x14, 0xd2, 0x3f, 0xcd, 0xf8, 0x6f, 0x7e, 0x75, 0x6a, 0x64, 0xa7, 0xa9,
@@ -251,7 +276,7 @@ mod tests {
                 coinb1: hvec!(
                     u8,
                     128,
-                    &[
+                    [
                         0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -263,7 +288,7 @@ mod tests {
                 coinb2: hvec!(
                     u8,
                     130,
-                    &[
+                    [
                         0xff, 0xff, 0xff, 0xff, 0x02, 0x00, 0xf2, 0x05, 0x2a, 0x01, 0x00, 0x00,
                         0x00, 0x16, 0x00, 0x14, 0xd4, 0x98, 0x9f, 0x31, 0x37, 0x80, 0x7d, 0xea,
                         0xb9, 0xa7, 0x6e, 0x54, 0x9e, 0xef, 0x5c, 0x5a, 0x03, 0x44, 0x8c, 0xa4,
@@ -297,7 +322,7 @@ mod tests {
                 coinb1: hvec!(
                     u8,
                     128,
-                    &[
+                    [
                         0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -308,7 +333,7 @@ mod tests {
                 coinb2: hvec!(
                     u8,
                     130,
-                    &[
+                    [
                         0xff, 0xff, 0xff, 0xff, 0x02, 0x94, 0xb1, 0xf5, 0x12, 0x00, 0x00, 0x00,
                         0x00, 0x19, 0x76, 0xa9, 0x14, 0x95, 0xe3, 0x81, 0x44, 0x0a, 0x0f, 0xaf,
                         0x41, 0xa7, 0x20, 0x6b, 0x86, 0xb0, 0xd7, 0x70, 0xbc, 0xab, 0xfe, 0xf2,
@@ -319,7 +344,7 @@ mod tests {
                         0x36, 0x4d, 0x00, 0x00, 0x00, 0x00,
                     ]
                 ),
-                merkle_branch: hveca!(u8, 32, 16, &[
+                merkle_branch: hveca!(u8, 32, 16, [
                     [
                         0x48, 0x13, 0x3c, 0xcb, 0x93, 0x55, 0x39, 0x5e, 0x02, 0x96, 0x01, 0x24, 0xdb, 0x8b,
                         0xf4, 0xf9, 0x8f, 0x3c, 0xb0, 0x59, 0x08, 0xf5, 0xc2, 0x7a, 0xbc, 0x77, 0xf0, 0x20,
