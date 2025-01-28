@@ -20,17 +20,49 @@ use tokio::{
     net::TcpStream,
     sync::{watch, Mutex},
 };
-
+/*
++------------------------+-------+-----------------------------------+---------------------------------------------------------------+
+| Pool URL               | Port  | Web URL                           | Status                                                        |
++------------------------+-------+-----------------------------------+---------------------------------------------------------------+
+| public-pool.io         | 21496 | https://web.public-pool.io        | Open Source Solo Bitcoin Mining Pool supporting open source   |
+|                        |       |                                   | miners                                                        |
++------------------------+-------+-----------------------------------+---------------------------------------------------------------+
+| stratum.braiins.com    | 3333  | https://pool.braiins.com          | Braiins Mining Pool                                           |
++------------------------+-------+-----------------------------------+---------------------------------------------------------------+
+| pool.nerdminers.org    | 3333  | https://nerdminers.org            | The official Nerdminer pool site - Maintained by @golden-guy  |
++------------------------+-------+-----------------------------------+---------------------------------------------------------------+
+| pool.pyblock.xyz       | 3333  | https://pool.pyblock.xyz/         | Maintained by curly60e                                        |
++------------------------+-------+-----------------------------------+---------------------------------------------------------------+
+| pool.sethforprivacy.com| 3333  | https://pool.sethforprivacy.com/  | Maintained by @sethforprivacy - public-pool fork              |
++------------------------+-------+-----------------------------------+---------------------------------------------------------------+
+*/
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    let pool =
-        Select::new("Which Pool should be used?", vec!["Public-Pool", "Braiins"]).prompt()?;
+    let pool = Select::new(
+        "Which Pool should be used?",
+        vec![
+            "Public-Pool",
+            "Braiins",
+            "NerdMiners.org",
+            "PyBlock",
+            "SethForPrivacy",
+        ],
+    )
+    .prompt()?;
 
     let addr = match pool {
-        "Public-Pool" => SocketAddr::new(Ipv4Addr::new(68, 235, 52, 36).into(), 21496),
+        // public-pool.io = 38.51.144.240:21496
+        "Public-Pool" => SocketAddr::new(Ipv4Addr::new(38, 51, 144, 240).into(), 21496),
+        // stratum.braiins.com = 64.225.5.77:3333
         "Braiins" => SocketAddr::new(Ipv4Addr::new(64, 225, 5, 77).into(), 3333),
+        // pool.nerdminers.org = 144.91.83.152:3333
+        "NerdMiners.org" => SocketAddr::new(Ipv4Addr::new(144, 91, 83, 152).into(), 3333),
+        // pool.pyblock.xyz = 172.81.181.23:3333
+        "PyBlock" => SocketAddr::new(Ipv4Addr::new(172, 81, 181, 23).into(), 3333),
+        // pool.sethforprivacy.com = 23.137.57.100:3333
+        "SethForPrivacy" => SocketAddr::new(Ipv4Addr::new(23, 137, 57, 100).into(), 3333),
         _ => unreachable!(),
     };
 
@@ -48,6 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::spawn(async move {
         loop {
+            tokio::time::sleep(Duration::from_millis(100)).await;
             let mut c = client_rx.lock().await;
             match c.poll_message().await {
                 Ok(msg) => match msg {
@@ -60,14 +93,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .unwrap();
                     }
                     Some(Message::Connected) => {
+                        #[cfg(any(
+                            feature = "suggest-difficulty-notification",
+                            feature = "suggest-difficulty-request",
+                        ))]
+                        if pool != "Braiins" {
+                            c.send_suggest_difficulty(256).await.unwrap();
+                        }
                         #[cfg(feature = "alloc")]
                         c.send_authorize(
                             match pool {
-                                "Public-Pool" => {
-                                    "1HLQGxzAQWnLore3fWHc2W8UP1CgMv1GKQ.miner1".to_string()
-                                }
-                                "Braiins" => "slush.miner1".to_string(),
-                                _ => unreachable!(),
+                                "Braiins" => "moquette31.miner1".to_string(),
+                                _ => "1HLQGxzAQWnLore3fWHc2W8UP1CgMv1GKQ.miner1".to_string(),
                             },
                             "x".to_string(),
                         )
@@ -76,12 +113,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         #[cfg(not(feature = "alloc"))]
                         c.send_authorize(
                             match pool {
-                                "Public-Pool" => String::<64>::from_str(
+                                "Braiins" => String::<64>::from_str("moquette31.miner1").unwrap(),
+                                _ => String::<64>::from_str(
                                     "1HLQGxzAQWnLore3fWHc2W8UP1CgMv1GKQ.miner1",
                                 )
                                 .unwrap(),
-                                "Braiins" => String::<64>::from_str("slush.miner1").unwrap(),
-                                _ => unreachable!(),
                             },
                             String::<64>::from_str("x").unwrap(),
                         )
@@ -89,6 +125,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .unwrap();
                     }
                     Some(Message::Authorized) => {
+                        #[cfg(any(
+                            feature = "suggest-difficulty-notification",
+                            feature = "suggest-difficulty-request",
+                        ))]
+                        if pool == "Braiins" {
+                            c.send_suggest_difficulty(256).await.unwrap();
+                        }
                         authorized_tx.send(true).unwrap();
                     }
                     Some(Message::Share {
@@ -114,6 +157,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     });
+
+    tokio::time::sleep(Duration::from_millis(1500)).await;
     {
         let mut c = client_tx.lock().await;
         let exts = Extensions {
@@ -238,15 +283,16 @@ mod adapter {
 
     impl<T: super::Readable + Unpin + ?Sized> embedded_io_async::ReadReady for FromTokio<T> {
         fn read_ready(&mut self) -> Result<bool, Self::Error> {
-            // TODO: This crash at runtime :
-            // Cannot start a runtime from within a runtime. This happens because a function (like `block_on`)
-            // attempted to block the current thread while the thread is being used to drive asynchronous tasks.
-            tokio::runtime::Handle::current().block_on(poll_fn(|cx| {
-                match Pin::new(&mut self.inner).poll_read_ready(cx) {
-                    Poll::Ready(_) => Poll::Ready(Ok(true)),
-                    Poll::Pending => Poll::Ready(Ok(false)),
-                }
-            }))
+            let h = tokio::runtime::Handle::current();
+
+            tokio::task::block_in_place(|| {
+                h.block_on(poll_fn(|cx| {
+                    match Pin::new(&mut self.inner).poll_read_ready(cx) {
+                        Poll::Ready(_) => Poll::Ready(Ok(true)),
+                        Poll::Pending => Poll::Ready(Ok(false)),
+                    }
+                }))
+            })
         }
     }
 

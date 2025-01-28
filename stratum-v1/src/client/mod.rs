@@ -112,16 +112,29 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
     pub async fn poll_message(&mut self) -> Result<Option<Message>> {
         let mut msg = None;
         let mut start = 0;
-        while let Some(stop) = self.rx_buf[start..self.rx_free_pos]
+        while let Some(mut stop) = self.rx_buf[start..self.rx_free_pos]
             .iter()
             .position(|&c| c == b'\n')
         {
+            stop += start;
+            trace!("Buffer start: {:?}", &self.rx_buf[..start]);
+            trace!("Current : {:?}", &self.rx_buf[start..stop]);
+            trace!("Buffer end: {:?}", &self.rx_buf[stop..]);
             let line = &self.rx_buf[start..stop];
+            trace!("Start: {}, Stop: {}", start, stop);
             debug!(
                 "Received Message [{}..{}], free pos: {}",
                 start, stop, self.rx_free_pos
             );
-            trace!("{:?}", line);
+            debug!(
+                "<< {}",
+                if let Ok(l) = core::str::from_utf8(line) {
+                    l
+                } else {
+                    "Invalid UTF-8"
+                }
+            );
+            debug!("unresponded reqs: {:?}", self.reqs);
             if let Some(id) = response::parse_id(line)? {
                 // it's a Response
                 match self.reqs.get(&id) {
@@ -171,14 +184,14 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                                 );
                             }
                             Err(Error::Pool {
-                                code: _c, // TODO: use this code to differentiate why share has been rejected
+                                code: c, // TODO: use this code to differentiate why share has been rejected
                                 message: _,
                                 detail: _,
                             }) => {
                                 self.shares_rejected += 1;
                                 info!(
-                                    "Share #{} Rejected, count: {}/{}",
-                                    id, self.shares_accepted, self.shares_rejected
+                                    "Share #{} Rejected, count: {}/{}, code: {}",
+                                    id, self.shares_accepted, self.shares_rejected, c
                                 );
                             }
                             Err(e) => return Err(e),
@@ -193,19 +206,19 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 }
             } else {
                 // it's a Notification
-                match notification::parse_method(line)? {
-                    Notification::SetVersionMask => {
+                match notification::parse_method(line) {
+                    Ok(Notification::SetVersionMask) => {
                         let mask = notification::parse_set_version_mask(line)?;
                         self.job_creator.set_version_mask(mask);
                         msg = Some(Message::VersionMask(mask));
                         info!("Set Version Mask: 0x{:x}", mask);
                     }
-                    Notification::SetDifficulty => {
+                    Ok(Notification::SetDifficulty) => {
                         let diff = notification::parse_set_difficulty(line)?;
                         msg = Some(Message::Difficulty(diff));
                         info!("Set Difficulty: {}", diff);
                     }
-                    Notification::Notify => {
+                    Ok(Notification::Notify) => {
                         let work = notification::parse_notify(line)?;
                         if work.clean_jobs {
                             msg = Some(Message::CleanJobs);
@@ -216,14 +229,21 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                         #[cfg(not(feature = "alloc"))]
                         self.job_creator.set_work(work)?;
                     }
+                    Err(e) => error!("Failed to parse notification: {:?}", e),
                 }
             }
             start = stop + 1;
+            if msg.is_some() {
+                break;
+            }
         }
+        // trace!("start: {}, free pos: {}", start, self.rx_free_pos);
         if start > 0 && self.rx_free_pos > start {
             debug!("copy {} bytes @0", self.rx_free_pos - start);
             self.rx_buf.copy_within(start..self.rx_free_pos, 0);
             self.rx_free_pos -= start;
+        } else if start == self.rx_free_pos {
+            self.rx_free_pos = 0;
         }
         if self.network_conn.read_ready().map_err(|_| Error::Network)? {
             let n = self
@@ -232,7 +252,11 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 .await
                 .map_err(|_| Error::Network)?;
             debug!("read {} bytes @{}", n, self.rx_free_pos);
-            trace!("{:?}", &self.rx_buf[self.rx_free_pos..self.rx_free_pos + n]);
+            trace!(
+                "<< chunk: {:?}",
+                core::str::from_utf8(&self.rx_buf[self.rx_free_pos..self.rx_free_pos + n])
+            );
+            // trace!("{:?}", &self.rx_buf[self.rx_free_pos..self.rx_free_pos + n]);
             self.rx_free_pos += n;
         }
         Ok(msg)
@@ -254,7 +278,15 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
 
     async fn send(&mut self, len: usize) -> Result<()> {
         self.tx_buf[len] = 0x0a;
-        trace!("{:?}", &self.tx_buf[..len + 1]);
+        debug!(
+            ">> {}",
+            if let Ok(l) = core::str::from_utf8(&self.tx_buf[..len + 1]) {
+                l
+            } else {
+                "Invalid UTF-8"
+            }
+        );
+        // trace!("{:?}", &self.tx_buf[..len + 1]);
         self.network_conn
             .write_all(&self.tx_buf[..len + 1])
             .await
