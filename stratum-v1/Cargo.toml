@@ -10,34 +10,46 @@ edition = "2021"
 homepage.workspace = true
 license = "GPL-3.0-or-later AND GPL-3.0-only"
 name = "stratum-v1"
-version = "0.2.0"
+version = "0.3.0"
 
 [dependencies]
 bitcoin_hashes = { workspace = true }
 defmt = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["from"] }
 embedded-io-async = { workspace = true }
-faster-hex = { version = "0.10", default-features = false }
-heapless = { workspace = true, features = ["serde"] }
+faster-hex = { version = "0.10", default-features = false, git = "https://github.com/nervosnetwork/faster-hex.git", rev = "4acf38e2404d87cce6f91526c15600af89ef7e72" } # use git waiting for 0.11 publish
 log = { workspace = true, optional = true }
 rustversion = { workspace = true }
 serde = { workspace = true }
 serde-json-core = { workspace = true, features = ["custom-error-messages"] }
 
+[target.'cfg(not(features = "alloc"))'.dependencies]
+heapless = { workspace = true, features = ["serde"] }
+
 [features]
+alloc = [
+    "bitcoin_hashes/alloc",
+    "defmt?/alloc",
+    "embedded-io-async/alloc",
+    "faster-hex/alloc",
+    "serde/alloc",
+]
 defmt-03 = [
     "dep:defmt",
     "embedded-io-async/defmt-03",
-    # "faster-hex/defmt-03", # will enable it after faster-hex publish 0.11
+    "faster-hex/defmt-03",
     "heapless/defmt-03",
     "serde-json-core/defmt",
 ]
+
+suggest-difficulty-notification = [] # should be the correct way of doing it
+suggest-difficulty-request = []
 
 [dev-dependencies]
 embedded-io = { workspace = true, features = ["std"] }
 env_logger = "0.11"
 inquire = "0.7"
-log = { workspace = true }
+log = { workspace = true, features = ["std"] }
 tokio = { version = "1", features = ["full"] }
 
 [[example]]
