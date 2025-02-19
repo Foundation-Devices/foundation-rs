@@ -196,6 +196,8 @@ where
                         &mut address,
                     )?;
 
+                    log::debug!("rendered output address: {address}");
+
                     // Non-change outputs should be rendered on the user
                     // interface, change outputs are validated so those are
                     // not emitted.
