@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use bech32::primitives::segwit::MAX_STRING_LENGTH;
 use core::{cmp::Ordering, fmt};
 
 use nom::bytes::complete::tag;
@@ -12,7 +13,8 @@ use secp256k1::{PublicKey, Scalar, XOnlyPublicKey};
 use foundation_bip32::{Fingerprint, KeySource, Xpriv};
 
 use crate::{
-    address::AddressType,
+    address,
+    address::{AddressType, Network, RenderAddressError},
     parser::{global, global::GlobalMap, input, input::InputMap, output, output::OutputMap},
     transaction::SIGHASH_ALL,
 };
@@ -20,7 +22,7 @@ use crate::{
 use bitcoin_hashes::{hash160, sha256t, HashEngine};
 use bitcoin_primitives::{TapTweakHash, TapTweakTag};
 
-use heapless::Vec;
+use heapless::{String, Vec};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionDetails {
@@ -46,13 +48,19 @@ impl TransactionDetails {
 pub enum Event {
     /// Validation progress percentage update.
     Progress(u64),
+    /// Output address.
+    OutputAddress {
+        amount: i64,
+        address: String<MAX_STRING_LENGTH>,
+    },
 }
 
 pub fn validate<Input, C, F, E, const N: usize>(
+    network: Network,
     i: Input,
     secp: &secp256k1::Secp256k1<C>,
     master_key: Xpriv,
-    mut handle_event: F,
+    mut event_handler: F,
 ) -> Result<TransactionDetails, Error<E>>
 where
     Input: for<'a> nom::Compare<&'a [u8]>
@@ -73,7 +81,7 @@ where
         + nom::error::FromExternalError<Input, bitcoin_hashes::FromSliceError>
         + nom::error::FromExternalError<Input, core::num::TryFromIntError>,
 {
-    handle_event(Event::Progress(0));
+    event_handler(Event::Progress(0));
 
     log::debug!("validating PSBT");
 
@@ -110,7 +118,7 @@ where
         }
 
         processed_items += 1;
-        handle_event(Event::Progress((processed_items * 100) / total_items));
+        event_handler(Event::Progress((processed_items * 100) / total_items));
     }
 
     log::debug!("validating outputs");
@@ -179,6 +187,22 @@ where
                 total_with_change += output_details.amount;
                 if output_details.is_change {
                     total_change += output_details.amount;
+                } else {
+                    let mut address = String::new();
+                    address::render(
+                        network,
+                        output_details.address_type,
+                        &output_details.data,
+                        &mut address,
+                    )?;
+
+                    // Non-change outputs should be rendered on the user
+                    // interface, change outputs are validated so those are
+                    // not emitted.
+                    event_handler(Event::OutputAddress {
+                        amount: output_details.amount,
+                        address,
+                    })
                 }
 
                 input = i;
@@ -188,7 +212,7 @@ where
         };
 
         processed_items += 1;
-        handle_event(Event::Progress((processed_items * 100) / total_items));
+        event_handler(Event::Progress((processed_items * 100) / total_items));
     }
 
     log::debug!("total with total_change: {total_with_change} sats");
@@ -286,6 +310,10 @@ pub struct OutputDetails {
     pub amount: i64,
     /// Is this a change output?
     pub is_change: bool,
+    /// Address type.
+    pub address_type: AddressType,
+    /// Address data.
+    pub data: Vec<u8, 35>,
 }
 
 /// Validate the output.
@@ -342,23 +370,27 @@ where
 
     log::debug!("output amount: {} sats", txout.value);
 
-    // A normal spend, we can't really validate anything else.
-    if our_keys.len() == 0 {
-        return Ok(OutputDetails {
-            amount: txout.value,
-            is_change: false,
-        });
-    }
-
     // Validate the address of the output, so, parse the scriptPubKey and
     // determine the type, this allows us to check that the scriptPubKey
     // matches our keys, so we need to determine the script type.
+    //
+    // Also used to render the address for the user interface.
     let (address_type, key) = match txout.address() {
         Some(v) => v,
         None => {
             return Err(ValidationError::UnknownOutputScript { index });
         }
     };
+
+    // A normal spend, we can't really validate anything else.
+    if our_keys.len() == 0 {
+        return Ok(OutputDetails {
+            amount: txout.value,
+            is_change: false,
+            address_type,
+            data: key,
+        });
+    }
 
     log::debug!("output address type {:?}", address_type);
 
@@ -373,7 +405,7 @@ where
 
             let pk = our_keys[0].serialize();
             let pkh = hash160::Hash::hash(&pk);
-            if key.compare(pkh.as_ref()) != nom::CompareResult::Ok {
+            if key != pkh.as_byte_array() {
                 return Err(ValidationError::FraudulentOutputPublicKey { index });
             }
 
@@ -387,16 +419,16 @@ where
                 return Err(ValidationError::MultipleKeysNotExpected { index });
             }
 
-            match key.input_len() {
+            match key.len() {
                 33 => {
                     let pk = our_keys[0].serialize();
-                    if key.compare(&pk) != nom::CompareResult::Ok {
+                    if key != pk {
                         return Err(ValidationError::FraudulentOutputPublicKey { index });
                     }
                 }
                 65 => {
                     let pk = our_keys[0].serialize_uncompressed();
-                    if key.compare(&pk) != nom::CompareResult::Ok {
+                    if key != pk {
                         return Err(ValidationError::FraudulentOutputPublicKey { index });
                     }
                 }
@@ -415,13 +447,10 @@ where
             // The tweaked key from the taproot output.
             let psbt_tweaked = {
                 // Output::address already makes sure of this.
-                debug_assert!(key.input_len() == 32);
+                debug_assert!(key.len() == 32);
 
                 let mut psbt_tweaked_buf = [0; 32];
-                for (i, b) in key.iter_indices() {
-                    psbt_tweaked_buf[i] = b;
-                }
-
+                psbt_tweaked_buf.copy_from_slice(&key);
                 match XOnlyPublicKey::from_byte_array(&psbt_tweaked_buf) {
                     Ok(v) => v,
                     Err(_) => return Err(ValidationError::TaprootOutputInvalidPublicKey { index }),
@@ -505,6 +534,8 @@ where
     Ok(OutputDetails {
         amount: txout.value,
         is_change: true,
+        address_type,
+        data: key,
     })
 }
 
@@ -512,6 +543,7 @@ where
 pub enum Error<E> {
     Parse(nom::Err<E>),
     Validation(ValidationError),
+    AddressRender(RenderAddressError),
 }
 
 impl<E> From<nom::Err<E>> for Error<E> {
@@ -526,11 +558,18 @@ impl<E> From<ValidationError> for Error<E> {
     }
 }
 
+impl<E> From<RenderAddressError> for Error<E> {
+    fn from(e: RenderAddressError) -> Self {
+        Self::AddressRender(e)
+    }
+}
+
 impl<E: fmt::Debug> fmt::Display for Error<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Parse(e) => fmt::Display::fmt(e, f),
             Error::Validation(e) => write!(f, "validation error: {e}"),
+            Error::AddressRender(e) => write!(f, "failed to render output address: {e}"),
         }
     }
 }

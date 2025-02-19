@@ -11,6 +11,7 @@ name = "sign"
 required-features = ["sign-example"]
 
 [dependencies]
+bech32 = { workspace = true }
 bitcoin_hashes = { workspace = true }
 bitcoin-primitives = { workspace = true }
 bitflags = { workspace = true }

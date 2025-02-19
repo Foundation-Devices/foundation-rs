@@ -21,5 +21,8 @@ fn test_output_p2wsh() {
         script_pubkey: SCRIPT_PUBKEY,
     };
 
-    assert_eq!(output.address(), Some((AddressType::P2WSH, SCRIPT_HASH)));
+    match output.address() {
+        Some((AddressType::P2WSH, hash)) => assert_eq!(hash, SCRIPT_HASH),
+        _ => panic!(),
+    }
 }

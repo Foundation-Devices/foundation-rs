@@ -4,6 +4,7 @@
 use bitcoin_hashes::sha256d;
 use bitcoin_primitives::Txid;
 use embedded_io::Write;
+use heapless::Vec;
 
 use crate::address::AddressType;
 use crate::encoder::{
@@ -92,7 +93,7 @@ where
     ///
     /// So, written for performance, not readability. That is also the reason
     /// of the nested ifs.
-    pub fn address(&self) -> Option<(AddressType, I)> {
+    pub fn address(&self) -> Option<(AddressType, Vec<u8, 35>)> {
         let len = self.script_pubkey.input_len();
         let mut iter = self.script_pubkey.iter_elements();
         let b0 = iter.next();
@@ -102,28 +103,52 @@ where
         //
         // 0x0014 and the rest is the RIPEMD-160 hash of the public key.
         if len == 22 && b0 == Some(0x00) && b1 == Some(0x14) {
-            return Some((AddressType::P2WPKH, self.script_pubkey.slice(2..22)));
+            return Some((
+                AddressType::P2WPKH,
+                self.script_pubkey
+                    .slice(2..22)
+                    .iter_elements()
+                    .collect::<_>(),
+            ));
         }
 
         // P2WSH (BIP-0141).
         //
         // 0x0014 and the rest is the SHA-256 hash of the public key.
         if len == 34 && b0 == Some(0x00) && b1 == Some(0x20) {
-            return Some((AddressType::P2WSH, self.script_pubkey.slice(2..34)));
+            return Some((
+                AddressType::P2WSH,
+                self.script_pubkey
+                    .slice(2..34)
+                    .iter_elements()
+                    .collect::<_>(),
+            ));
         }
 
         // P2TR (BIP-0341).
         //
         // 0x5120 and the rest if the output public key.
         if len == 34 && b0 == Some(0x51) && b1 == Some(0x20) {
-            return Some((AddressType::P2TR, self.script_pubkey.slice(2..34)));
+            return Some((
+                AddressType::P2TR,
+                self.script_pubkey
+                    .slice(2..34)
+                    .iter_elements()
+                    .collect::<_>(),
+            ));
         }
 
         // P2SH (BIP-16).
         if len == 23 && b0 == Some(0xA9) && b1 == Some(0x14) {
             let b22 = self.script_pubkey.slice(22..).iter_elements().nth(0);
             if b22 == Some(0x87) {
-                return Some((AddressType::P2SH, self.script_pubkey.slice(2..22)));
+                return Some((
+                    AddressType::P2SH,
+                    self.script_pubkey
+                        .slice(2..22)
+                        .iter_elements()
+                        .collect::<_>(),
+                ));
             }
         }
 
@@ -131,7 +156,13 @@ where
         if (len == 35 || len == 67) && (b0 == Some(0x21) || b0 == Some(0x41)) {
             let last = self.script_pubkey.slice(len - 1..).iter_elements().nth(0);
             if last == Some(0xAC) {
-                return Some((AddressType::P2PK, self.script_pubkey.slice(2..35)));
+                return Some((
+                    AddressType::P2PK,
+                    self.script_pubkey
+                        .slice(2..35)
+                        .iter_elements()
+                        .collect::<_>(),
+                ));
             }
         }
 
@@ -143,7 +174,13 @@ where
             if b23 == Some(0x88) {
                 let b24 = self.script_pubkey.slice(24..).iter_elements().nth(0);
                 if b24 == Some(0xAC) {
-                    return Some((AddressType::P2PKH, self.script_pubkey.slice(3..23)));
+                    return Some((
+                        AddressType::P2PKH,
+                        self.script_pubkey
+                            .slice(3..23)
+                            .iter_elements()
+                            .collect::<_>(),
+                    ));
                 }
             }
         }
