@@ -3,8 +3,10 @@
 
 use bech32::{hrp, primitives::segwit::MAX_STRING_LENGTH, segwit, Hrp};
 use core::fmt;
-use heapless::String;
+use heapless::{String, Vec};
+use tinyvec::SliceVec;
 
+/// Bitcoin network type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Network {
     Mainnet,
@@ -12,7 +14,7 @@ pub enum Network {
 }
 
 impl Network {
-    /// Bech32 Human-Readable-Part for the network.
+    /// Bech32 Human-Readable-Part of the network.
     pub fn bech32_hrp(&self) -> Hrp {
         match self {
             Network::Mainnet => hrp::BC,
@@ -21,6 +23,7 @@ impl Network {
     }
 }
 
+/// Supported address types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddressType {
     P2WPKH,
@@ -47,6 +50,7 @@ pub enum RenderAddressError {
     Format(fmt::Error),
     /// Invalid address data.
     InvalidAddressData,
+    AddressTooBig,
     Unimplemented,
 }
 
@@ -55,9 +59,34 @@ impl fmt::Display for RenderAddressError {
         match self {
             Self::Format(e) => write!(f, "formatting error: {e}"),
             Self::InvalidAddressData => write!(f, "internal error: address data is invalid"),
+            Self::AddressTooBig => write!(f, "address is too big to be rendered"),
             Self::Unimplemented => write!(f, "not yet implemented"),
         }
     }
+}
+
+fn render_base58_address(
+    version: u8,
+    data: &[u8],
+    s: &mut String<MAX_STRING_LENGTH>,
+) -> Result<(), RenderAddressError> {
+    let mut buf: Vec<u8, MAX_STRING_LENGTH> = Vec::new();
+    buf.resize_default(MAX_STRING_LENGTH)
+        .expect("the new length should be the capacity (unreachable)");
+
+    let len = bs58::encode::EncodeBuilder::new(data, bs58::Alphabet::BITCOIN)
+        .with_check_version(version)
+        .onto(SliceVec::from(buf.as_mut_slice()))
+        .map_err(|_| RenderAddressError::AddressTooBig)?;
+    buf.truncate(len);
+
+    // Encoder should only produce valid UTF-8, anything else is a logic
+    // error, better to not continue with execution since this is
+    // impossible.
+    *s = String::from_utf8(buf)
+        .expect("conversion to base58 always contains valid characters (unreachable)");
+
+    Ok(())
 }
 
 /// Render a Bitcoin address as text.
@@ -69,6 +98,8 @@ pub fn render(
     data: &[u8],
     s: &mut String<MAX_STRING_LENGTH>,
 ) -> Result<(), RenderAddressError> {
+    s.clear();
+
     match kind {
         AddressType::P2WPKH => {
             if data.len() != 20 {
@@ -94,8 +125,21 @@ pub fn render(
             segwit::encode_to_fmt_unchecked(s, network.bech32_hrp(), segwit::VERSION_1, data)
                 .map_err(RenderAddressError::Format)?;
         }
-        AddressType::P2PKH => return Err(RenderAddressError::Unimplemented),
-        AddressType::P2SH => return Err(RenderAddressError::Unimplemented),
+        AddressType::P2PKH => {
+            if data.len() != 20 {
+                return Err(RenderAddressError::InvalidAddressData);
+            }
+
+            render_base58_address(0x00, data, s)?;
+        }
+        AddressType::P2SH => {
+            if data.len() != 20 {
+                return Err(RenderAddressError::InvalidAddressData);
+            }
+
+            render_base58_address(0x05, data, s)?;
+        }
+        // Maybe render the public key as hex.
         AddressType::P2PK => return Err(RenderAddressError::Unimplemented),
     };
 

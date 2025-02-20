@@ -12,6 +12,7 @@ required-features = ["sign-example"]
 
 [dependencies]
 bech32 = { workspace = true }
+bs58 = { workspace = true }
 bitcoin_hashes = { workspace = true }
 bitcoin-primitives = { workspace = true }
 bitflags = { workspace = true }
@@ -25,6 +26,7 @@ nom = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 secp256k1 = { workspace = true }
+tinyvec = { workspace = true }
 
 [dev-dependencies]
 foundation-test-vectors = { workspace = true, features = ["psbt"] }
