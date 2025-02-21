@@ -53,6 +53,11 @@ pub enum Event {
         amount: i64,
         address: String<MAX_STRING_LENGTH>,
     },
+    /// Change address.
+    ChangeAddress {
+        amount: i64,
+        address: String<MAX_STRING_LENGTH>,
+    },
 }
 
 pub fn validate<Input, C, F, E, const N: usize>(
@@ -187,21 +192,25 @@ where
                 total_with_change += output_details.amount;
                 if output_details.is_change {
                     total_change += output_details.amount;
-                } else {
-                    let mut address = String::new();
-                    address::render(
-                        network,
-                        output_details.address_type,
-                        &output_details.data,
-                        &mut address,
-                    )?;
+                }
 
-                    log::debug!("rendered output address: {address}");
+                let mut address = String::new();
+                address::render(
+                    network,
+                    output_details.address_type,
+                    &output_details.data,
+                    &mut address,
+                )?;
 
-                    // Non-change outputs should be rendered on the user
-                    // interface, change outputs are validated so those are
-                    // not emitted.
+                if output_details.is_change {
+                    log::debug!("rendered change address: {address}");
                     event_handler(Event::OutputAddress {
+                        amount: output_details.amount,
+                        address,
+                    })
+                } else {
+                    log::debug!("rendered output address: {address}");
+                    event_handler(Event::ChangeAddress {
                         amount: output_details.amount,
                         address,
                     })
