@@ -27,6 +27,7 @@ homepage = "https://github.com/Foundation-Devices/foundation-rs"
 anyhow = { version = "1.0.83", default-features = false }
 arbitrary = { version = "1", features = ["derive"] }
 base58ck = { version = "0.1", default-features = false }
+bs58 = { version = "0.5", features = ["check", "tinyvec"], default-features = false }
 bech32 = { version = "0.11", default-features = false }
 bip39 = { version = "2.1", default-features = false }
 bitcoin = { version = "0.31", default-features = false }
@@ -61,6 +62,7 @@ secp256k1 = { version = "0.30", default-features = false }
 serde = { version = "1.0.156", features = ["derive"], default-features = false }
 serde_json = "1"
 serde-json-core = { version = "0.6.0" }
+tinyvec = { version = "1", default-features = false }
 uuid = { version = "1", default-features = false }
 
 # The crates in this workspace.
