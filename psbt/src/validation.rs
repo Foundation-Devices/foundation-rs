@@ -204,13 +204,13 @@ where
 
                 if output_details.is_change {
                     log::debug!("rendered change address: {address}");
-                    event_handler(Event::OutputAddress {
+                    event_handler(Event::ChangeAddress {
                         amount: output_details.amount,
                         address,
                     })
                 } else {
                     log::debug!("rendered output address: {address}");
-                    event_handler(Event::ChangeAddress {
+                    event_handler(Event::OutputAddress {
                         amount: output_details.amount,
                         address,
                     })
