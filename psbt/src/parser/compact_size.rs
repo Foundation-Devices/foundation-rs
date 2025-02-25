@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use nom::{
-    branch::alt,
-    bytes::complete::tag,
     combinator::{cut, map, verify},
     error::ParseError,
     number::complete::{le_u16, le_u32, le_u64, u8},
-    sequence::preceded,
     Compare, IResult, InputIter, InputLength, InputTake, Slice,
 };
 
@@ -29,24 +26,14 @@ where
         + Slice<core::ops::RangeFrom<usize>>,
     E: ParseError<I>,
 {
-    let tag = tag::<_, I, E>;
+    let (i, prefix) = u8(i)?;
 
-    let parse_u8 = map(u8, u64::from);
-    let parse_u16 = preceded(
-        tag(b"\xFD"),
-        cut(verify(map(le_u16, u64::from), |&n| n > 0xFD)),
-    );
-    let parse_u32 = preceded(
-        tag(b"\xFE"),
-        cut(verify(map(le_u32, u64::from), |&n| n > 0xFFFF)),
-    );
-    let parse_u64 = preceded(
-        tag(b"\xFF"),
-        cut(verify(map(le_u64, u64::from), |&n| n > 0xFFFF_FFFF)),
-    );
-    let mut parser = alt((parse_u64, parse_u32, parse_u16, parse_u8));
-
-    parser(i)
+    match prefix {
+        0xFD => cut(verify(map(le_u16, u64::from), |&n| n > 0xFD))(i),
+        0xFE => cut(verify(map(le_u32, u64::from), |&n| n > 0xFFFF))(i),
+        0xFF => cut(verify(map(le_u64, u64::from), |&n| n > 0xFFFF_FFFF))(i),
+        _ => Ok((i, u64::from(prefix))),
+    }
 }
 
 #[cfg(test)]
