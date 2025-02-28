@@ -64,7 +64,7 @@ impl<I> Transaction<I> {
 }
 
 /// A transaction input.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Input<I> {
     pub previous_output: OutputPoint,
     pub script_sig: I,
@@ -72,7 +72,7 @@ pub struct Input<I> {
 }
 
 /// A transaction output.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Output<I> {
     /// Number of satoshis this output is worth.
     pub value: i64,
@@ -93,11 +93,19 @@ where
     ///
     /// So, written for performance, not readability. That is also the reason
     /// of the nested ifs.
-    pub fn address(&self) -> Option<(AddressType, Vec<u8, 35>)> {
+    pub fn address(&self) -> Option<(AddressType, Vec<u8, 90>)> {
         let len = self.script_pubkey.input_len();
         let mut iter = self.script_pubkey.iter_elements();
         let b0 = iter.next();
         let b1 = iter.next();
+
+        // OP_RETURN.
+        if b0 == Some(0x6A) {
+            return Some((
+                AddressType::Return,
+                self.script_pubkey.slice(1..).iter_elements().collect::<_>(),
+            ));
+        }
 
         // P2WPKH (BIP-0141).
         //
@@ -190,7 +198,7 @@ where
 }
 
 /// Points to the output of a transaction.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OutputPoint {
     /// The transaction ID of the transaction holding the output to spend.
     pub hash: Txid,

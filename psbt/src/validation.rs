@@ -324,7 +324,7 @@ pub struct OutputDetails {
     /// Address type.
     pub address_type: AddressType,
     /// Address data.
-    pub data: Vec<u8, 35>,
+    pub data: Vec<u8, 90>,
 }
 
 /// Validate the output.

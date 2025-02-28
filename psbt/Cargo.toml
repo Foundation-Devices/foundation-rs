@@ -19,6 +19,7 @@ bitflags = { workspace = true }
 either = { workspace = true }
 embedded-io = { workspace = true }
 env_logger = { workspace = true, optional = true }
+faster-hex = { workspace = true }
 foundation-bip32 = { workspace = true }
 heapless = { workspace = true }
 log = { workspace = true }

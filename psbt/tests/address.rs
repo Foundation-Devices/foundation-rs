@@ -26,3 +26,23 @@ fn test_output_p2wsh() {
         _ => panic!(),
     }
 }
+
+#[test]
+fn test_output_return() {
+    const SCRIPT_PUBKEY: &[u8] = &[
+        0x6a, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x2C, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64, 0x21,
+    ];
+    const DATA: &[u8] = &[
+        0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x2C, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64, 0x21,
+    ];
+
+    let output = Output {
+        value: 0,
+        script_pubkey: SCRIPT_PUBKEY,
+    };
+
+    match output.address() {
+        Some((AddressType::Return, data)) => assert_eq!(data, DATA),
+        _ => panic!(),
+    }
+}
