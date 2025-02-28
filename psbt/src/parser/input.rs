@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use core::num::TryFromIntError;
+use core::ops::RangeFrom;
 
 use bitcoin_hashes::{hash160, ripemd160, sha256, sha256d};
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{eof, map, map_res, rest};
-use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError};
-use nom::multi::length_value;
-use nom::number::complete::{le_u32, le_u64};
+use nom::combinator::{eof, map, rest};
+use nom::error::{ContextError, ErrorKind, FromExternalError, ParseError};
+use nom::number::complete::le_u32;
 use nom::sequence::tuple;
 use nom::{Compare, Err, IResult, InputIter, InputLength, InputTake, Slice};
 
@@ -23,15 +23,18 @@ use foundation_bip32::{
 
 use bitcoin_primitives::{TapNodeHash, Txid};
 
-use crate::parser::compact_size::compact_size;
+use crate::parser::global::GlobalMap;
 use crate::parser::hash::{
     hash160, ripemd160, sha256, sha256d, taproot_leaf_hash, taproot_node_hash, txid,
 };
 use crate::parser::keypair::key_pair;
 use crate::parser::secp::{schnorr_signature, x_only_public_key};
-use crate::parser::transaction::transaction;
+use crate::parser::transaction::{output, transaction};
 use crate::taproot::TaprootScriptSignature;
-use crate::transaction::{Transaction, SIGHASH_ALL};
+use crate::{
+    transaction,
+    transaction::{Transaction, SIGHASH_ALL},
+};
 
 /// Insert `value` into `option` if it's not set already, if already set
 /// return an error.
@@ -145,7 +148,7 @@ where
     Error: FromExternalError<Input, TryFromIntError>,
 {
     let non_witness_utxo = key_pair(0x00, eof, transaction);
-    let witness_utxo = key_pair(0x01, eof, witness_utxo);
+    let witness_utxo = key_pair(0x01, eof, output);
     let partial_sig = key_pair(0x02, public_key, rest);
     let sighash_type = key_pair(0x03, eof, le_u32);
     let redeem_script = key_pair(0x04, eof, rest);
@@ -209,38 +212,6 @@ where
     ))(i)
 }
 
-fn witness_utxo<Input, Error>(i: Input) -> IResult<Input, WitnessUtxo<Input>, Error>
-where
-    Input: for<'a> Compare<&'a [u8]>
-        + Clone
-        + InputTake
-        + InputLength
-        + InputIter<Item = u8>
-        + Slice<core::ops::RangeFrom<usize>>,
-    Error: ParseError<Input>,
-    Error: ContextError<Input>,
-    Error: FromExternalError<Input, TryFromIntError>,
-{
-    let amount = context("amount", le_u64);
-    let script_pubkey = context(
-        "script pubkey",
-        length_value(
-            context(
-                "script pubkey length",
-                map_res(compact_size, usize::try_from),
-            ),
-            rest,
-        ),
-    );
-
-    map(tuple((amount, script_pubkey)), |(amount, script_pubkey)| {
-        WitnessUtxo {
-            amount,
-            script_pubkey,
-        }
-    })(i)
-}
-
 fn tap_script_sig<Input, Error>(i: Input) -> IResult<Input, TaprootScriptSignature, Error>
 where
     Input:
@@ -261,7 +232,7 @@ where
 #[derive(Debug)]
 pub struct InputMap<Input> {
     pub non_witness_utxo: Option<Transaction<Input>>,
-    pub witness_utxo: Option<WitnessUtxo<Input>>,
+    pub witness_utxo: Option<transaction::Output<Input>>,
     pub sighash_type: Option<u32>,
     pub redeem_script: Option<Input>,
     pub witness_script: Option<Input>,
@@ -281,6 +252,37 @@ pub struct InputMap<Input> {
 impl<Input> InputMap<Input> {
     pub fn sighash_type(&self) -> u32 {
         self.sighash_type.unwrap_or(SIGHASH_ALL)
+    }
+
+    /// Return the output point for this input.
+    pub fn output_point(
+        &self,
+        global: &GlobalMap<Input>,
+        index: usize,
+    ) -> Option<transaction::OutputPoint>
+    where
+        Input: for<'a> Compare<&'a [u8]>
+            + core::fmt::Debug
+            + Clone
+            + PartialEq
+            + InputTake
+            + InputIter<Item = u8>
+            + InputLength
+            + Slice<RangeFrom<usize>>,
+    {
+        match global.version {
+            0 => global.transaction.as_ref().and_then(|tx| {
+                tx.inputs
+                    .iter()
+                    .nth(index)
+                    .map(|i| i.previous_output.clone())
+            }),
+            2 => match (self.previous_txid, self.output_index) {
+                (Some(hash), Some(index)) => Some(transaction::OutputPoint { hash, index }),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 }
 
@@ -310,7 +312,7 @@ impl<Input> Default for InputMap<Input> {
 #[derive(Debug)]
 enum KeyPair<Input> {
     NonWitnessUtxo(Transaction<Input>),
-    WitnessUtxo(WitnessUtxo<Input>),
+    WitnessUtxo(transaction::Output<Input>),
     PartialSig(PublicKey),
     SighashType(u32),
     RedeemScript(Input),

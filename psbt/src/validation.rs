@@ -26,6 +26,7 @@ use heapless::{String, Vec};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionDetails {
+    pub total_input: i64,
     pub total_with_change: i64,
     pub total_change: i64,
 }
@@ -41,6 +42,10 @@ impl TransactionDetails {
     /// Returns true if total amount spent is all change.
     pub fn is_self_send(&self) -> bool {
         self.total() == 0
+    }
+
+    pub fn fee(&self) -> i64 {
+        self.total_input - self.total_with_change
     }
 }
 
@@ -109,12 +114,14 @@ where
 
     log::debug!("validating inputs");
     let mut input = i.clone();
-    for _ in 0..input_count {
+    let mut total_input = 0;
+    for input_index in 0..input_count {
         let input_ = input.clone();
 
         match input::input_map(input_derivation_is_valid(wallet_fingerprint))(input_) {
             Ok((i, txin)) => {
-                input_is_valid(&txin, global_map.version)?;
+                let details = input_is_valid(&txin, &global_map, input_index)?;
+                total_input += details.amount;
 
                 input = i;
             }
@@ -230,15 +237,21 @@ where
     log::debug!("total change: {total_change} sats");
 
     Ok(TransactionDetails {
+        total_input,
         total_with_change,
         total_change,
     })
 }
 
+pub struct InputDetails {
+    pub amount: i64,
+}
+
 pub fn input_is_valid<Input>(
     map: &InputMap<Input>,
-    psbt_version: u32,
-) -> Result<(), ValidationError>
+    global_map: &GlobalMap<Input>,
+    index: u64,
+) -> Result<InputDetails, ValidationError>
 where
     Input: for<'a> nom::Compare<&'a [u8]>
         + Clone
@@ -277,7 +290,7 @@ where
     // Validate the UTXO against the provided TXID if present.
     //
     // This avoids signing an un-related UTXO.
-    match (psbt_version, &map.non_witness_utxo, map.previous_txid) {
+    match (global_map.version, &map.non_witness_utxo, map.previous_txid) {
         (n, Some(utxo), Some(previous_txid)) if n >= 2 => {
             if utxo.txid() != previous_txid {
                 return Err(ValidationError::TxidMismatch);
@@ -293,9 +306,49 @@ where
         _ => (),
     }
 
+    // Make sure we can convert u64 to usize, if not then we can't really
+    // handle this transaction anyway.
+    //
+    // (And this would be highly unlikely to happen).
+    let index_usize = usize::try_from(index).map_err(|_| ValidationError::TooManyInputs)?;
+
+    let output_point = map
+        .output_point(global_map, index_usize)
+        .ok_or(ValidationError::MissingOutputPoint { index })?;
+
+    // Calculate the input amount.
+    let amount = match (&map.non_witness_utxo, &map.witness_utxo) {
+        (Some(non_witness_utxo), Some(witness_utxo)) => {
+            let output = non_witness_utxo
+                .outputs
+                .iter()
+                .nth(usize::try_from(output_point.index).unwrap())
+                .unwrap();
+
+            if output.value != witness_utxo.value
+                || output.script_pubkey != witness_utxo.script_pubkey
+            {
+                return Err(ValidationError::FraudulentWitnessUtxo { index });
+            }
+
+            output.value
+        }
+        (Some(non_witness_utxo), None) => {
+            let output = non_witness_utxo
+                .outputs
+                .iter()
+                .nth(usize::try_from(output_point.index).unwrap())
+                .unwrap();
+
+            output.value
+        }
+        (None, Some(ref witness_utxo)) => witness_utxo.value,
+        (None, None) => panic!(),
+    };
+
     log::debug!("input is valid!");
 
-    Ok(())
+    Ok(InputDetails { amount })
 }
 
 pub fn input_derivation_is_valid<Input>(
@@ -507,10 +560,10 @@ where
             }
         }
         AddressType::P2SH => {
-            let redeem_script = match &output_map.redeem_script {
-                Some(v) => v,
-                None => return Err(ValidationError::MissingRedeemWitnessScript { index }),
-            };
+            let redeem_script = output_map
+                .redeem_script
+                .as_ref()
+                .ok_or(ValidationError::MissingRedeemWitnessScript { index })?;
 
             // Handle P2WPKH nested in P2SH.
             if redeem_script.input_len() == 22 {
@@ -592,6 +645,10 @@ pub enum ValidationError {
     InvalidRedeemScript,
     UnsupportedSighash,
     TxidMismatch,
+    /// The transaction input does not provide an output point.
+    MissingOutputPoint {
+        index: u64,
+    },
     MissingPreviousTxid,
     /// Redeem/Witness script missing for P2SH output.
     MissingRedeemWitnessScript {
@@ -601,6 +658,7 @@ pub enum ValidationError {
     TaprootOutputInvalidPublicKey {
         index: u64,
     },
+    TooManyInputs,
     TooManyOutputs,
     TooManyOutputKeys {
         index: u64,
@@ -626,6 +684,10 @@ pub enum ValidationError {
     UnknownOutputScript {
         index: u64,
     },
+    /// The data contained in the input's witness UTXO is fraudulent.
+    FraudulentWitnessUtxo {
+        index: u64,
+    },
 }
 
 impl fmt::Display for ValidationError {
@@ -636,6 +698,9 @@ impl fmt::Display for ValidationError {
             ValidationError::InvalidRedeemScript => write!(f, "invalid redeem script"),
             ValidationError::UnsupportedSighash => write!(f, "unsupported sighash"),
             ValidationError::TxidMismatch => write!(f, "TXID mismatch"),
+            ValidationError::MissingOutputPoint { index } => {
+                write!(f, "missing output point for input {index}")
+            }
             ValidationError::MissingPreviousTxid => write!(f, "missing previous TXID"),
             ValidationError::MissingRedeemWitnessScript { index } => {
                 write!(f, "missing redeem/witness script for output {index}")
@@ -643,6 +708,10 @@ impl fmt::Display for ValidationError {
             ValidationError::TaprootOutputInvalidPublicKey { index } => {
                 write!(f, "x-only public key of taproot output {index} is invalid")
             }
+            ValidationError::TooManyInputs => write!(
+                f,
+                "there's more inputs in this transaction than the system can handle"
+            ),
             ValidationError::TooManyOutputs => write!(
                 f,
                 "there's more outputs in this transaction than the system can handle"
@@ -663,6 +732,9 @@ impl fmt::Display for ValidationError {
                 f,
                 "could not determine script type the of output number {index}"
             ),
+            ValidationError::FraudulentWitnessUtxo { index } => {
+                write!(f, "the wintess UTXO of input {index} is fraudulent")
+            }
         }
     }
 }

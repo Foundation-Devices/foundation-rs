@@ -93,6 +93,8 @@ where
     ///
     /// So, written for performance, not readability. That is also the reason
     /// of the nested ifs.
+    ///
+    /// TODO: Just return the slice with the bytes, let the user collect it.
     pub fn address(&self) -> Option<(AddressType, Vec<u8, 90>)> {
         let len = self.script_pubkey.input_len();
         let mut iter = self.script_pubkey.iter_elements();
