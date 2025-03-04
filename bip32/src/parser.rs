@@ -12,7 +12,7 @@ use nom::{
     multi::{fill, many0_count},
     number::complete::{be_u32, le_u32, u8},
     sequence::tuple,
-    Compare, Err, IResult, InputIter, InputLength, InputTake, Slice,
+    Err, IResult, InputIter, InputLength, Slice,
 };
 use secp256k1::{PublicKey, SecretKey};
 
@@ -66,13 +66,7 @@ where
 /// Parse an extended public key.
 pub fn xpub<Input, Error>(i: Input) -> IResult<Input, Xpub, Error>
 where
-    Input: for<'a> Compare<&'a [u8]>
-        + PartialEq
-        + InputTake
-        + Clone
-        + InputIter<Item = u8>
-        + InputLength
-        + Slice<RangeFrom<usize>>,
+    Input: PartialEq + Clone + InputIter<Item = u8> + InputLength + Slice<RangeFrom<usize>>,
     Error: ParseError<Input>,
     Error: FromExternalError<Input, secp256k1::Error>,
 {
@@ -118,13 +112,7 @@ where
 /// Parse an extended private key.
 pub fn xprv<Input, Error>(i: Input) -> IResult<Input, Xpriv, Error>
 where
-    Input: for<'a> Compare<&'a [u8]>
-        + PartialEq
-        + InputTake
-        + Clone
-        + InputIter<Item = u8>
-        + InputLength
-        + Slice<RangeFrom<usize>>,
+    Input: PartialEq + Clone + InputIter<Item = u8> + InputLength + Slice<RangeFrom<usize>>,
     Error: ParseError<Input>,
     Error: FromExternalError<Input, secp256k1::Error>,
 {
@@ -232,10 +220,10 @@ where
     Error: ParseError<Input> + FromExternalError<Input, secp256k1::Error>,
 {
     let mut buf = [0; 33];
-    let (next_i, ()) = fill(u8, &mut buf)(i.clone())?;
+    let (rest, ()) = fill(u8, &mut buf)(i.clone())?;
     let p = PublicKey::from_slice(&buf)
         .map_err(|e| Err::Failure(Error::from_external_error(i, ErrorKind::Fail, e)))?;
-    Ok((next_i, p))
+    Ok((rest, p))
 }
 
 /// Parses a [`secp256k1::SecretKey`].
@@ -245,10 +233,10 @@ where
     Error: ParseError<Input> + FromExternalError<Input, secp256k1::Error>,
 {
     let mut buf = [0; 33];
-    let (next_i, ()) = fill(u8, &mut buf)(i.clone())?;
+    let (rest, ()) = fill(u8, &mut buf)(i.clone())?;
     let p = SecretKey::from_slice(&buf[1..])
         .map_err(|e| Err::Failure(Error::from_external_error(i, ErrorKind::Fail, e)))?;
-    Ok((next_i, p))
+    Ok((rest, p))
 }
 
 /// Parses a [`KeySource`].
