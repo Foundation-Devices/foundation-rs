@@ -6,8 +6,6 @@
 use core::ops::RangeFrom;
 
 use nom::{
-    branch::alt,
-    bytes::complete::tag,
     character::complete::char,
     combinator::{map, opt, verify},
     error::{ErrorKind, FromExternalError, ParseError},
@@ -25,101 +23,44 @@ use crate::{
     VERSION_ZPUB,
 };
 
-fn to_fixed_bytes<Input, const N: usize>(i: Input) -> [u8; N]
-where
-    Input: InputIter<Item = u8>,
-{
-    let mut slice = [0; N];
-    for (i, byte) in i.iter_indices() {
-        slice[i] = byte;
-    }
-    slice
-}
-
-fn bitcoin_mainnet_xpub<Input, Error>(i: Input) -> IResult<Input, Input, Error>
-where
-    Input: for<'a> Compare<&'a [u8]> + InputTake + Clone,
-    Error: ParseError<Input>,
-{
-    let tag = tag::<_, Input, Error>;
-
-    let xpub = tag(&VERSION_XPUB);
-    let ypub = tag(&VERSION_YPUB);
-    let zpub = tag(&VERSION_ZPUB);
-    let multisig_ypub = tag(&VERSION_MULTISIG_YPUB); // Ypub
-    let multisig_zpub = tag(&VERSION_MULTISIG_ZPUB); // Zpub
-
-    let mut parser = alt((xpub, ypub, zpub, multisig_ypub, multisig_zpub));
-    parser(i)
-}
-
-fn bitcoin_mainnet_xprv<Input, Error>(i: Input) -> IResult<Input, Input, Error>
-where
-    Input: for<'a> Compare<&'a [u8]> + InputTake + Clone,
-    Error: ParseError<Input>,
-{
-    let tag = tag::<_, Input, Error>;
-
-    let xprv = tag(&VERSION_XPRV);
-    xprv(i)
-}
-
-fn bitcoin_testnet_xpub<Input, Error>(i: Input) -> IResult<Input, Input, Error>
-where
-    Input: for<'a> Compare<&'a [u8]> + InputTake + Clone,
-    Error: ParseError<Input>,
-{
-    let tag = tag::<_, Input, Error>;
-
-    let tpub = tag(&VERSION_TPUB);
-    let upub = tag(&VERSION_UPUB);
-    let vpub = tag(&VERSION_VPUB);
-    let multisig_upub = tag(&VERSION_MULTISIG_UPUB); // Upub
-    let multisig_vpub = tag(&VERSION_MULTISIG_VPUB); // Vpub
-
-    let mut parser = alt((tpub, upub, vpub, multisig_upub, multisig_vpub));
-    parser(i)
-}
-
-fn bitcoin_testnet_xprv<Input, Error>(i: Input) -> IResult<Input, Input, Error>
-where
-    Input: for<'a> Compare<&'a [u8]> + InputTake + Clone,
-    Error: ParseError<Input>,
-{
-    let tag = tag::<_, Input, Error>;
-
-    let tprv = tag(&VERSION_TPRV);
-    tprv(i)
-}
-
 fn xpub_version<Input, Error>(i: Input) -> IResult<Input, [u8; 4], Error>
 where
-    Input: for<'a> Compare<&'a [u8]> + InputTake + Clone + InputIter<Item = u8>,
+    Input: PartialEq + Clone + InputLength + InputIter<Item = u8> + Slice<RangeFrom<usize>>,
     Error: ParseError<Input>,
 {
-    let bitcoin_xpub = alt((
-        bitcoin_mainnet_xpub::<Input, Error>,
-        bitcoin_testnet_xpub::<Input, Error>,
-    ));
+    let mut buf = [0; 4];
+    let (rest, _) = fill(u8, &mut buf)(i.clone())?;
 
-    let mut version = map(bitcoin_xpub, to_fixed_bytes::<Input, 4>);
+    if buf != VERSION_XPUB
+        && buf != VERSION_YPUB
+        && buf != VERSION_ZPUB
+        && buf != VERSION_MULTISIG_YPUB
+        && buf != VERSION_MULTISIG_ZPUB
+        && buf != VERSION_TPUB
+        && buf != VERSION_UPUB
+        && buf != VERSION_VPUB
+        && buf != VERSION_MULTISIG_UPUB
+        && buf != VERSION_MULTISIG_VPUB
+    {
+        return Err(Err::Failure(Error::from_error_kind(i, ErrorKind::Alt)));
+    }
 
-    version(i)
+    Ok((rest, buf))
 }
 
 fn xprv_version<Input, Error>(i: Input) -> IResult<Input, [u8; 4], Error>
 where
-    Input: for<'a> Compare<&'a [u8]> + InputTake + Clone + InputIter<Item = u8>,
+    Input: PartialEq + Clone + InputLength + InputIter<Item = u8> + Slice<RangeFrom<usize>>,
     Error: ParseError<Input>,
 {
-    let bitcoin_xpub = alt((
-        bitcoin_mainnet_xprv::<Input, Error>,
-        bitcoin_testnet_xprv::<Input, Error>,
-    ));
+    let mut buf = [0; 4];
+    let (rest, _) = fill(u8, &mut buf)(i.clone())?;
 
-    let mut version = map(bitcoin_xpub, to_fixed_bytes::<Input, 4>);
+    if buf != VERSION_XPRV && buf != VERSION_TPRV {
+        return Err(Err::Failure(Error::from_error_kind(i, ErrorKind::Alt)));
+    }
 
-    version(i)
+    Ok((rest, buf))
 }
 
 /// Parse an extended public key.
