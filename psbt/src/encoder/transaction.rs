@@ -3,13 +3,14 @@
 
 use embedded_io::Write;
 
-use crate::encoder::compact_size::encode_compact_size;
-use crate::transaction::{Input, Inputs, Output, OutputPoint, Outputs};
+use crate::{
+    encoder::compact_size::encode_compact_size,
+    transaction::{Input, Inputs, Output, OutputPoint, Outputs},
+};
 
 pub fn encode_inputs<I, W>(mut w: W, inputs: &Inputs<I>) -> Result<usize, W::Error>
 where
-    I: for<'a> nom::Compare<&'a [u8]>
-        + Clone
+    I: Clone
         + PartialEq
         + core::fmt::Debug
         + nom::InputTake
