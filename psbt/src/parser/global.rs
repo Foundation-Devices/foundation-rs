@@ -6,7 +6,7 @@ use core::num::TryFromIntError;
 use bitflags::bitflags;
 use nom::{
     bytes::complete::tag,
-    combinator::{map, verify},
+    combinator::{map, verify, rest},
     error::{context, ContextError, FromExternalError, ParseError},
     multi::fold_many0,
     number::complete::le_u32,
@@ -59,6 +59,7 @@ where
                 KeyPair::OutputCount(v) => map.output_count = Some(v),
                 KeyPair::TxModifiable(v) => map.tx_modifiable = Some(v),
                 KeyPair::Version(v) => map.version = v,
+                KeyPair::Unknown(_, _) => (),
             };
 
             map
@@ -121,7 +122,10 @@ where
             0x05 => map(value(compact_size), KeyPair::OutputCount)(i),
             0x06 => map(value(tx_modifiable), KeyPair::TxModifiable)(i),
             0xFB => map(value(le_u32), KeyPair::Version)(i),
-            _ => todo!(),
+            _ => {
+                let (i, v) = value(rest)(i)?;
+                Ok((i, KeyPair::Unknown(keydata, v)))
+            },
         }
     }
 }
@@ -204,6 +208,7 @@ enum KeyPair<I> {
     OutputCount(u64),
     TxModifiable(TxModifiable),
     Version(u32),
+    Unknown(I, I),
 }
 
 bitflags! {

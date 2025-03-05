@@ -62,6 +62,7 @@ where
                 KeyPair::TapInternalKey(v) => map.tap_internal_key = Some(v),
                 KeyPair::TapTree(v) => map.tap_tree = Some(v),
                 KeyPair::TapBip32Derivation(p, s) => tap_bip32_derivation(p, s),
+                KeyPair::Unknown(_, _) => (),
             };
 
             map
@@ -117,7 +118,10 @@ where
 
                 Ok((i, KeyPair::TapBip32Derivation(pk, v)))
             }
-            _ => todo!(),
+            _ => {
+                let (i, v) = value(rest)(i)?;
+                Ok((i, KeyPair::Unknown(keydata, v)))
+            },
         }
     }
 }
@@ -198,4 +202,5 @@ enum KeyPair<Input> {
     TapInternalKey(XOnlyPublicKey),
     TapTree(Input),
     TapBip32Derivation(XOnlyPublicKey, Input),
+    Unknown(Input, Input)
 }

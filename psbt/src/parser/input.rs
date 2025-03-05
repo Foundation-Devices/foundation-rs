@@ -124,6 +124,7 @@ where
                 KeyPair::TapBip32Derivation(_, _) => (), // TODO
                 KeyPair::TapInternalKey(v) => insert(&mut map.tap_internal_key, v, i_)?,
                 KeyPair::TapMerkleRoot(v) => insert(&mut map.tap_merkle_root, v, i_)?,
+                KeyPair::Unknown(_, _) => (),
             };
         }
 
@@ -222,7 +223,10 @@ where
             }
             0x17 => map(value(x_only_public_key), KeyPair::TapInternalKey)(i),
             0x18 => map(value(taproot_node_hash), KeyPair::TapMerkleRoot)(i),
-            _ => todo!(),
+            _ => {
+                let (i, v) = value(rest)(i)?;
+                Ok((i, KeyPair::Unknown(keydata, v)))
+            },
         }
     }
 }
@@ -350,6 +354,7 @@ enum KeyPair<Input> {
     TapBip32Derivation(XOnlyPublicKey, Input),
     TapInternalKey(XOnlyPublicKey),
     TapMerkleRoot(TapNodeHash),
+    Unknown(Input, Input)
 }
 
 #[derive(Debug)]
