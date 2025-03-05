@@ -3,14 +3,15 @@
 
 use core::num::TryFromIntError;
 
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::combinator::{eof, map, rest, verify};
-use nom::error::{context, ContextError, FromExternalError, ParseError};
-use nom::multi::fold_many0;
-use nom::number::complete::le_u64;
-use nom::sequence::terminated;
-use nom::{Compare, IResult, InputIter, InputLength, InputTake, Slice};
+use nom::{
+    bytes::complete::tag,
+    combinator::{map, rest, verify},
+    error::{context, ContextError, FromExternalError, ParseError},
+    multi::fold_many0,
+    number::complete::le_u64,
+    sequence::terminated,
+    Compare, IResult, InputIter, InputLength, InputTake, Slice,
+};
 
 use secp256k1::{PublicKey, XOnlyPublicKey};
 
@@ -19,12 +20,15 @@ use foundation_bip32::{
     KeySource,
 };
 
-use crate::parser::global::GlobalMap;
-use crate::parser::keypair::key_pair;
-use crate::parser::secp::x_only_public_key;
-use crate::transaction;
+use crate::{
+    parser::{
+        global::GlobalMap,
+        keypair::{key, value},
+        secp::x_only_public_key,
+    },
+    transaction,
+};
 
-#[rustfmt::skip]
 pub fn output_map<B, C, Input, Error>(
     version: u32,
     mut bip32_derivation: B,
@@ -41,20 +45,22 @@ where
         + InputIter<Item = u8>
         + Slice<core::ops::RangeFrom<usize>>,
     Error: ContextError<Input>,
-    Error: ParseError<Input> + FromExternalError<Input, secp256k1::Error> + FromExternalError<Input, TryFromIntError>,
+    Error: ParseError<Input>
+        + FromExternalError<Input, secp256k1::Error>
+        + FromExternalError<Input, TryFromIntError>,
 {
     let keypairs = fold_many0(
-        output_key_pair,
+        output_key_pair(),
         OutputMap::default,
         move |mut map, key_pair| {
             match key_pair {
-                KeyPair::RedeemScript(v)          => map.redeem_script = Some(v),
-                KeyPair::WitnessScript(v)         => map.witness_script = Some(v),
-                KeyPair::Bip32Derivation(p, s)    => bip32_derivation(p, s),
-                KeyPair::Amount(v)                => map.amount = Some(v),
-                KeyPair::Script(v)                => map.script = Some(v),
-                KeyPair::TapInternalKey(v)        => map.tap_internal_key = Some(v),
-                KeyPair::TapTree(v)               => map.tap_tree = Some(v),
+                KeyPair::RedeemScript(v) => map.redeem_script = Some(v),
+                KeyPair::WitnessScript(v) => map.witness_script = Some(v),
+                KeyPair::Bip32Derivation(p, s) => bip32_derivation(p, s),
+                KeyPair::Amount(v) => map.amount = Some(v),
+                KeyPair::Script(v) => map.script = Some(v),
+                KeyPair::TapInternalKey(v) => map.tap_internal_key = Some(v),
+                KeyPair::TapTree(v) => map.tap_tree = Some(v),
                 KeyPair::TapBip32Derivation(p, s) => tap_bip32_derivation(p, s),
             };
 
@@ -65,23 +71,19 @@ where
     verify(
         terminated(
             keypairs,
-            context("output separator", tag::<_, Input, Error>(b"\x00"))
+            context("output separator", tag::<_, Input, Error>(b"\x00")),
         ),
-        move |map| {
-            match version {
-                0 => true,
-                2 => map.script.is_some() && map.amount.is_some(),
-                _ => false,
-            }
-        }
+        move |map| match version {
+            0 => true,
+            2 => map.script.is_some() && map.amount.is_some(),
+            _ => false,
+        },
     )
 }
 
-#[rustfmt::skip]
-fn output_key_pair<Input, Error>(i: Input) -> IResult<Input, KeyPair<Input>, Error>
+fn output_key_pair<Input, Error>() -> impl FnMut(Input) -> IResult<Input, KeyPair<Input>, Error>
 where
-    Input: for<'a> Compare<&'a [u8]>
-        + Clone
+    Input: Clone
         + PartialEq
         + InputTake
         + InputLength
@@ -92,25 +94,32 @@ where
     Error: FromExternalError<Input, secp256k1::Error>,
     Error: FromExternalError<Input, TryFromIntError>,
 {
-    let redeem_script        = context("redeem script", key_pair(0x00, eof, rest));
-    let witness_script       = context("witness script", key_pair(0x01, eof, rest));
-    let bip32_derivation     = context("bip32 derivation", key_pair(0x02, context("output public key", public_key), key_source));
-    let amount               = context("amount", key_pair(0x03, eof, context("output amount", le_u64)));
-    let script               = context("script", key_pair(0x04, eof, rest));
-    let tap_internal_key     = context("tap internal key", key_pair(0x05, eof, context("tap internal key", x_only_public_key)));
-    let tap_tree             = context("tap tree", key_pair(0x06, eof, rest));
-    let tap_bip32_derivation = context("tap bip32 derivation", key_pair(0x06, context("x only public key", x_only_public_key), rest));
+    move |i| {
+        let (i, (key, keydata)) = key(i)?;
 
-    alt((
-        map(redeem_script,        |(_, v)| KeyPair::RedeemScript(v)),
-        map(witness_script,       |(_, v)| KeyPair::WitnessScript(v)),
-        map(bip32_derivation,     |(k, v)| KeyPair::Bip32Derivation(k, v)),
-        map(amount,               |(_, v)| KeyPair::Amount(v)),
-        map(script,               |(_, v)| KeyPair::Script(v)),
-        map(tap_internal_key,     |(_, v)| KeyPair::TapInternalKey(v)),
-        map(tap_tree,             |(_, v)| KeyPair::TapTree(v)),
-        map(tap_bip32_derivation, |(k, v)| KeyPair::TapBip32Derivation(k, v)),
-    ))(i)
+        match key {
+            0x00 => map(value(rest), KeyPair::RedeemScript)(i),
+            0x01 => map(value(rest), KeyPair::WitnessScript)(i),
+            0x02 => {
+                let (_, pk) = public_key(keydata)?;
+                let (i, source) = value(key_source)(i)?;
+
+                Ok((i, KeyPair::Bip32Derivation(pk, source)))
+            }
+            0x03 => map(value(le_u64), KeyPair::Amount)(i),
+            0x04 => map(value(rest), KeyPair::Script)(i),
+            0x05 => map(value(x_only_public_key), KeyPair::TapInternalKey)(i),
+            0x06 => map(value(rest), KeyPair::TapTree)(i),
+            // TODO: Parse value.
+            0x07 => {
+                let (_, pk) = x_only_public_key(keydata)?;
+                let (i, v) = value(rest)(i)?;
+
+                Ok((i, KeyPair::TapBip32Derivation(pk, v)))
+            }
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -125,8 +134,7 @@ pub struct OutputMap<Input> {
 
 impl<Input> OutputMap<Input>
 where
-    Input: for<'a> nom::Compare<&'a [u8]>
-        + Clone
+    Input: Clone
         + PartialEq
         + core::fmt::Debug
         + nom::InputTake

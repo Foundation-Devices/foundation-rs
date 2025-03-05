@@ -43,8 +43,7 @@ pub struct Transaction<I> {
 impl<I> Transaction<I> {
     pub fn txid(&self) -> Txid
     where
-        I: for<'a> nom::Compare<&'a [u8]>
-            + Clone
+        I: Clone
             + PartialEq
             + core::fmt::Debug
             + nom::InputTake
@@ -242,8 +241,7 @@ pub struct InputsIter<I> {
 
 impl<I> Iterator for InputsIter<I>
 where
-    I: for<'a> nom::Compare<&'a [u8]>
-        + Clone
+    I: Clone
         + PartialEq
         + core::fmt::Debug
         + nom::InputTake
@@ -302,8 +300,7 @@ pub struct OutputsIter<I> {
 
 impl<I> Iterator for OutputsIter<I>
 where
-    I: for<'a> nom::Compare<&'a [u8]>
-        + Clone
+    I: Clone
         + PartialEq
         + core::fmt::Debug
         + nom::InputTake

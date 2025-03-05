@@ -62,8 +62,7 @@ where
 
 pub fn encode_outputs<I, W>(mut w: W, outputs: &Outputs<I>) -> Result<usize, W::Error>
 where
-    I: for<'a> nom::Compare<&'a [u8]>
-        + Clone
+    I: Clone
         + PartialEq
         + core::fmt::Debug
         + nom::InputTake

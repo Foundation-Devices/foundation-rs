@@ -22,18 +22,18 @@ use nom::{
     multi::length_data,
     number::complete::{le_i32, le_i64, le_u32},
     sequence::tuple,
-    Compare, Err, IResult, InputIter, InputLength, InputTake, Slice,
+    Err, IResult, InputIter, InputLength, InputTake, Slice,
 };
 
-use crate::parser::compact_size::compact_size;
-use crate::parser::hash::txid;
-use crate::transaction::{Input, Inputs, Output, OutputPoint, Outputs, Transaction};
+use crate::{
+    parser::{compact_size::compact_size, hash::txid},
+    transaction::{Input, Inputs, Output, OutputPoint, Outputs, Transaction},
+};
 
 /// Parses a raw bitcoin transaction.
 pub fn transaction<I, E>(i: I) -> IResult<I, Transaction<I>, E>
 where
-    I: for<'a> Compare<&'a [u8]>
-        + Clone
+    I: Clone
         + PartialEq
         + InputLength
         + InputIter<Item = u8>
@@ -54,8 +54,7 @@ where
 
 pub fn inputs<I, E>(i: I) -> IResult<I, Inputs<I>, E>
 where
-    I: for<'a> Compare<&'a [u8]>
-        + Clone
+    I: Clone
         + PartialEq
         + InputLength
         + InputIter<Item = u8>
@@ -90,8 +89,7 @@ where
 /// Parses a raw bitcoin transaction input.
 pub fn input<I, E>(i: I) -> IResult<I, Input<I>, E>
 where
-    I: for<'a> Compare<&'a [u8]>
-        + Clone
+    I: Clone
         + PartialEq
         + InputLength
         + InputIter<Item = u8>
@@ -115,12 +113,7 @@ where
 
 pub fn outputs<I, E>(i: I) -> IResult<I, Outputs<I>, E>
 where
-    I: for<'a> Compare<&'a [u8]>
-        + Clone
-        + InputTake
-        + InputLength
-        + InputIter<Item = u8>
-        + Slice<core::ops::RangeFrom<usize>>,
+    I: Clone + InputTake + InputLength + InputIter<Item = u8> + Slice<core::ops::RangeFrom<usize>>,
     E: ParseError<I>,
     E: FromExternalError<I, TryFromIntError>,
 {
@@ -153,12 +146,7 @@ where
 /// Parses a raw bitcoin transaction output.
 pub fn output<I, E>(i: I) -> IResult<I, Output<I>, E>
 where
-    I: for<'a> Compare<&'a [u8]>
-        + Clone
-        + InputTake
-        + InputLength
-        + InputIter<Item = u8>
-        + Slice<core::ops::RangeFrom<usize>>,
+    I: Clone + InputTake + InputLength + InputIter<Item = u8> + Slice<core::ops::RangeFrom<usize>>,
     E: ParseError<I>,
     E: FromExternalError<I, TryFromIntError>,
 {

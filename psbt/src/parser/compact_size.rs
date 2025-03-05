@@ -5,7 +5,7 @@ use nom::{
     combinator::{cut, map, verify},
     error::ParseError,
     number::complete::{le_u16, le_u32, le_u64, u8},
-    Compare, IResult, InputIter, InputLength, InputTake, Slice,
+    IResult, InputIter, InputLength, Slice,
 };
 
 /// Parse a Bitcoin protocol variable length integer.
@@ -18,12 +18,7 @@ use nom::{
 /// fits in 1 byte.
 pub fn compact_size<I, E>(i: I) -> IResult<I, u64, E>
 where
-    I: for<'a> Compare<&'a [u8]>
-        + Clone
-        + InputTake
-        + InputLength
-        + InputIter<Item = u8>
-        + Slice<core::ops::RangeFrom<usize>>,
+    I: Clone + InputLength + InputIter<Item = u8> + Slice<core::ops::RangeFrom<usize>>,
     E: ParseError<I>,
 {
     let (i, prefix) = u8(i)?;

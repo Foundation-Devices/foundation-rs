@@ -5,9 +5,8 @@ use core::num::TryFromIntError;
 
 use bitflags::bitflags;
 use nom::{
-    branch::alt,
     bytes::complete::tag,
-    combinator::{eof, map, verify},
+    combinator::{map, verify},
     error::{context, ContextError, FromExternalError, ParseError},
     multi::fold_many0,
     number::complete::le_u32,
@@ -20,10 +19,14 @@ use foundation_bip32::{
     KeySource, Xpub,
 };
 
-use crate::parser::compact_size::compact_size;
-use crate::parser::keypair::key_pair;
-use crate::parser::transaction::transaction;
-use crate::transaction::Transaction;
+use crate::{
+    parser::{
+        compact_size::compact_size,
+        keypair::{key, value},
+        transaction::transaction,
+    },
+    transaction::Transaction,
+};
 
 pub fn global_map<I, F, Error>(
     mut xpub_event: F,
@@ -101,29 +104,26 @@ where
         + FromExternalError<I, secp256k1::Error>
         + FromExternalError<I, TryFromIntError>,
 {
-    let unsigned_tx = context("utx", key_pair(0x00, eof, transaction));
-    let xpub = key_pair(0x01, xpub, key_source);
-    let xpub = context(
-        "xpub",
-        verify(xpub, |(k, v)| usize::from(k.depth) == v.path.len()),
-    );
-    let tx_version = context("tx ver", key_pair(0x02, eof, le_u32));
-    let fallback_locktime = context("fallback locktime", key_pair(0x03, eof, le_u32));
-    let input_count = context("input cnt", key_pair(0x04, eof, compact_size));
-    let output_count = context("output cnt", key_pair(0x05, eof, compact_size));
-    let tx_modifiable = context("tx modifiable", key_pair(0x06, eof, tx_modifiable));
-    let version = context("version", key_pair(0xFB, eof, le_u32));
+    move |i| {
+        let (i, (key, keydata)) = key(i)?;
 
-    alt((
-        map(unsigned_tx, |(_, v)| KeyPair::UnsignedTx(v)),
-        map(xpub, |(k, v)| KeyPair::Xpub { key: k, source: v }),
-        map(tx_version, |(_, v)| KeyPair::TxVersion(v)),
-        map(fallback_locktime, |(_, v)| KeyPair::FallbackLocktime(v)),
-        map(input_count, |(_, v)| KeyPair::InputCount(v)),
-        map(output_count, |(_, v)| KeyPair::OutputCount(v)),
-        map(tx_modifiable, |(_, v)| KeyPair::TxModifiable(v)),
-        map(version, |(_, v)| KeyPair::Version(v)),
-    ))
+        match key {
+            0x00 => map(value(transaction), KeyPair::UnsignedTx)(i),
+            0x01 => {
+                let (_, xpub) = xpub(keydata)?;
+                let (i, source) = value(key_source)(i)?;
+
+                Ok((i, KeyPair::Xpub { key: xpub, source }))
+            }
+            0x02 => map(value(le_u32), KeyPair::TxVersion)(i),
+            0x03 => map(value(le_u32), KeyPair::FallbackLocktime)(i),
+            0x04 => map(value(compact_size), KeyPair::InputCount)(i),
+            0x05 => map(value(compact_size), KeyPair::OutputCount)(i),
+            0x06 => map(value(tx_modifiable), KeyPair::TxModifiable)(i),
+            0xFB => map(value(le_u32), KeyPair::Version)(i),
+            _ => todo!(),
+        }
+    }
 }
 
 fn tx_modifiable<I, Error>(i: I) -> IResult<I, TxModifiable, Error>

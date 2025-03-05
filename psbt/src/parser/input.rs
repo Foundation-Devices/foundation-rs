@@ -6,15 +6,16 @@ use core::ops::RangeFrom;
 
 use bitcoin_hashes::{hash160, ripemd160, sha256, sha256d};
 
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::combinator::{eof, map, rest};
-use nom::error::{ContextError, ErrorKind, FromExternalError, ParseError};
-use nom::number::complete::le_u32;
-use nom::sequence::tuple;
-use nom::{Compare, Err, IResult, InputIter, InputLength, InputTake, Slice};
+use nom::{
+    bytes::complete::tag,
+    combinator::{map, rest},
+    error::{ContextError, ErrorKind, FromExternalError, ParseError},
+    number::complete::le_u32,
+    sequence::tuple,
+    Compare, Err, IResult, InputIter, InputLength, InputTake, Slice,
+};
 
-use secp256k1::{schnorr, PublicKey, XOnlyPublicKey};
+use secp256k1::{PublicKey, XOnlyPublicKey};
 
 use foundation_bip32::{
     parser::{key_source, public_key},
@@ -23,15 +24,15 @@ use foundation_bip32::{
 
 use bitcoin_primitives::{TapNodeHash, Txid};
 
-use crate::parser::global::GlobalMap;
-use crate::parser::hash::{
-    hash160, ripemd160, sha256, sha256d, taproot_leaf_hash, taproot_node_hash, txid,
-};
-use crate::parser::keypair::key_pair;
-use crate::parser::secp::{schnorr_signature, x_only_public_key};
-use crate::parser::transaction::{output, transaction};
-use crate::taproot::TaprootScriptSignature;
 use crate::{
+    parser::{
+        global::GlobalMap,
+        hash::{hash160, ripemd160, sha256, sha256d, taproot_leaf_hash, taproot_node_hash, txid},
+        keypair::{key, value},
+        secp::x_only_public_key,
+        transaction::{output, transaction},
+    },
+    taproot::TaprootScriptSignature,
     transaction,
     transaction::{Transaction, SIGHASH_ALL},
 };
@@ -77,7 +78,7 @@ where
             let i_ = input.clone();
             let len = input.input_len();
 
-            let key_pair = match input_key_pair(i_.clone()) {
+            let key_pair = match input_key_pair()(i_.clone()) {
                 Ok((i, k)) => {
                     // infinite loop check: the parser must always consume.
                     if i.input_len() == len {
@@ -98,7 +99,7 @@ where
             match key_pair {
                 KeyPair::NonWitnessUtxo(v) => insert(&mut map.non_witness_utxo, v, i_)?,
                 KeyPair::WitnessUtxo(v) => insert(&mut map.witness_utxo, v, i_)?,
-                KeyPair::PartialSig(_) => (), // TODO
+                KeyPair::PartialSig(_, _) => (), // TODO
                 KeyPair::SighashType(v) => insert(&mut map.sighash_type, v, i_)?,
                 KeyPair::RedeemScript(v) => insert(&mut map.redeem_script, v, i_)?,
                 KeyPair::WitnessScript(v) => insert(&mut map.witness_script, v, i_)?,
@@ -106,10 +107,10 @@ where
                 KeyPair::FinalScriptsig(v) => insert(&mut map.final_scriptsig, v, i_)?,
                 KeyPair::FinalScriptwitness(v) => insert(&mut map.final_scriptwitness, v, i_)?,
                 KeyPair::PorCommitment(v) => insert(&mut map.por_commitment, v, i_)?,
-                KeyPair::Ripemd160(_) => (), // TODO
-                KeyPair::Sha256(_) => (),    // TODO
-                KeyPair::Hash160(_) => (),   // TODO
-                KeyPair::Hash256(_) => (),   // TODO
+                KeyPair::Ripemd160(_, _) => (), // TODO
+                KeyPair::Sha256(_, _) => (),    // TODO
+                KeyPair::Hash160(_, _) => (),   // TODO
+                KeyPair::Hash256(_, _) => (),   // TODO
                 KeyPair::PreviousTxid(v) => insert(&mut map.previous_txid, v, i_)?,
                 KeyPair::OutputIndex(v) => insert(&mut map.output_index, v, i_)?,
                 KeyPair::Sequence(v) => insert(&mut map.sequence, v, i_)?,
@@ -133,10 +134,9 @@ where
     }
 }
 
-fn input_key_pair<Input, Error>(i: Input) -> IResult<Input, KeyPair<Input>, Error>
+fn input_key_pair<Input, Error>() -> impl FnMut(Input) -> IResult<Input, KeyPair<Input>, Error>
 where
-    Input: for<'a> Compare<&'a [u8]>
-        + Clone
+    Input: Clone
         + PartialEq
         + InputTake
         + InputLength
@@ -147,69 +147,84 @@ where
     Error: FromExternalError<Input, secp256k1::Error>,
     Error: FromExternalError<Input, TryFromIntError>,
 {
-    let non_witness_utxo = key_pair(0x00, eof, transaction);
-    let witness_utxo = key_pair(0x01, eof, output);
-    let partial_sig = key_pair(0x02, public_key, rest);
-    let sighash_type = key_pair(0x03, eof, le_u32);
-    let redeem_script = key_pair(0x04, eof, rest);
-    let witness_script = key_pair(0x05, eof, rest);
-    let bip32_derivation = key_pair(0x06, public_key, key_source);
-    let final_scriptsig = key_pair(0x07, eof, rest);
-    let final_scriptwitness = key_pair(0x08, eof, rest);
-    let por_commitment = key_pair(0x09, eof, rest);
-    let ripemd160 = key_pair(0x0a, ripemd160, rest);
-    let sha256 = key_pair(0x0b, sha256, rest);
-    let hash160 = key_pair(0x0c, hash160, rest);
-    let hash256 = key_pair(0x0d, sha256d, rest);
-    let previous_txid = key_pair(0x0e, eof, txid);
-    let output_index = key_pair(0x0f, eof, le_u32);
-    let sequence = key_pair(0x10, eof, le_u32);
-    let required_time_locktime = key_pair(0x11, eof, le_u32);
-    let required_height_locktime = key_pair(0x12, eof, le_u32);
-    let tap_key_sig = key_pair(0x13, eof, schnorr_signature);
-    let tap_script_sig = key_pair(0x14, tap_script_sig, schnorr_signature);
-    let tap_leaf_script = key_pair(0x15, rest, rest); // TODO
-    let tap_bip32_derivation = key_pair(0x16, x_only_public_key, rest); // TODO
-    let tap_internal_key = key_pair(0x17, eof, x_only_public_key);
-    let tap_merkle_root = key_pair(0x18, eof, taproot_node_hash);
+    move |i| {
+        let (i, (key, keydata)) = key(i)?;
 
-    alt((
-        map(non_witness_utxo, |(_, v)| KeyPair::NonWitnessUtxo(v)),
-        map(witness_utxo, |(_, v)| KeyPair::WitnessUtxo(v)),
-        map(partial_sig, |(k, _)| KeyPair::PartialSig(k)),
-        map(sighash_type, |(_, v)| KeyPair::SighashType(v)),
-        map(redeem_script, |(_, v)| KeyPair::RedeemScript(v)),
-        map(witness_script, |(_, v)| KeyPair::WitnessScript(v)),
-        map(bip32_derivation, |(k, v)| KeyPair::Bip32Derivation(k, v)),
-        map(final_scriptsig, |(_, v)| KeyPair::FinalScriptsig(v)),
-        map(final_scriptwitness, |(_, v)| KeyPair::FinalScriptwitness(v)),
-        map(por_commitment, |(_, v)| KeyPair::PorCommitment(v)),
-        map(ripemd160, |(k, _)| KeyPair::Ripemd160(k)), // TODO
-        map(sha256, |(k, _)| KeyPair::Sha256(k)),       // TODO
-        map(hash160, |(k, _)| KeyPair::Hash160(k)),     // TODO
-        map(hash256, |(k, _)| KeyPair::Hash256(k)),     // TODO
-        map(previous_txid, |(_, v)| KeyPair::PreviousTxid(v)),
-        map(output_index, |(_, v)| KeyPair::OutputIndex(v)),
-        map(sequence, |(_, v)| KeyPair::Sequence(v)),
-        map(required_time_locktime, |(_, v)| {
-            KeyPair::RequiredTimeLocktime(v)
-        }),
-        map(required_height_locktime, |(_, v)| {
-            KeyPair::RequiredHeightLocktime(v)
-        }),
-        map(tap_key_sig, |(_, v)| KeyPair::TapKeySig(v)),
-        // This nesting is needed because `Alt` can only handle tuples up to
-        // 21 elements.
-        alt((
-            map(tap_script_sig, |(k, v)| KeyPair::TapScriptSig(k, v)),
-            map(tap_leaf_script, |(k, v)| KeyPair::TapLeafScript(k, v)),
-            map(tap_bip32_derivation, |(k, v)| {
-                KeyPair::TapBip32Derivation(k, v)
-            }),
-            map(tap_internal_key, |(_, v)| KeyPair::TapInternalKey(v)),
-            map(tap_merkle_root, |(_, v)| KeyPair::TapMerkleRoot(v)),
-        )),
-    ))(i)
+        match key {
+            0x00 => map(value(transaction), KeyPair::NonWitnessUtxo)(i),
+            0x01 => map(value(output), KeyPair::WitnessUtxo)(i),
+            0x02 => {
+                let (_, pk) = public_key(keydata)?;
+                let (i, sig) = value(rest)(i)?;
+
+                Ok((i, KeyPair::PartialSig(pk, sig)))
+            }
+            0x03 => map(value(le_u32), KeyPair::SighashType)(i),
+            0x04 => map(value(rest), KeyPair::RedeemScript)(i),
+            0x05 => map(value(rest), KeyPair::WitnessScript)(i),
+            0x06 => {
+                let (_, pk) = public_key(keydata)?;
+                let (i, source) = value(key_source)(i)?;
+
+                Ok((i, KeyPair::Bip32Derivation(pk, source)))
+            }
+            0x07 => map(value(rest), KeyPair::FinalScriptsig)(i),
+            0x08 => map(value(rest), KeyPair::FinalScriptwitness)(i),
+            0x09 => map(value(rest), KeyPair::PorCommitment)(i),
+            0x0a => {
+                let (_, h) = ripemd160(keydata)?;
+                let (i, preimage) = value(rest)(i)?;
+
+                Ok((i, KeyPair::Ripemd160(h, preimage)))
+            }
+            0x0b => {
+                let (_, h) = sha256(keydata)?;
+                let (i, preimage) = value(rest)(i)?;
+
+                Ok((i, KeyPair::Sha256(h, preimage)))
+            }
+            0x0c => {
+                let (_, h) = hash160(keydata)?;
+                let (i, preimage) = value(rest)(i)?;
+
+                Ok((i, KeyPair::Hash160(h, preimage)))
+            }
+            0x0d => {
+                let (_, h) = sha256d(keydata)?;
+                let (i, preimage) = value(rest)(i)?;
+
+                Ok((i, KeyPair::Hash256(h, preimage)))
+            }
+            0x0e => map(value(txid), KeyPair::PreviousTxid)(i),
+            0x0f => map(value(le_u32), KeyPair::OutputIndex)(i),
+            0x10 => map(value(le_u32), KeyPair::Sequence)(i),
+            0x11 => map(value(le_u32), KeyPair::RequiredTimeLocktime)(i),
+            0x12 => map(value(le_u32), KeyPair::RequiredHeightLocktime)(i),
+            // TODO: Parse Schnorr signature.
+            0x13 => map(value(rest), KeyPair::TapKeySig)(i),
+            0x14 => {
+                let (_, scriptsig) = tap_script_sig(keydata)?;
+                let (i, sig) = value(rest)(i)?;
+
+                Ok((i, KeyPair::TapScriptSig(scriptsig, sig)))
+            }
+            // TODO: Parse fields
+            0x15 => {
+                let (i, v) = value(rest)(i)?;
+                Ok((i, KeyPair::TapLeafScript(keydata, v)))
+            }
+            // TODO: Parse value.
+            0x16 => {
+                let (_, pk) = x_only_public_key(keydata)?;
+                let (i, v) = value(rest)(i)?;
+
+                Ok((i, KeyPair::TapBip32Derivation(pk, v)))
+            }
+            0x17 => map(value(x_only_public_key), KeyPair::TapInternalKey)(i),
+            0x18 => map(value(taproot_node_hash), KeyPair::TapMerkleRoot)(i),
+            _ => todo!(),
+        }
+    }
 }
 
 fn tap_script_sig<Input, Error>(i: Input) -> IResult<Input, TaprootScriptSignature, Error>
@@ -244,7 +259,7 @@ pub struct InputMap<Input> {
     pub sequence: Option<u32>,
     pub required_time_locktime: Option<u32>,
     pub required_height_locktime: Option<u32>,
-    pub tap_key_sig: Option<schnorr::Signature>,
+    pub tap_key_sig: Option<Input>,
     pub tap_internal_key: Option<XOnlyPublicKey>,
     pub tap_merkle_root: Option<TapNodeHash>,
 }
@@ -261,8 +276,7 @@ impl<Input> InputMap<Input> {
         index: usize,
     ) -> Option<transaction::OutputPoint>
     where
-        Input: for<'a> Compare<&'a [u8]>
-            + core::fmt::Debug
+        Input: core::fmt::Debug
             + Clone
             + PartialEq
             + InputTake
@@ -313,7 +327,7 @@ impl<Input> Default for InputMap<Input> {
 enum KeyPair<Input> {
     NonWitnessUtxo(Transaction<Input>),
     WitnessUtxo(transaction::Output<Input>),
-    PartialSig(PublicKey),
+    PartialSig(PublicKey, Input),
     SighashType(u32),
     RedeemScript(Input),
     WitnessScript(Input),
@@ -321,17 +335,17 @@ enum KeyPair<Input> {
     FinalScriptsig(Input),
     FinalScriptwitness(Input),
     PorCommitment(Input),
-    Ripemd160(ripemd160::Hash),
-    Sha256(sha256::Hash),
-    Hash160(hash160::Hash),
-    Hash256(sha256d::Hash),
+    Ripemd160(ripemd160::Hash, Input),
+    Sha256(sha256::Hash, Input),
+    Hash160(hash160::Hash, Input),
+    Hash256(sha256d::Hash, Input),
     PreviousTxid(Txid),
     OutputIndex(u32),
     Sequence(u32),
     RequiredTimeLocktime(u32),
     RequiredHeightLocktime(u32),
-    TapKeySig(schnorr::Signature),
-    TapScriptSig(TaprootScriptSignature, schnorr::Signature),
+    TapKeySig(Input),
+    TapScriptSig(TaprootScriptSignature, Input),
     TapLeafScript(Input, Input),
     TapBip32Derivation(XOnlyPublicKey, Input),
     TapInternalKey(XOnlyPublicKey),
