@@ -20,7 +20,7 @@ where
     E: ParseError<I> + FromExternalError<I, TryFromIntError>,
 {
     // This verification makes sure that the length is not a separator of a map.
-    let length = map_res(verify(compact_size, |&v| v != 0x00), |v| usize::try_from(v));
+    let length = map_res(verify(compact_size, |&v| v != 0x00), usize::try_from);
     length_value(length, tuple((compact_size, rest)))(i)
 }
 
@@ -29,7 +29,7 @@ pub fn value<I, O, E, F>(f: F) -> impl FnMut(I) -> IResult<I, O, E>
 where
     I: Clone + InputTake + InputLength + InputIter<Item = u8> + Slice<RangeFrom<usize>>,
     F: Parser<I, O, E>,
-    E: ParseError<I>,
+    E: ParseError<I> + FromExternalError<I, TryFromIntError>,
 {
-    length_value(compact_size, f)
+    length_value(map_res(compact_size, usize::try_from), f)
 }
