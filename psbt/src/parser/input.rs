@@ -226,7 +226,7 @@ where
             _ => {
                 let (i, v) = value(rest)(i)?;
                 Ok((i, KeyPair::Unknown(keydata, v)))
-            },
+            }
         }
     }
 }
@@ -354,7 +354,7 @@ enum KeyPair<Input> {
     TapBip32Derivation(XOnlyPublicKey, Input),
     TapInternalKey(XOnlyPublicKey),
     TapMerkleRoot(TapNodeHash),
-    Unknown(Input, Input)
+    Unknown(Input, Input),
 }
 
 #[derive(Debug)]

@@ -6,7 +6,7 @@ use core::num::TryFromIntError;
 use bitflags::bitflags;
 use nom::{
     bytes::complete::tag,
-    combinator::{map, verify, rest},
+    combinator::{map, rest, verify},
     error::{context, ContextError, FromExternalError, ParseError},
     multi::fold_many0,
     number::complete::le_u32,
@@ -93,8 +93,7 @@ where
 
 fn global_key_pair<I, Error>() -> impl FnMut(I) -> IResult<I, KeyPair<I>, Error>
 where
-    I: for<'a> Compare<&'a [u8]>
-        + PartialEq
+    I: PartialEq
         + Clone
         + InputTake
         + InputLength
@@ -125,7 +124,7 @@ where
             _ => {
                 let (i, v) = value(rest)(i)?;
                 Ok((i, KeyPair::Unknown(keydata, v)))
-            },
+            }
         }
     }
 }

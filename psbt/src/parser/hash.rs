@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use core::ops::RangeFrom;
+
 use nom::{
     error::ParseError, multi::fill, number::complete::u8, IResult, InputIter, InputLength, Slice,
 };
@@ -11,8 +13,7 @@ use bitcoin_primitives::{TapLeafHash, TapNodeHash, Txid};
 /// Parses a [`bitcoin_hashes::Hash`].
 pub fn hash<Input, Hash, Error, const N: usize>(i: Input) -> IResult<Input, Hash, Error>
 where
-    Input:
-        Clone + PartialEq + InputLength + InputIter<Item = u8> + Slice<core::ops::RangeFrom<usize>>,
+    Input: Clone + PartialEq + InputLength + InputIter<Item = u8> + Slice<RangeFrom<usize>>,
     Hash: bitcoin_hashes::Hash<Bytes = [u8; N]>,
     Error: ParseError<Input>,
 {
