@@ -23,5 +23,4 @@
     "rust:tools"
 
     ;; Nice to have utilities.
-    "hal"
     "xxd"))
