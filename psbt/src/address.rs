@@ -192,7 +192,6 @@ pub fn render(
 
             render_base58_address(network.p2sh_version(), data, s)?;
         }
-        // Maybe render the public key as hex.
         AddressType::P2PK => return Err(RenderAddressError::Unimplemented),
         // OP_RETURN, display message if encoded as UTF-8 or just the
         // hexadecimal bytes.

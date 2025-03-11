@@ -102,10 +102,42 @@ where
 
         // OP_RETURN.
         if b0 == Some(0x6A) {
-            return Some((
-                AddressType::Return,
-                self.script_pubkey.slice(1..).iter_elements().collect::<_>(),
-            ));
+            // TODO: Use the length of the opcode for slicing.
+            match b1 {
+                // Push next bytes to the stack.
+                Some(n) if n <= 0x4B => {
+                    return Some((
+                        AddressType::Return,
+                        self.script_pubkey.slice(2..).iter_elements().collect::<_>(),
+                    ));
+                }
+                // OP_PUSHDATA1
+                Some(0x4C) => {
+                    return Some((
+                        AddressType::Return,
+                        self.script_pubkey.slice(3..).iter_elements().collect::<_>(),
+                    ));
+                }
+                // OP_PUSHDATA2
+                Some(0x4D) => {
+                    return Some((
+                        AddressType::Return,
+                        self.script_pubkey.slice(4..).iter_elements().collect::<_>(),
+                    ));
+                }
+                // OP_PUSHDATA4
+                Some(0x4E) => {
+                    return Some((
+                        AddressType::Return,
+                        self.script_pubkey.slice(6..).iter_elements().collect::<_>(),
+                    ));
+                }
+                // Any sequence of bytes.
+                _ => return Some((
+                        AddressType::Return,
+                        self.script_pubkey.slice(1..).iter_elements().collect::<_>(),
+                )),
+            }
         }
 
         // P2WPKH (BIP-0141).
