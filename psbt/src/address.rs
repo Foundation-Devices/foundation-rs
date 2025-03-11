@@ -22,6 +22,22 @@ impl Network {
             Network::Testnet => hrp::TB,
         }
     }
+
+    /// P2PKH Base-58 version prefix.
+    pub fn p2pkh_version(&self) -> u8 {
+        match self {
+            Network::Mainnet => 0x00,
+            Network::Testnet => 0x6F,
+        }
+    }
+
+    /// P2SH Base-58 version prefix.
+    pub fn p2sh_version(&self) -> u8 {
+        match self {
+            Network::Mainnet => 0x05,
+            Network::Testnet => 0xC4,
+        }
+    }
 }
 
 /// Supported address types.
@@ -78,7 +94,7 @@ fn render_base58_address(
 
     let len = bs58::encode::EncodeBuilder::new(data, bs58::Alphabet::BITCOIN)
         .with_check_version(version)
-        .onto(SliceVec::from(buf.as_mut_slice()))
+        .onto(SliceVec::from_slice_len(buf.as_mut_slice(), 0))
         .map_err(|_| RenderAddressError::AddressTooBig)?;
     buf.truncate(len);
 
@@ -167,14 +183,14 @@ pub fn render(
                 return Err(RenderAddressError::InvalidAddressData);
             }
 
-            render_base58_address(0x00, data, s)?;
+            render_base58_address(network.p2pkh_version(), data, s)?;
         }
         AddressType::P2SH => {
             if data.len() != 20 {
                 return Err(RenderAddressError::InvalidAddressData);
             }
 
-            render_base58_address(0x05, data, s)?;
+            render_base58_address(network.p2sh_version(), data, s)?;
         }
         // Maybe render the public key as hex.
         AddressType::P2PK => return Err(RenderAddressError::Unimplemented),

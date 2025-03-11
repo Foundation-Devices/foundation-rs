@@ -179,9 +179,10 @@ where
 
         // P2PKH.
         if len == 25 && b0 == Some(0x76) && b1 == Some(0xA9) && b2 == Some(0x14) {
-            let b23 = self.script_pubkey.slice(23..).iter_elements().nth(0);
+            let mut tmp = self.script_pubkey.slice(23..).iter_elements();
+            let b23 = tmp.next();
             if b23 == Some(0x88) {
-                let b24 = self.script_pubkey.slice(24..).iter_elements().nth(0);
+                let b24 = tmp.next();
                 if b24 == Some(0xAC) {
                     return Some((
                         AddressType::P2PKH,
