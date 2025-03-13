@@ -3,6 +3,7 @@
 
 use core::num::TryFromIntError;
 
+use bitcoin_primitives::Amount;
 use nom::{
     bytes::complete::tag,
     combinator::{map, rest, verify},
@@ -12,7 +13,6 @@ use nom::{
     sequence::terminated,
     Compare, IResult, InputIter, InputLength, InputTake, Slice,
 };
-
 use secp256k1::{PublicKey, XOnlyPublicKey};
 
 use foundation_bip32::{
@@ -107,7 +107,7 @@ where
 
                 Ok((i, KeyPair::Bip32Derivation(pk, source)))
             }
-            0x03 => map(value(le_u64), KeyPair::Amount)(i),
+            0x03 => map(value(map(le_u64, Amount::from_sat)), KeyPair::Amount)(i),
             0x04 => map(value(rest), KeyPair::Script)(i),
             0x05 => map(value(x_only_public_key), KeyPair::TapInternalKey)(i),
             0x06 => map(value(rest), KeyPair::TapTree)(i),
@@ -130,7 +130,7 @@ where
 pub struct OutputMap<Input> {
     pub redeem_script: Option<Input>,
     pub witness_script: Option<Input>,
-    pub amount: Option<u64>,
+    pub amount: Option<Amount>,
     pub script: Option<Input>,
     pub tap_internal_key: Option<XOnlyPublicKey>,
     pub tap_tree: Option<Input>,
@@ -159,22 +159,13 @@ where
                 .as_ref()
                 .map(|tx| tx.outputs.iter().nth(index))
                 .flatten(),
-            2 => {
-                match (self.amount, self.script.clone()) {
-                    (Some(amount), Some(script)) => {
-                        // TODO: Report error when converting from u64 to i64 instead.
-                        if let Ok(amount) = i64::try_from(amount) {
-                            Some(transaction::Output {
-                                value: amount,
-                                script_pubkey: script,
-                            })
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                }
-            }
+            2 => match (self.amount, self.script.clone()) {
+                (Some(amount), Some(script)) => Some(transaction::Output {
+                    value: amount,
+                    script_pubkey: script,
+                }),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -197,7 +188,7 @@ enum KeyPair<Input> {
     RedeemScript(Input),
     WitnessScript(Input),
     Bip32Derivation(PublicKey, KeySource<Input>),
-    Amount(u64),
+    Amount(Amount),
     Script(Input),
     TapInternalKey(XOnlyPublicKey),
     TapTree(Input),

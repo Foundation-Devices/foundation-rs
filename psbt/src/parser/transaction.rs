@@ -16,11 +16,12 @@
 
 use core::num::TryFromIntError;
 
+use bitcoin_primitives::Amount;
 use nom::{
     combinator::{map, map_res},
     error::{ErrorKind, FromExternalError, ParseError},
     multi::length_data,
-    number::complete::{le_i32, le_i64, le_u32},
+    number::complete::{le_i32, le_u32, le_u64},
     sequence::tuple,
     Err, IResult, InputIter, InputLength, InputTake, Slice,
 };
@@ -150,7 +151,7 @@ where
     E: ParseError<I>,
     E: FromExternalError<I, TryFromIntError>,
 {
-    let value = le_i64;
+    let value = map(le_u64, Amount::from_sat);
     let script_pubkey = length_data(map_res(compact_size, usize::try_from));
     let fields = tuple((value, script_pubkey));
     let mut parser = map(fields, |(value, script_pubkey)| Output {

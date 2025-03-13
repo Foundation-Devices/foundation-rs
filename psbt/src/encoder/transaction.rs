@@ -90,7 +90,7 @@ where
 {
     let mut count = 0;
 
-    count += w.write(&output.value.to_le_bytes())?;
+    count += w.write(&output.value.to_sat().to_le_bytes())?;
     count += encode_compact_size(
         &mut w,
         u64::try_from(output.script_pubkey.input_len()).unwrap(),

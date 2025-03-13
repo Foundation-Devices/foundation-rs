@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use bitcoin_hashes::sha256d;
-use bitcoin_primitives::Txid;
+use bitcoin_primitives::{Amount, Txid};
 use embedded_io::Write;
 use heapless::Vec;
 
-use crate::address::AddressType;
-use crate::encoder::{
-    hash_engine::HashEngine,
-    transaction::{encode_inputs, encode_outputs},
+use crate::{
+    address::AddressType,
+    encoder::{
+        hash_engine::HashEngine,
+        transaction::{encode_inputs, encode_outputs},
+    },
 };
 
 /// A raw segwit bitcoin transaction.
@@ -74,7 +76,7 @@ pub struct Input<I> {
 #[derive(Debug, Clone)]
 pub struct Output<I> {
     /// Number of satoshis this output is worth.
-    pub value: i64,
+    pub value: Amount,
     /// Script with the conditions to spend this output.
     pub script_pubkey: I,
 }
@@ -133,10 +135,12 @@ where
                     ));
                 }
                 // Any sequence of bytes.
-                _ => return Some((
+                _ => {
+                    return Some((
                         AddressType::Return,
                         self.script_pubkey.slice(1..).iter_elements().collect::<_>(),
-                )),
+                    ))
+                }
             }
         }
 

@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundationdevices.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use bech32::primitives::segwit::MAX_STRING_LENGTH;
 use core::{cmp::Ordering, fmt};
 
-use nom::bytes::complete::tag;
-use nom::error::ErrorKind;
-use nom::Err;
-
+use bech32::primitives::segwit::MAX_STRING_LENGTH;
+use bitcoin_hashes::{hash160, sha256t, HashEngine};
+use bitcoin_primitives::{Amount, TapTweakHash, TapTweakTag};
+use heapless::{String, Vec};
+use nom::{bytes::complete::tag, error::ErrorKind, Err};
 use secp256k1::{PublicKey, Scalar, XOnlyPublicKey};
 
 use foundation_bip32::{Fingerprint, KeySource, Xpriv};
@@ -19,33 +19,30 @@ use crate::{
     transaction::SIGHASH_ALL,
 };
 
-use bitcoin_hashes::{hash160, sha256t, HashEngine};
-use bitcoin_primitives::{TapTweakHash, TapTweakTag};
-
-use heapless::{String, Vec};
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionDetails {
-    pub total_input: i64,
-    pub total_with_change: i64,
-    pub total_change: i64,
+    pub total_input: Amount,
+    pub total_with_change: Amount,
+    pub total_change: Amount,
 }
 
 impl TransactionDetails {
     /// Total amount sent to external wallets.
-    pub fn total(&self) -> i64 {
-        // This operation should always yield a positive number or zero as
-        // total_change is less than or equal to total_with_change.
-        (self.total_with_change - self.total_change).max(0)
+    pub fn total(&self) -> Amount {
+        self.total_with_change
+            .checked_sub(self.total_change)
+            .unwrap_or(Amount::ZERO)
     }
 
     /// Returns true if total amount spent is all change.
     pub fn is_self_send(&self) -> bool {
-        self.total() == 0
+        self.total() == Amount::ZERO
     }
 
-    pub fn fee(&self) -> i64 {
-        self.total_input - self.total_with_change
+    pub fn fee(&self) -> Amount {
+        self.total_input
+            .checked_sub(self.total_with_change)
+            .unwrap_or(Amount::ZERO)
     }
 }
 
@@ -55,12 +52,12 @@ pub enum Event {
     Progress(u64),
     /// Output address.
     OutputAddress {
-        amount: i64,
+        amount: Amount,
         address: String<MAX_STRING_LENGTH>,
     },
     /// Change address.
     ChangeAddress {
-        amount: i64,
+        amount: Amount,
         address: String<MAX_STRING_LENGTH>,
     },
 }
@@ -114,7 +111,7 @@ where
 
     log::debug!("validating inputs");
     let mut input = i.clone();
-    let mut total_input = 0;
+    let mut total_input = Amount::ZERO;
     for input_index in 0..input_count {
         let input_ = input.clone();
 
@@ -134,8 +131,8 @@ where
     }
 
     log::debug!("validating outputs");
-    let mut total_with_change = 0;
-    let mut total_change = 0;
+    let mut total_with_change = Amount::ZERO;
+    let mut total_change = Amount::ZERO;
     for output_index in 0..output_count {
         let input_ = input.clone();
 
@@ -244,7 +241,7 @@ where
 }
 
 pub struct InputDetails {
-    pub amount: i64,
+    pub amount: Amount,
 }
 
 pub fn input_is_valid<Input>(
@@ -371,7 +368,7 @@ pub fn input_derivation_is_valid<Input>(
 
 pub struct OutputDetails {
     /// The output amount, in satoshis.
-    pub amount: i64,
+    pub amount: Amount,
     /// Is this a change output?
     pub is_change: bool,
     /// Address type.

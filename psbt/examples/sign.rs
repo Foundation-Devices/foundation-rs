@@ -54,10 +54,10 @@ fn main() {
     println!("Transaction details:");
     if details.is_self_send() {
         println!("This transaction is a self-send.");
-        println!("Total: {} sats", details.total_change);
+        println!("Total: {}", details.total_change);
     } else {
-        println!("Total: {} sats", details.total());
-        println!("Change: {} sats", details.total_change);
+        println!("Total: {}", details.total());
+        println!("Change: {}", details.total_change);
     }
     println!("Fee: {} sats", details.fee());
 
