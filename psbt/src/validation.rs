@@ -230,8 +230,8 @@ where
         event_handler(Event::Progress((processed_items * 100) / total_items));
     }
 
-    log::debug!("total with total_change: {total_with_change} sats");
-    log::debug!("total change: {total_change} sats");
+    log::debug!("total with total_change: {total_with_change}");
+    log::debug!("total change: {total_change}");
 
     Ok(TransactionDetails {
         total_input,
