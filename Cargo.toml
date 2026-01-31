@@ -28,7 +28,7 @@ bitcoin = { version = "0.31", default-features = false }
 bitcoin_hashes = { version = "0.15", default-features = false }
 bs58 = "0.5"
 clap = { version = "4", features = ["cargo"] }
-crc = "3"
+crc = ">=3, <3.4"  # 3.4+ requires rustc 1.83+
 criterion = { version = "0.4" }
 defmt = "0.3"
 derive_more = { version = "1.0", default-features = false }

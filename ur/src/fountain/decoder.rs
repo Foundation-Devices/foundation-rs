@@ -670,7 +670,7 @@ pub mod tests {
                 progress
             );
             // Progress should be in valid range
-            assert!(progress >= 0.0 && progress <= 1.0);
+            assert!((0.0..=1.0).contains(&progress));
             last_progress = progress;
         }
 
