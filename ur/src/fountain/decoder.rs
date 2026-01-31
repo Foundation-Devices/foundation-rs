@@ -203,7 +203,13 @@ impl<T: Types> BaseDecoder<T> {
                 .unwrap()
     }
 
-    /// Calculate estimated percentage of completion.
+    /// Calculate percentage of completion based on decoded bytes.
+    ///
+    /// Returns a value between 0.0 and 1.0 representing the proportion
+    /// of the message that has been successfully decoded.
+    ///
+    /// This counts only fully decoded fragments (in `received`), not
+    /// mixed/XOR'd parts that are still being resolved.
     pub fn estimated_percent_complete(&self) -> f64 {
         if self.is_complete() {
             return 1.0;
@@ -213,10 +219,26 @@ impl<T: Types> BaseDecoder<T> {
             return 0.0;
         }
 
-        let estimated_input_parts =
-            f64::from(self.message_description.as_ref().unwrap().sequence_count) * 1.75;
-        let received_parts = u32::try_from(self.received.len()).unwrap();
-        f64::min(0.99, f64::from(received_parts) / estimated_input_parts)
+        let desc = self.message_description.as_ref().unwrap();
+        let sequence_count = desc.sequence_count as usize;
+        let fragment_len = desc.fragment_length;
+        let message_len = desc.message_length;
+
+        // Last fragment may be smaller due to padding
+        let last_fragment_index = sequence_count - 1;
+        let last_fragment_real_len = message_len.saturating_sub(fragment_len * last_fragment_index);
+
+        // Sum bytes from fully decoded fragments only
+        let mut bytes_received = 0usize;
+        for &index in self.received.iter() {
+            if index == last_fragment_index {
+                bytes_received += last_fragment_real_len;
+            } else {
+                bytes_received += fragment_len;
+            }
+        }
+
+        bytes_received as f64 / message_len as f64
     }
 
     /// Returns `true` if the decoder doesn't contain any data.
@@ -623,5 +645,36 @@ pub mod tests {
 
         test(&mut heapless_decoder);
         test(&mut decoder);
+    }
+
+    #[test]
+    fn test_estimated_percent_complete_accuracy() {
+        let message = make_message(SEED, MESSAGE_SIZE);
+        let mut encoder = Encoder::new();
+        encoder.start(&message, MAX_FRAGMENT_LEN);
+        let mut decoder = Decoder::default();
+
+        // Progress should start at 0
+        assert_eq!(decoder.estimated_percent_complete(), 0.0);
+
+        let mut last_progress = 0.0;
+        while !decoder.is_complete() {
+            let part = encoder.next_part();
+            decoder.receive(&part).unwrap();
+            let progress = decoder.estimated_percent_complete();
+            // Progress should be monotonically non-decreasing
+            assert!(
+                progress >= last_progress,
+                "Progress went backwards: {} -> {}",
+                last_progress,
+                progress
+            );
+            // Progress should be in valid range
+            assert!(progress >= 0.0 && progress <= 1.0);
+            last_progress = progress;
+        }
+
+        // When complete, progress should be exactly 1.0
+        assert_eq!(decoder.estimated_percent_complete(), 1.0);
     }
 }
