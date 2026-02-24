@@ -56,8 +56,8 @@ TEST_P(NIP19Test, Encode) {
         EXPECT_EQ(GetParam().bytes.size(), 32) << GetParam().name;
 
         char npub[FOUNDATION_NPUB_LEN + 1];
-        auto bytes  = reinterpret_cast<const uint8_t(*)[32]>(GetParam().bytes.data());
-        auto result = reinterpret_cast<uint8_t(*)[FOUNDATION_NPUB_LEN]>(npub);
+        auto bytes  = reinterpret_cast<const uint8_t (*)[32]>(GetParam().bytes.data());
+        auto result = reinterpret_cast<uint8_t (*)[FOUNDATION_NPUB_LEN]>(npub);
         foundation_encode_npub(bytes, result);
         npub[FOUNDATION_NPUB_LEN] = '\0';
 
@@ -69,8 +69,8 @@ TEST_P(NIP19Test, Encode) {
         EXPECT_EQ(GetParam().bytes.size(), 32) << GetParam().name;
 
         char nsec[FOUNDATION_NSEC_LEN + 1];
-        auto bytes  = reinterpret_cast<const uint8_t(*)[32]>(GetParam().bytes.data());
-        auto result = reinterpret_cast<uint8_t(*)[FOUNDATION_NSEC_LEN]>(nsec);
+        auto bytes  = reinterpret_cast<const uint8_t (*)[32]>(GetParam().bytes.data());
+        auto result = reinterpret_cast<uint8_t (*)[FOUNDATION_NSEC_LEN]>(nsec);
         foundation_encode_nsec(bytes, result);
         nsec[FOUNDATION_NSEC_LEN] = '\0';
 

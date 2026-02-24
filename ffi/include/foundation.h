@@ -51,7 +51,7 @@ void foundation_encode_nsec(const uint8_t (*FOUNDATION_NONNULL secret_key)[32],
                             uint8_t (*FOUNDATION_NONNULL output)[FOUNDATION_NSEC_LEN]);
 
 #ifdef __cplusplus
-} // extern "C"
-#endif // __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
-#endif /* FOUNDATION_H */
+#endif  /* FOUNDATION_H */
