@@ -88,6 +88,7 @@ pub fn encode_nsec_to_fmt(
 }
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod tests {
     use foundation_test_vectors::NIP19Vector;
 
