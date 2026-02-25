@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Rust
-Cargo.lock
 target/
 
 # cargo fuzz
@@ -15,3 +14,6 @@ target/
 
 # Firmware files.
 *.bin
+
+# Nix
+result

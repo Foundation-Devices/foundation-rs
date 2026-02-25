@@ -50,7 +50,11 @@ impl<T> Set<T> for alloc::collections::BTreeSet<T>
 where
     T: Clone + Ord,
 {
-    type Iter<'a> = alloc::collections::btree_set::Iter<'a, T> where T: 'a, Self: 'a;
+    type Iter<'a>
+        = alloc::collections::btree_set::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
 
     fn insert(&mut self, value: T) -> Result<bool, T> {
         Ok(alloc::collections::BTreeSet::insert(self, value))
@@ -98,7 +102,8 @@ where
     T: Clone + Eq + Hash,
     S: BuildHasher + Clone + Default,
 {
-    type Iter<'a> = heapless::IndexSetIter<'a, T>
+    type Iter<'a>
+        = heapless::IndexSetIter<'a, T>
     where
         T: 'a,
         Self: 'a;

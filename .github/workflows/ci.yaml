@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundationdevices.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: CI
+on: [push]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nix-checks:
+    name: Nix flake checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+      - run: nix flake check --print-build-logs
+
+  minimal-versions:
+    name: Minimal versions
+    needs: [nix-checks]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+      - run: |
+          nix develop .#nightly --command bash -c '
+            cargo update -p arrayvec --precise 0.7.4 -Z minimal-versions
+            cargo check -Z minimal-versions
+          '
+
+  fuzzing:
+    name: Fuzzing
+    needs: [nix-checks]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+      - run: |
+          nix develop .#nightly --command bash -c './contrib/fuzz.sh'

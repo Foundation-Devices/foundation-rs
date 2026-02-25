@@ -48,6 +48,7 @@ impl<T, const N: usize> Arena<T, N> {
     ///
     /// If there's not enough space left in the arena, then the item is
     /// returned as-is.
+    #[allow(clippy::mut_from_ref)] // Sound: interior mutability via RefCell
     pub fn alloc(&self, item: T) -> Result<&mut T, T> {
         let mut storage = self.storage.borrow_mut();
         let len = storage.len();

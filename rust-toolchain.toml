@@ -1,12 +1,8 @@
 # SPDX-FileCopyrightText: © 2023 Foundation Devices, Inc. <hello@foundationdevices.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Keep this in sync. with the CI.
-#
-# Preferably should be the same version as GNU Guix to make packaging easier:
-#
-# <https://packages.guix.gnu.org/packages/rust/>
+# Keep this in sync. with the CI (flake.nix).
 [toolchain]
-channel = "1.77"
+channel = "1.93.1"
 profile = "default"
 targets = ["thumbv7em-none-eabihf"]
