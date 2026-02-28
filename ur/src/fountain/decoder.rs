@@ -208,15 +208,15 @@ impl<T: Types> BaseDecoder<T> {
         if self.is_complete() {
             return 1.0;
         }
-    
+
         let Some(desc) = self.message_description.as_ref() else {
             return 0.0;
         };
-    
+
         let sequence_count = f64::from(desc.sequence_count);
         let received = self.received.len() as f64;
         let raw = received / sequence_count;
-    
+
         let progress = (1.0 - (1.0 - raw)) * 1.1;
         f64::min(0.99, progress)
     }
