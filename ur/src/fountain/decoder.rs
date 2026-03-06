@@ -217,7 +217,7 @@ impl<T: Types> BaseDecoder<T> {
         let received = self.received.len() as f64;
         let raw = received / sequence_count;
 
-        let progress = (1.0 - (1.0 - raw)) * 1.1;
+        let progress = (1.0 - (1.0 - raw)) * 1.2;
         f64::min(0.99, progress)
     }
 
