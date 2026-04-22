@@ -30,7 +30,7 @@ use core::fmt::{Display, Formatter};
 
 use minicbor::{bytes::ByteSlice, encode::Write, Encode, Encoder};
 
-use crate::registry::{HDKeyRef, PassportRequest, PassportResponse};
+use crate::registry::{HDKeyRef, PassportRequest, PassportResponse, Terminal, TerminalContext};
 
 #[derive(Debug, PartialEq)]
 pub enum Value<'a> {
@@ -67,6 +67,15 @@ impl<'a> Value<'a> {
         Ok(value)
     }
 
+    /// Whether `ur_type` is a known output-descriptor UR type.
+    ///
+    /// Accepts the historical `crypto-output` spelling (BCR-2020-010, still
+    /// emitted by e.g. Sparrow) as well as the newer `output-descriptor` and
+    /// short `output` aliases.
+    pub fn is_output_descriptor(ur_type: &str) -> bool {
+        matches!(ur_type, "output" | "output-descriptor" | "crypto-output")
+    }
+
     /// Return the type of this value as a string.
     ///
     /// # Notes
@@ -85,6 +94,28 @@ impl<'a> Value<'a> {
             Value::PassportResponse(_) => "crypto-response",
         }
     }
+}
+
+/// Decode a `crypto-output` / `output-descriptor` UR payload into a [`Terminal`].
+///
+/// [`Terminal`] is a recursive data structure, so its sub-nodes are allocated
+/// into the caller-provided [`TerminalContext`] arena. `N` must be large
+/// enough to hold every nested `Terminal` node in the descriptor (e.g. a
+/// `wsh(sortedmulti(...))` needs at least 2 slots).
+///
+/// Dispatches on the UR type string so callers can route from a generic
+/// "got a UR" entry point without re-implementing the aliases. See
+/// [`Value::is_output_descriptor`] for the accepted spellings.
+pub fn decode_output_descriptor<'a, 'b, const N: usize>(
+    ur_type: &str,
+    payload: &'b [u8],
+    arena: &'a TerminalContext<'a, 'b, N>,
+) -> Result<Terminal<'a, 'b>, Error> {
+    if !Value::is_output_descriptor(ur_type) {
+        return Err(Error::UnsupportedResource);
+    }
+    let mut ctx: &'a TerminalContext<'a, 'b, N> = arena;
+    minicbor::decode_with::<_, Terminal>(payload, &mut ctx).map_err(Into::into)
 }
 
 impl<'a, C> Encode<C> for Value<'a> {
@@ -140,6 +171,80 @@ impl From<minicbor::decode::Error> for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::registry::{ECKey, Key, Multikey, Terminal, TerminalContext};
+    use foundation_arena::boxed::Box as ArenaBox;
+
+    #[test]
+    fn test_is_output_descriptor() {
+        assert!(Value::is_output_descriptor("output"));
+        assert!(Value::is_output_descriptor("output-descriptor"));
+        assert!(Value::is_output_descriptor("crypto-output"));
+        assert!(!Value::is_output_descriptor("hdkey"));
+        assert!(!Value::is_output_descriptor("crypto-hdkey"));
+        assert!(!Value::is_output_descriptor(""));
+    }
+
+    fn sample_wsh_sortedmulti_cbor() -> alloc::vec::Vec<u8> {
+        // wsh(sorted_multi(2 of 2)) — the flavor Sparrow emits for BIP48
+        // P2WSH multisigs. Same keys as `output_descriptor::test_example_3`.
+        let a: TerminalContext<8> = TerminalContext::new();
+        let key1 = Key::ECKey(ECKey {
+            curve: ECKey::SECP256K1,
+            is_private: false,
+            data: &[
+                0x02, 0x2f, 0x01, 0xe5, 0xe1, 0x5c, 0xca, 0x35, 0x1d, 0xaf, 0xf3, 0x84, 0x3f, 0xb7,
+                0x0f, 0x3c, 0x2f, 0x0a, 0x1b, 0xdd, 0x05, 0xe5, 0xaf, 0x88, 0x8a, 0x67, 0x78, 0x4e,
+                0xf3, 0xe1, 0x0a, 0x2a, 0x01,
+            ],
+        });
+        let key2 = Key::ECKey(ECKey {
+            curve: ECKey::SECP256K1,
+            is_private: false,
+            data: &[
+                0x03, 0xac, 0xd4, 0x84, 0xe2, 0xf0, 0xc7, 0xf6, 0x53, 0x09, 0xad, 0x17, 0x8a, 0x9f,
+                0x55, 0x9a, 0xbd, 0xe0, 0x97, 0x96, 0x97, 0x4c, 0x57, 0xe7, 0x14, 0xc3, 0x5f, 0x11,
+                0x0d, 0xfc, 0x27, 0xcc, 0xbe,
+            ],
+        });
+        let keys: &[Key] = &[key1, key2];
+        let sortedmulti = ArenaBox::new_in(
+            Terminal::SortedMultisig(Multikey {
+                threshold: 2,
+                keys: keys.into(),
+            }),
+            &a,
+        )
+        .unwrap();
+        let descriptor = Terminal::WitnessScriptHash(sortedmulti);
+        minicbor::to_vec(&descriptor).unwrap()
+    }
+
+    #[test]
+    fn test_decode_output_descriptor_crypto_output_alias() {
+        let cbor = sample_wsh_sortedmulti_cbor();
+        let arena: TerminalContext<8> = TerminalContext::new();
+        let decoded = decode_output_descriptor("crypto-output", &cbor, &arena).unwrap();
+        assert!(matches!(decoded, Terminal::WitnessScriptHash(_)));
+    }
+
+    #[test]
+    fn test_decode_output_descriptor_new_alias() {
+        let cbor = sample_wsh_sortedmulti_cbor();
+        let arena: TerminalContext<8> = TerminalContext::new();
+        let decoded = decode_output_descriptor("output-descriptor", &cbor, &arena).unwrap();
+        assert!(matches!(decoded, Terminal::WitnessScriptHash(_)));
+    }
+
+    #[test]
+    fn test_decode_output_descriptor_rejects_other_types() {
+        let cbor = sample_wsh_sortedmulti_cbor();
+        let arena: TerminalContext<8> = TerminalContext::new();
+        match decode_output_descriptor("bytes", &cbor, &arena) {
+            Err(Error::UnsupportedResource) => {}
+            other => panic!("expected UnsupportedResource, got {other:?}"),
+        };
+    }
 
     #[test]
     fn test_byte_string_bytes() {
