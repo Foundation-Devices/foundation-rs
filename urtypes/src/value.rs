@@ -67,13 +67,18 @@ impl<'a> Value<'a> {
         Ok(value)
     }
 
-    /// Whether `ur_type` is a known output-descriptor UR type.
+    /// Whether `ur_type` is the legacy `crypto-output` UR type (BCR-2020-010).
     ///
-    /// Accepts the historical `crypto-output` spelling (BCR-2020-010, still
-    /// emitted by e.g. Sparrow) as well as the newer `output-descriptor` and
-    /// short `output` aliases.
+    /// This is the flavor still emitted by e.g. Sparrow: a recursive CBOR
+    /// tree rooted at one of the script-type tags (400..=410) that decodes
+    /// into [`Terminal`].
+    ///
+    /// The newer BCR-2023-010 `output-descriptor` UR (CBOR tag 40308 map
+    /// wrapping a text descriptor) is NOT the same wire format and is not
+    /// accepted here; feeding its payload through [`decode_output_descriptor`]
+    /// would produce `InvalidCbor(invalid tag)`.
     pub fn is_output_descriptor(ur_type: &str) -> bool {
-        matches!(ur_type, "output" | "output-descriptor" | "crypto-output")
+        matches!(ur_type, "crypto-output")
     }
 
     /// Return the type of this value as a string.
@@ -96,7 +101,7 @@ impl<'a> Value<'a> {
     }
 }
 
-/// Decode a `crypto-output` / `output-descriptor` UR payload into a [`Terminal`].
+/// Decode a legacy `crypto-output` UR payload (BCR-2020-010) into a [`Terminal`].
 ///
 /// [`Terminal`] is a recursive data structure, so its sub-nodes are allocated
 /// into the caller-provided [`TerminalContext`] arena. `N` must be large
@@ -104,8 +109,9 @@ impl<'a> Value<'a> {
 /// `wsh(sortedmulti(...))` needs at least 2 slots).
 ///
 /// Dispatches on the UR type string so callers can route from a generic
-/// "got a UR" entry point without re-implementing the aliases. See
-/// [`Value::is_output_descriptor`] for the accepted spellings.
+/// "got a UR" entry point. Only `crypto-output` is accepted; the newer
+/// BCR-2023-010 `output-descriptor` (tag 40308) uses a different CBOR shape
+/// and is not supported by this helper. See [`Value::is_output_descriptor`].
 pub fn decode_output_descriptor<'a, 'b, const N: usize>(
     ur_type: &str,
     payload: &'b [u8],
@@ -177,9 +183,14 @@ mod tests {
 
     #[test]
     fn test_is_output_descriptor() {
-        assert!(Value::is_output_descriptor("output"));
-        assert!(Value::is_output_descriptor("output-descriptor"));
         assert!(Value::is_output_descriptor("crypto-output"));
+        // `output-descriptor` is a distinct BCR-2023-010 UR (tag 40308 map,
+        // not the tag-400..410 tree) and must NOT be accepted by this helper
+        // — the reviewer on PR #54 reproduced `InvalidCbor(invalid tag)`
+        // when a spec-compliant `output-descriptor` payload was routed here.
+        assert!(!Value::is_output_descriptor("output-descriptor"));
+        // Bare `output` is not a registered UR type at all.
+        assert!(!Value::is_output_descriptor("output"));
         assert!(!Value::is_output_descriptor("hdkey"));
         assert!(!Value::is_output_descriptor("crypto-hdkey"));
         assert!(!Value::is_output_descriptor(""));
@@ -229,11 +240,17 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_output_descriptor_new_alias() {
+    fn test_decode_output_descriptor_rejects_output_descriptor_alias() {
+        // BCR-2023-010 `output-descriptor` uses a different CBOR shape (tag
+        // 40308 map), so this helper — which only understands the legacy
+        // BCR-2020-010 tag-400..410 tree — must reject it at the type-string
+        // layer rather than handing the bytes to the wrong decoder.
         let cbor = sample_wsh_sortedmulti_cbor();
         let arena: TerminalContext<8> = TerminalContext::new();
-        let decoded = decode_output_descriptor("output-descriptor", &cbor, &arena).unwrap();
-        assert!(matches!(decoded, Terminal::WitnessScriptHash(_)));
+        match decode_output_descriptor("output-descriptor", &cbor, &arena) {
+            Err(Error::UnsupportedResource) => {}
+            other => panic!("expected UnsupportedResource, got {other:?}"),
+        };
     }
 
     #[test]
