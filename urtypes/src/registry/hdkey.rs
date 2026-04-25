@@ -284,23 +284,34 @@ impl<'b, C> Decode<'b, C> for DerivedKeyRef<'b> {
                 }
             }
 
+            // BCR-2020-007 (legacy) and BCR-2023-007 (current) tag numbers.
+            // Sparrow and other wallets built against the original spec emit
+            // the legacy 304/305 tags; accept both so imports work either way.
             const TAGGED_COININFO: Tag = Tag::new(40305);
+            const TAGGED_COININFO_LEGACY: Tag = Tag::new(305);
             const TAGGED_KEYPATH: Tag = Tag::new(40304);
+            const TAGGED_KEYPATH_LEGACY: Tag = Tag::new(304);
 
             match d.u32()? {
                 2 => is_private = d.bool()?,
                 3 => key_data = Some(DecodeBytes::decode_bytes(d, ctx)?),
                 4 => chain_code = Some(DecodeBytes::decode_bytes(d, ctx)?),
                 5 => match d.tag()? {
-                    TAGGED_COININFO => use_info = Some(CoinInfo::decode(d, ctx)?),
+                    TAGGED_COININFO | TAGGED_COININFO_LEGACY => {
+                        use_info = Some(CoinInfo::decode(d, ctx)?)
+                    }
                     _ => return Err(Error::message("invalid tag for coininfo")),
                 },
                 6 => match d.tag()? {
-                    TAGGED_KEYPATH => origin = Some(KeypathRef::decode(d, ctx)?),
+                    TAGGED_KEYPATH | TAGGED_KEYPATH_LEGACY => {
+                        origin = Some(KeypathRef::decode(d, ctx)?)
+                    }
                     _ => return Err(Error::message("invalid tag for keypath")),
                 },
                 7 => match d.tag()? {
-                    TAGGED_KEYPATH => children = Some(KeypathRef::decode(d, ctx)?),
+                    TAGGED_KEYPATH | TAGGED_KEYPATH_LEGACY => {
+                        children = Some(KeypathRef::decode(d, ctx)?)
+                    }
                     _ => return Err(Error::message("invalid tag for keypath")),
                 },
                 8 => {
