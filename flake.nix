@@ -212,6 +212,20 @@
             }
           );
 
+          # --- Cargo test (stratum-v1 with the `log` backend) ---
+          #
+          # The all-features checks have to exclude stratum-v1, because several
+          # of its features are mutually exclusive. That leaves the credential
+          # redaction regression test — which needs a logging backend to have
+          # any output to assert over — unrun, so select it explicitly.
+          cargo-test-stratum-v1-log = craneLib.cargoTest (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              cargoTestExtraArgs = "-p stratum-v1 --features log";
+            }
+          );
+
           # --- cbindgen header verification ---
           cbindgen-verify =
             let
