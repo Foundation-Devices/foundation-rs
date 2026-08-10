@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{Error, Result};
+use crate::limits::{
+    check_exact, check_max, COINB1_HEX_LEN_MAX, COINB2_HEX_LEN_MAX, JOB_ID_LEN_MAX,
+    MERKLE_BRANCH_LEN_MAX, PREV_HASH_HEX_LEN, SINGLE_PARAM_LEN_MAX,
+};
+use crate::{Error, Field, Result};
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use faster_hex::hex_decode;
@@ -55,17 +59,14 @@ pub(crate) fn parse_method(resp: &[u8]) -> Result<Notification> {
 }
 
 pub(crate) fn parse_set_version_mask(resp: &[u8]) -> Result<u32> {
+    let mut params = serde_json_core::from_slice::<Request<tvecstring!(8, 1)>>(resp)?
+        .0
+        .params
+        .ok_or(Error::RpcBadRequest)?;
+    check_max(Field::VersionMaskParams, params.len(), SINGLE_PARAM_LEN_MAX)?;
+    let mask = params.pop().ok_or(Error::VecEmpty)?;
     let mut v = [0; 4];
-    hex_decode(
-        serde_json_core::from_slice::<Request<tvecstring!(8, 1)>>(resp)?
-            .0
-            .params
-            .ok_or(Error::RpcBadRequest)?
-            .pop()
-            .ok_or(Error::VecEmpty)?
-            .as_bytes(),
-        &mut v,
-    )?;
+    hex_decode(mask.as_bytes(), &mut v)?;
     Ok(u32::from_be_bytes(v))
 }
 
@@ -98,6 +99,16 @@ pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
         type Error = Error;
 
         fn try_from(raw: WorkRaw) -> Result<Self> {
+            // In `heapless` builds these bounds come from the field types; with
+            // `alloc` the deserialized strings are unbounded, so enforce the
+            // same maxima here. `prev_hash` is checked for an exact length
+            // because the loop below slices it at fixed offsets.
+            check_max(Field::JobId, raw.0.len(), JOB_ID_LEN_MAX)?;
+            check_exact(Field::PrevHash, raw.1.len(), PREV_HASH_HEX_LEN)?;
+            check_max(Field::Coinb1, raw.2.len(), COINB1_HEX_LEN_MAX)?;
+            check_max(Field::Coinb2, raw.3.len(), COINB2_HEX_LEN_MAX)?;
+            check_max(Field::MerkleBranch, raw.4.len(), MERKLE_BRANCH_LEN_MAX)?;
+
             let mut work = Work {
                 job_id: raw.0,
                 prev_hash: [0; 32],
@@ -167,12 +178,18 @@ pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
 }
 
 pub(crate) fn parse_set_difficulty(resp: &[u8]) -> Result<f64> {
-    serde_json_core::from_slice::<Request<tvec!(f64, 1)>>(resp)?
+    let mut params = serde_json_core::from_slice::<Request<tvec!(f64, 1)>>(resp)?
         .0
         .params
-        .ok_or(Error::RpcBadRequest)?
-        .pop()
-        .ok_or(Error::VecEmpty)
+        .ok_or(Error::RpcBadRequest)?;
+    check_max(Field::DifficultyParams, params.len(), SINGLE_PARAM_LEN_MAX)?;
+    let difficulty = params.pop().ok_or(Error::VecEmpty)?;
+    // JSON has no NaN or infinity literals, but an out-of-range exponent
+    // parses to one, and it would propagate into the caller's target.
+    if !difficulty.is_finite() {
+        return Err(Error::InvalidDifficulty);
+    }
+    Ok(difficulty)
 }
 
 #[cfg(test)]
@@ -201,12 +218,7 @@ mod tests {
         #[cfg(not(feature = "alloc"))]
         assert_eq!(
             parse_set_version_mask(resp),
-            Err(Error::JsonError(
-                serde_json_core::de::Error::CustomErrorWithMessage(hstring!(
-                    64,
-                    "invalid length 9, expected a string no more than 8 bytes long"
-                ))
-            ))
+            Err(Error::JsonError(serde_json_core::de::Error::CustomError))
         );
         #[cfg(feature = "alloc")]
         assert_eq!(
@@ -419,6 +431,48 @@ mod tests {
         );
     }
 
+    /// A `mining.notify` whose previous-hash field is not exactly 64 hex
+    /// characters used to be sliced at fixed offsets regardless, panicking.
+    #[test]
+    fn test_notify_short_prev_hash() {
+        let resp = br#"{"params": ["bf", "4d16b6f8","01000000","072f736c7573682f", [],"00000002", "1c2ac4af", "504e86b9", false], "id": null, "method": "mining.notify"}"#;
+        assert_eq!(
+            parse_notify(resp),
+            Err(Error::InvalidFieldLength {
+                field: Field::PrevHash,
+                expected: 64,
+                actual: 8,
+            })
+        );
+
+        // Empty is the degenerate case of the same bug.
+        let resp = br#"{"params": ["bf", "","01000000","072f736c7573682f", [],"00000002", "1c2ac4af", "504e86b9", false], "id": null, "method": "mining.notify"}"#;
+        assert_eq!(
+            parse_notify(resp),
+            Err(Error::InvalidFieldLength {
+                field: Field::PrevHash,
+                expected: 64,
+                actual: 0,
+            })
+        );
+    }
+
+    /// With `alloc` the field is unbounded, so an over-long previous hash must
+    /// be rejected rather than silently truncated to its first 64 characters.
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_notify_long_prev_hash() {
+        let resp = br#"{"params": ["bf", "4d16b6f85af6e2198f44ae2a6de67f78487ae5611b77c6c0440b921e0000000000","01000000","072f736c7573682f", [],"00000002", "1c2ac4af", "504e86b9", false], "id": null, "method": "mining.notify"}"#;
+        assert_eq!(
+            parse_notify(resp),
+            Err(Error::InvalidFieldLength {
+                field: Field::PrevHash,
+                expected: 64,
+                actual: 66,
+            })
+        );
+    }
+
     #[test]
     fn test_parse_set_difficulty() {
         assert_eq!(
@@ -435,6 +489,15 @@ mod tests {
             Err(Error::JsonError(
                 serde_json_core::de::Error::ExpectedListCommaOrEnd
             ))
+        );
+
+        // An out-of-range exponent is the only way to reach a non-finite
+        // difficulty through JSON.
+        assert_eq!(
+            parse_set_difficulty(
+                br#"{"params": [1e400], "id": null, "method": "mining.set_difficulty"}"#
+            ),
+            Err(Error::InvalidDifficulty)
         );
     }
 

@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{Error, Extensions, Info, Result, VersionRolling};
+use crate::limits::{
+    check_max, EXTRANONCE1_HEX_LEN_MAX, EXTRANONCE2_SIZE_MAX, SUBSCRIPTIONS_LEN_MAX,
+};
+use crate::{Error, Extensions, Field, Info, Result, VersionRolling};
 #[cfg(feature = "alloc")]
 use alloc::{string::String, vec::Vec};
 use faster_hex::hex_decode;
@@ -316,6 +319,14 @@ pub(crate) fn parse_connect(resp: &[u8]) -> Result<ConnectResp> {
         type Error = Error;
 
         fn try_from(raw: ConnectRespRaw) -> Result<Self> {
+            // The pool picks all three of these. `extranonce2_size` is the one
+            // that matters most: it is a bare count that later drives the size
+            // of the rolled extranonce2 buffer, so it has to be bounded before
+            // it reaches any resize.
+            check_max(Field::Subscriptions, raw.0.len(), SUBSCRIPTIONS_LEN_MAX)?;
+            check_max(Field::Extranonce1, raw.1.len(), EXTRANONCE1_HEX_LEN_MAX)?;
+            check_max(Field::Extranonce2Size, raw.2, EXTRANONCE2_SIZE_MAX)?;
+
             Ok(Self {
                 subscriptions: raw.0,
                 extranonce1: {
@@ -505,6 +516,67 @@ mod tests {
                 code: 20,
                 message: hstring!(32, "Other/Unknown"),
                 detail: None
+            })
+        );
+    }
+
+    /// Any serde error message over 64 bytes used to panic inside
+    /// `serde-json-core`'s error formatting. An unrecognized key reaches it
+    /// with room to spare, because the message embeds the whole "expected one
+    /// of" text — and the standard JSON-RPC `jsonrpc` field, which real pools
+    /// send, is an unrecognized key here.
+    #[test]
+    fn test_long_deserializer_error_does_not_panic() {
+        let resp = br#"{"id":2,"result":true,"error":null,"jsonrpc":"2.0"}"#;
+        assert!(parse_authorize(resp).is_err());
+
+        let resp =
+            br#"{"id":2,"result":true,"error":null,"a-key-that-is-not-recognized-at-all":1}"#;
+        assert!(parse_submit(resp).is_err());
+
+        let resp = br#"{"id":1,"error":null,"jsonrpc":"2.0","result":[[["mining.notify","1"]],"e26e1928",4]}"#;
+        assert!(parse_connect(resp).is_err());
+    }
+
+    /// The pool picks `extranonce2_size`, and it drives a resize of the
+    /// extranonce2 buffer, so anything over the buffer's capacity is refused
+    /// at the parser rather than at the allocator.
+    #[test]
+    fn test_parse_connect_oversized_extranonce2_size() {
+        let resp =
+            br#"{"id":2,"error":null,"result":[[["mining.notify","e26e1928"]],"e26e1928",9]}"#;
+        assert_eq!(
+            parse_connect(resp),
+            Err(Error::FieldTooLarge {
+                field: Field::Extranonce2Size,
+                max: EXTRANONCE2_SIZE_MAX,
+                actual: 9,
+            })
+        );
+
+        let resp = br#"{"id":2,"error":null,"result":[[["mining.notify","e26e1928"]],"e26e1928",18446744073709551615]}"#;
+        assert_eq!(
+            parse_connect(resp),
+            Err(Error::FieldTooLarge {
+                field: Field::Extranonce2Size,
+                max: EXTRANONCE2_SIZE_MAX,
+                actual: usize::MAX,
+            })
+        );
+    }
+
+    /// With `alloc` the hex string is unbounded; it is copied into a fixed
+    /// 8-byte extranonce1 either way.
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_parse_connect_oversized_extranonce1() {
+        let resp = br#"{"id":2,"error":null,"result":[[["mining.notify","e26e1928"]],"e26e1928e26e1928e26e1928",4]}"#;
+        assert_eq!(
+            parse_connect(resp),
+            Err(Error::FieldTooLarge {
+                field: Field::Extranonce1,
+                max: EXTRANONCE1_HEX_LEN_MAX,
+                actual: 24,
             })
         );
     }
