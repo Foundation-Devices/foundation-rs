@@ -193,7 +193,10 @@ impl<'b, C> Decode<'b, C> for MasterKey {
                     let mut data = [0; 32];
 
                     let bytes: [u8; 33] = DecodeBytes::decode_bytes(d, ctx)?;
-                    data.copy_from_slice(&bytes[..32]);
+                    if bytes[0] != 0 {
+                        return Err(Error::message("master private key-data prefix is not zero"));
+                    }
+                    data.copy_from_slice(&bytes[1..]);
                     key_data = Some(data)
                 }
                 4 => chain_code = Some(DecodeBytes::decode_bytes(d, ctx)?),
