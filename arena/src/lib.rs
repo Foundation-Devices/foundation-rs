@@ -26,20 +26,29 @@
 
 #![no_std]
 
-use core::{cell::RefCell, mem::MaybeUninit};
+use core::{
+    cell::{Cell, UnsafeCell},
+    mem::MaybeUninit,
+};
 
 pub mod boxed;
 
 /// An arena of objects of type `T`.
 pub struct Arena<T, const N: usize> {
-    storage: RefCell<Chunk<T, N>>,
+    /// Each slot is written at most once. `UnsafeCell` permits initializing a
+    /// new slot through `&self` without creating a mutable reference to the
+    /// complete backing array, which would invalidate references to earlier
+    /// slots.
+    storage: UnsafeCell<[MaybeUninit<T>; N]>,
+    len: Cell<usize>,
 }
 
 impl<T, const N: usize> Arena<T, N> {
     /// Construct a new arena.
     pub const fn new() -> Self {
         Self {
-            storage: RefCell::new(Chunk::new()),
+            storage: UnsafeCell::new([const { MaybeUninit::uninit() }; N]),
+            len: Cell::new(0),
         }
     }
 
@@ -48,48 +57,110 @@ impl<T, const N: usize> Arena<T, N> {
     ///
     /// If there's not enough space left in the arena, then the item is
     /// returned as-is.
-    #[allow(clippy::mut_from_ref)] // Sound: interior mutability via RefCell
+    ///
+    /// Values allocated directly are not dropped when the arena is dropped.
+    /// Use [`boxed::Box`] when the value needs drop glue.
+    ///
+    /// # Safety invariants
+    ///
+    /// - `len` increases monotonically, so no two successful allocations use
+    ///   the same slot.
+    /// - A mutable reference is created only for the newly initialized slot.
+    ///   Later allocations access other slots only through raw pointers and
+    ///   never create a mutable reference to the complete backing array.
+    /// - The returned reference is tied to the arena, so safe code cannot
+    ///   outlive the arena or reset a slot while that reference exists.
     pub fn alloc(&self, item: T) -> Result<&mut T, T> {
-        let mut storage = self.storage.borrow_mut();
-        let len = storage.len();
-        storage.push(item)?;
-        Ok(unsafe { &mut *storage.as_mut_ptr().add(len) })
+        let slot = self.len.get();
+        if slot == N {
+            return Err(item);
+        }
+
+        let ptr = self.slot_ptr(slot);
+        // SAFETY: `slot < N`, the slot is uninitialized, and the monotonic
+        // allocation index ensures no other reference can point at it.
+        unsafe { ptr.write(item) };
+
+        self.len.set(slot + 1);
+
+        // SAFETY: the slot was initialized above and is uniquely owned by
+        // this allocation for the lifetime of the arena.
+        Ok(unsafe { &mut *ptr })
     }
-}
 
-struct Chunk<T, const N: usize> {
-    buffer: [MaybeUninit<T>; N],
-    len: usize,
-}
-
-impl<T, const N: usize> Chunk<T, N> {
-    const ELEM: MaybeUninit<T> = MaybeUninit::uninit();
-    const INIT: [MaybeUninit<T>; N] = [Self::ELEM; N];
-
-    pub const fn new() -> Self {
-        Self {
-            buffer: Self::INIT,
-            len: 0,
+    fn slot_ptr(&self, slot: usize) -> *mut T {
+        // SAFETY: callers ensure `slot < N`. Casting the raw pointer avoids
+        // creating a reference to the whole array.
+        unsafe {
+            self.storage
+                .get()
+                .cast::<MaybeUninit<T>>()
+                .add(slot)
+                .cast::<T>()
         }
     }
+}
 
-    pub const fn len(&self) -> usize {
-        self.len
+#[cfg(test)]
+mod tests {
+    use core::cell::Cell;
+
+    use super::{boxed::Box, Arena};
+
+    #[test]
+    fn allocates_distinct_slots_up_to_capacity() {
+        let arena: Arena<u32, 2> = Arena::new();
+
+        let first = arena.alloc(11).unwrap();
+        let second = arena.alloc(22).unwrap();
+
+        assert_eq!((*first, *second), (11, 22));
+        assert_eq!(arena.alloc(33), Err(33));
     }
 
-    pub fn push(&mut self, item: T) -> Result<(), T> {
-        if self.len < N {
-            unsafe {
-                *self.buffer.get_unchecked_mut(self.len) = MaybeUninit::new(item);
-                self.len += 1;
+    #[test]
+    fn earlier_allocation_remains_usable_after_later_allocation() {
+        let arena: Arena<u32, 2> = Arena::new();
+
+        let first = arena.alloc(11).unwrap();
+        let second = arena.alloc(22).unwrap();
+
+        // This is the arena's intended contract: successful allocations own
+        // distinct, stable slots for as long as the arena is alive. Before
+        // the allocator redesign, Miri reports UB when `first` is used here.
+        *first += 1;
+        *second += 1;
+
+        assert_eq!((*first, *second), (12, 23));
+    }
+
+    #[test]
+    fn counts_zero_sized_allocations_toward_capacity() {
+        let arena: Arena<(), 2> = Arena::new();
+
+        let first = arena.alloc(()).unwrap();
+        let second = arena.alloc(()).unwrap();
+
+        assert_eq!((*first, *second), ((), ()));
+        assert_eq!(arena.alloc(()), Err(()));
+    }
+
+    #[test]
+    fn boxed_value_is_dropped_once() {
+        #[derive(Debug)]
+        struct DropCounter<'a>(&'a Cell<u8>);
+
+        impl Drop for DropCounter<'_> {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
             }
-            Ok(())
-        } else {
-            Err(item)
         }
-    }
 
-    pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.buffer.as_mut_ptr() as *mut T
+        let drops = Cell::new(0);
+        let arena: Arena<DropCounter, 1> = Arena::new();
+        let value = Box::new_in(DropCounter(&drops), &arena).unwrap();
+
+        drop(value);
+        assert_eq!(drops.get(), 1);
     }
 }
