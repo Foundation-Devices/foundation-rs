@@ -35,10 +35,6 @@ pub mod boxed;
 
 /// An arena of objects of type `T`.
 pub struct Arena<T, const N: usize> {
-    /// Each slot is written at most once. `UnsafeCell` permits initializing a
-    /// new slot through `&self` without creating a mutable reference to the
-    /// complete backing array, which would invalidate references to earlier
-    /// slots.
     storage: UnsafeCell<[MaybeUninit<T>; N]>,
     len: Cell<usize>,
 }
@@ -125,9 +121,6 @@ mod tests {
         let first = arena.alloc(11).unwrap();
         let second = arena.alloc(22).unwrap();
 
-        // This is the arena's intended contract: successful allocations own
-        // distinct, stable slots for as long as the arena is alive. Before
-        // the allocator redesign, Miri reports UB when `first` is used here.
         *first += 1;
         *second += 1;
 

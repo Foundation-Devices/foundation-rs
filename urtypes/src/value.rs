@@ -241,9 +241,6 @@ mod tests {
 
     #[test]
     fn test_decode_output_descriptor_retains_nested_arena_nodes() {
-        // sh(sh(wsh(raw(0x42)))) allocates three nested `Terminal`s into the
-        // decode arena. The returned descriptor must retain and safely
-        // traverse every node after later allocations.
         const CBOR: &[u8] = &[
             0xd9, 0x01, 0x90, // script-hash
             0xd9, 0x01, 0x90, // script-hash
@@ -255,8 +252,6 @@ mod tests {
         let arena: TerminalContext<3> = TerminalContext::new();
         let decoded = decode_output_descriptor("crypto-output", CBOR, &arena).unwrap();
 
-        // Before the arena redesign, Miri reports UB while following this
-        // earliest arena-backed box after later decode allocations.
         let Terminal::ScriptHash(first) = decoded else {
             panic!("expected outer script-hash");
         };
