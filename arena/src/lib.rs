@@ -66,6 +66,7 @@ impl<T, const N: usize> Arena<T, N> {
     ///   never create a mutable reference to the complete backing array.
     /// - The returned reference is tied to the arena, so safe code cannot
     ///   outlive the arena or reset a slot while that reference exists.
+    #[allow(clippy::mut_from_ref)] // SAFETY: see the invariants below.
     pub fn alloc(&self, item: T) -> Result<&mut T, T> {
         let slot = self.len.get();
         if slot == N {
