@@ -42,8 +42,12 @@ pub struct Arena<T, const N: usize> {
 impl<T, const N: usize> Arena<T, N> {
     /// Construct a new arena.
     pub const fn new() -> Self {
+        // SAFETY: an array of `MaybeUninit<T>` may contain uninitialized
+        // elements regardless of `T`.
+        let storage = unsafe { MaybeUninit::<[MaybeUninit<T>; N]>::uninit().assume_init() };
+
         Self {
-            storage: UnsafeCell::new([const { MaybeUninit::uninit() }; N]),
+            storage: UnsafeCell::new(storage),
             len: Cell::new(0),
         }
     }
@@ -69,7 +73,7 @@ impl<T, const N: usize> Arena<T, N> {
     #[allow(clippy::mut_from_ref)] // SAFETY: see the invariants below.
     pub fn alloc(&self, item: T) -> Result<&mut T, T> {
         let slot = self.len.get();
-        if slot == N {
+        if slot >= N {
             return Err(item);
         }
 
@@ -86,6 +90,15 @@ impl<T, const N: usize> Arena<T, N> {
     }
 
     fn slot_ptr(&self, slot: usize) -> *mut T {
+        // This should compile out if invariants hold up, and if not,
+        // crashing is preferable to undefined behavior.
+        assert!(
+            slot < N,
+            "Arena allocation slot out of bounds: slot = {}, N = {}",
+            slot,
+            N
+        );
+
         // SAFETY: callers ensure `slot < N`. Casting the raw pointer avoids
         // creating a reference to the whole array.
         unsafe {
