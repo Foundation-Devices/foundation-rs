@@ -21,7 +21,12 @@ faster-hex = { version = "0.10", default-features = false, git = "https://github
 log = { workspace = true, optional = true }
 rustversion = { workspace = true }
 serde = { workspace = true }
-serde-json-core = { workspace = true, features = ["custom-error-messages"] }
+# `custom-error-messages` is deliberately NOT enabled. It formats serde's error
+# text into a `heapless::String<64>` with `write!(..).unwrap()`, and serde's
+# Display impls ignore the `{:.64}` precision, so any error message over 64
+# bytes panics. Peer input reaches that path trivially: a response carrying the
+# standard `"jsonrpc"` field is enough. See SFT-7490.
+serde-json-core = { workspace = true }
 
 [target.'cfg(not(features = "alloc"))'.dependencies]
 heapless = { workspace = true, features = ["serde"] }

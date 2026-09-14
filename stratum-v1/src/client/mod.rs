@@ -48,6 +48,9 @@ pub struct Client<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const T
     req_id: u64,
     connected: bool,
     authorized: bool,
+    /// Set after an over-long frame was dropped: bytes are discarded up to the
+    /// next terminator so parsing resumes on a frame boundary.
+    rx_resync: bool,
     #[cfg(feature = "alloc")]
     user: String,
     #[cfg(not(feature = "alloc"))]
@@ -87,6 +90,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
             req_id: 0,
             connected: false,
             authorized: false,
+            rx_resync: false,
             user: String::new(),
         }
     }
@@ -109,9 +113,63 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.job_creator.roll()
     }
 
+    /// # Poll for a Message from the Pool
+    ///
+    /// Parses at most one message out of the receive buffer, then tops the
+    /// buffer up from the network.
+    ///
+    /// ## Failure behaviour
+    ///
+    /// Malformed peer input is reported as an [`Error`], never as a panic, in
+    /// both the `heapless` and the `alloc` builds. The frame that caused the
+    /// error is consumed before the error is returned, so the next call
+    /// resumes on the following frame rather than failing on the same bytes
+    /// forever.
+    ///
+    /// A frame longer than `RX_BUF_SIZE` can never be terminated, so it is
+    /// dropped with [`Error::LineTooLong`] and the client resynchronizes on the
+    /// next terminator instead of stalling on a zero-length read.
+    ///
+    /// Client state is only updated once a frame has been fully validated, so
+    /// a rejected frame leaves the session as it was.
     pub async fn poll_message(&mut self) -> Result<Option<Message>> {
+        if self.rx_resync {
+            match self.rx_buf[..self.rx_free_pos]
+                .iter()
+                .position(|&c| c == b'\n')
+            {
+                Some(pos) => {
+                    self.rx_buf.copy_within(pos + 1..self.rx_free_pos, 0);
+                    self.rx_free_pos -= pos + 1;
+                    self.rx_resync = false;
+                }
+                // Still inside the over-long frame.
+                None => self.rx_free_pos = 0,
+            }
+        }
+
         let mut msg = None;
         let mut start = 0;
+        // Errors are recorded rather than returned on the spot: the loop has
+        // already consumed the offending frame, and the buffer still needs to
+        // be compacted before we hand the error to the caller.
+        let mut result = Ok(());
+
+        macro_rules! fail {
+            ($e:expr) => {{
+                result = Err($e);
+                break;
+            }};
+        }
+        macro_rules! consume {
+            ($e:expr) => {
+                match $e {
+                    Ok(v) => v,
+                    Err(e) => fail!(e),
+                }
+            };
+        }
+
         while let Some(mut stop) = self.rx_buf[start..self.rx_free_pos]
             .iter()
             .position(|&c| c == b'\n')
@@ -120,12 +178,16 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
             trace!("Buffer start: {:?}", &self.rx_buf[..start]);
             trace!("Current : {:?}", &self.rx_buf[start..stop]);
             trace!("Buffer end: {:?}", &self.rx_buf[stop..]);
-            let line = &self.rx_buf[start..stop];
             trace!("Start: {}, Stop: {}", start, stop);
             debug!(
                 "Received Message [{}..{}], free pos: {}",
                 start, stop, self.rx_free_pos
             );
+            let line = &self.rx_buf[start..stop];
+            // Consume the frame before acting on it. Leaving it buffered while
+            // returning its error would make every later poll re-parse the same
+            // bytes and fail the same way.
+            start = stop + 1;
             debug!(
                 "<< {}",
                 if let Ok(l) = core::str::from_utf8(line) {
@@ -135,31 +197,28 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 }
             );
             debug!("unresponded reqs: {:?}", self.reqs);
-            if let Some(id) = response::parse_id(line)? {
+            if let Some(id) = consume!(response::parse_id(line)) {
                 // it's a Response
                 match self.reqs.get(&id) {
                     Some(ReqKind::Configure) => {
-                        self.configuration = Some(response::parse_configure(line)?);
+                        self.configuration = Some(consume!(response::parse_configure(line)));
                         self.reqs.remove(&id);
                         info!("Stratum v1 Client Configured");
                         msg = Some(Message::Configured);
                     }
                     Some(ReqKind::Connect) => {
-                        let conn = response::parse_connect(line)?;
+                        let conn = consume!(response::parse_connect(line));
+                        consume!(self
+                            .job_creator
+                            .set_extranonces(conn.extranonce1, conn.extranonce2_size));
                         self.subscriptions = conn.subscriptions;
-                        #[cfg(feature = "alloc")]
-                        self.job_creator
-                            .set_extranonces(conn.extranonce1, conn.extranonce2_size);
-                        #[cfg(not(feature = "alloc"))]
-                        self.job_creator
-                            .set_extranonces(conn.extranonce1, conn.extranonce2_size)?;
                         self.connected = true;
                         self.reqs.remove(&id);
                         info!("Stratum v1 Client Connected");
                         msg = Some(Message::Connected);
                     }
                     Some(ReqKind::Authorize) => {
-                        if response::parse_authorize(line)? {
+                        if consume!(response::parse_authorize(line)) {
                             self.authorized = true;
                             self.reqs.remove(&id);
                             info!("Stratum v1 Client Authorized");
@@ -194,7 +253,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                                     id, self.shares_accepted, self.shares_rejected, c
                                 );
                             }
-                            Err(e) => return Err(e),
+                            Err(e) => fail!(e),
                         }
                         self.reqs.remove(&id);
                         msg = Some(Message::Share {
@@ -202,37 +261,33 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                             rejected: self.shares_rejected,
                         });
                     }
-                    None => return Err(Error::IdNotFound(id)),
+                    None => fail!(Error::IdNotFound(id)),
                 }
             } else {
                 // it's a Notification
                 match notification::parse_method(line) {
                     Ok(Notification::SetVersionMask) => {
-                        let mask = notification::parse_set_version_mask(line)?;
+                        let mask = consume!(notification::parse_set_version_mask(line));
                         self.job_creator.set_version_mask(mask);
                         msg = Some(Message::VersionMask(mask));
                         info!("Set Version Mask: 0x{:x}", mask);
                     }
                     Ok(Notification::SetDifficulty) => {
-                        let diff = notification::parse_set_difficulty(line)?;
+                        let diff = consume!(notification::parse_set_difficulty(line));
                         msg = Some(Message::Difficulty(diff));
                         info!("Set Difficulty: {}", diff);
                     }
                     Ok(Notification::Notify) => {
-                        let work = notification::parse_notify(line)?;
+                        let work = consume!(notification::parse_notify(line));
                         if work.clean_jobs {
                             msg = Some(Message::CleanJobs);
                         }
                         info!("New Work: {:?}", work);
-                        #[cfg(feature = "alloc")]
-                        self.job_creator.set_work(work);
-                        #[cfg(not(feature = "alloc"))]
-                        self.job_creator.set_work(work)?;
+                        consume!(self.job_creator.set_work(work));
                     }
                     Err(e) => error!("Failed to parse notification: {:?}", e),
                 }
             }
-            start = stop + 1;
             if msg.is_some() {
                 break;
             }
@@ -245,6 +300,21 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         } else if start == self.rx_free_pos {
             self.rx_free_pos = 0;
         }
+
+        // Only now, with the offending frame gone from the buffer, is it safe
+        // to surface the failure.
+        result?;
+
+        if self.rx_free_pos == RX_BUF_SIZE {
+            // The buffer is full and holds no terminator, so no terminator can
+            // ever arrive for this frame. Reading again would only ask the
+            // transport to fill a zero-length slice, forever.
+            warn!("Dropping over-long frame of {} bytes", self.rx_free_pos);
+            self.rx_free_pos = 0;
+            self.rx_resync = true;
+            return Err(Error::LineTooLong);
+        }
+
         if self.network_conn.read_ready().map_err(|_| Error::Network)? {
             let n = self
                 .network_conn
@@ -277,6 +347,11 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
     }
 
     async fn send(&mut self, len: usize) -> Result<()> {
+        // The serializer may fill the buffer completely; the terminator needs
+        // one byte beyond that.
+        if len >= TX_BUF_SIZE {
+            return Err(Error::JsonBufferFull);
+        }
         self.tx_buf[len] = 0x0a;
         debug!(
             ">> {}",
