@@ -240,6 +240,31 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_output_descriptor_retains_nested_arena_nodes() {
+        const CBOR: &[u8] = &[
+            0xd9, 0x01, 0x90, // script-hash
+            0xd9, 0x01, 0x90, // script-hash
+            0xd9, 0x01, 0x91, // witness-script-hash
+            0xd9, 0x01, 0x98, // raw-script
+            0x41, 0x42, // byte string: 0x42
+        ];
+
+        let arena: TerminalContext<3> = TerminalContext::new();
+        let decoded = decode_output_descriptor("crypto-output", CBOR, &arena).unwrap();
+
+        let Terminal::ScriptHash(first) = decoded else {
+            panic!("expected outer script-hash");
+        };
+        let Terminal::ScriptHash(second) = &*first else {
+            panic!("expected nested script-hash");
+        };
+        let Terminal::WitnessScriptHash(third) = &**second else {
+            panic!("expected witness-script-hash");
+        };
+        assert!(matches!(&**third, Terminal::RawScript(&[0x42])));
+    }
+
+    #[test]
     fn test_decode_output_descriptor_rejects_output_descriptor_alias() {
         // BCR-2023-010 `output-descriptor` uses a different CBOR shape (tag
         // 40308 map), so this helper — which only understands the legacy
