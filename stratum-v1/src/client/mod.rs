@@ -3,6 +3,7 @@
 
 mod job;
 mod notification;
+mod redact;
 mod request;
 mod response;
 
@@ -10,6 +11,7 @@ use crate::{Error, Result};
 pub use job::Job;
 use job::JobCreator;
 use notification::Notification;
+use redact::Sensitivity;
 use request::ReqKind;
 pub use request::{Extensions, Info, Share, VersionRolling};
 use response::Subscription;
@@ -117,25 +119,29 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
             .position(|&c| c == b'\n')
         {
             stop += start;
-            trace!("Buffer start: {:?}", &self.rx_buf[..start]);
-            trace!("Current : {:?}", &self.rx_buf[start..stop]);
-            trace!("Buffer end: {:?}", &self.rx_buf[stop..]);
             let line = &self.rx_buf[start..stop];
             trace!("Start: {}, Stop: {}", start, stop);
             debug!(
                 "Received Message [{}..{}], free pos: {}",
                 start, stop, self.rx_free_pos
             );
-            debug!(
-                "<< {}",
-                if let Ok(l) = core::str::from_utf8(line) {
-                    l
-                } else {
-                    "Invalid UTF-8"
-                }
-            );
+            // Classify before logging. Pools echo the submitted user back in
+            // the error detail of an authorization or share response, so a
+            // reply matched to one of those requests is as revealing as the
+            // request itself. Anything we cannot match stays loggable: it
+            // carries no credential of ours, and suppressing it would leave
+            // malformed frames undiagnosable.
+            let parsed_id = response::parse_id(line);
+            let inbound = match &parsed_id {
+                Ok(Some(id)) => match self.reqs.get(id) {
+                    Some(ReqKind::Authorize) | Some(ReqKind::Submit) => Sensitivity::Secret,
+                    _ => Sensitivity::Public,
+                },
+                _ => Sensitivity::Public,
+            };
+            debug!("<< {}", inbound.loggable(line));
             debug!("unresponded reqs: {:?}", self.reqs);
-            if let Some(id) = response::parse_id(line)? {
+            if let Some(id) = parsed_id? {
                 // it's a Response
                 match self.reqs.get(&id) {
                     Some(ReqKind::Configure) => {
@@ -251,12 +257,11 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 .read(self.rx_buf[self.rx_free_pos..].as_mut())
                 .await
                 .map_err(|_| Error::Network)?;
+            // Only the size. A freshly read chunk spans an arbitrary number of
+            // frames, so there is no way to tell here whether one of them is a
+            // reply that echoes our credentials back; each frame is logged
+            // individually, and classified, once it has been framed above.
             debug!("read {} bytes @{}", n, self.rx_free_pos);
-            trace!(
-                "<< chunk: {:?}",
-                core::str::from_utf8(&self.rx_buf[self.rx_free_pos..self.rx_free_pos + n])
-            );
-            // trace!("{:?}", &self.rx_buf[self.rx_free_pos..self.rx_free_pos + n]);
             self.rx_free_pos += n;
         }
         Ok(msg)
@@ -276,17 +281,16 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         Ok(())
     }
 
-    async fn send(&mut self, len: usize) -> Result<()> {
+    /// Terminate and write the serialized request sitting in the transmit
+    /// buffer.
+    ///
+    /// `sensitivity` decides what reaches the log. It is a required argument
+    /// rather than something inferred here so that a new secret-bearing
+    /// request cannot be added without the author choosing a classification;
+    /// see [`Sensitivity`].
+    async fn send(&mut self, len: usize, sensitivity: Sensitivity) -> Result<()> {
         self.tx_buf[len] = 0x0a;
-        debug!(
-            ">> {}",
-            if let Ok(l) = core::str::from_utf8(&self.tx_buf[..len + 1]) {
-                l
-            } else {
-                "Invalid UTF-8"
-            }
-        );
-        // trace!("{:?}", &self.tx_buf[..len + 1]);
+        debug!(">> {}", sensitivity.loggable(&self.tx_buf[..len + 1]));
         self.network_conn
             .write_all(&self.tx_buf[..len + 1])
             .await
@@ -309,7 +313,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.prepare_req(ReqKind::Configure)?;
         let n = request::configure(self.req_id, exts, self.tx_buf.as_mut_slice())?;
         debug!("Send Configure: {} bytes, id = {}", n, self.req_id);
-        self.send(n).await
+        self.send(n, Sensitivity::Public).await
     }
 
     /// # Suggest Difficulty to Server
@@ -338,7 +342,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         let id = None;
         let n = request::suggest_difficulty(id, difficulty, self.tx_buf.as_mut_slice())?;
         debug!("Send Suggest Difficulty: {} bytes, id = {}", n, self.req_id);
-        self.send(n).await
+        self.send(n, Sensitivity::Public).await
     }
 
     /// # Connect Client
@@ -360,7 +364,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.prepare_req(ReqKind::Connect)?;
         let n = request::connect(self.req_id, identifier, self.tx_buf.as_mut_slice())?;
         debug!("Send Connect: {} bytes, id = {}", n, self.req_id);
-        self.send(n).await
+        self.send(n, Sensitivity::Public).await
     }
 
     /// # Authorize Client
@@ -386,7 +390,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.user = user.clone();
         let n = request::authorize(self.req_id, user, pass, self.tx_buf.as_mut_slice())?;
         debug!("Send Authorize: {} bytes, id = {}", n, self.req_id);
-        self.send(n).await
+        self.send(n, Sensitivity::Secret).await
     }
 
     /// # Submit a Share
@@ -418,6 +422,6 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
             self.tx_buf.as_mut_slice(),
         )?;
         debug!("Send Submit: {} bytes, id = {}", n, self.req_id);
-        self.send(n).await
+        self.send(n, Sensitivity::Secret).await
     }
 }
