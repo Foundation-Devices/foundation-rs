@@ -38,6 +38,13 @@ fn main() -> Result<()> {
     let file_buf = fs::read(file_name).context("failed to read firmware")?;
 
     let header_len = usize::try_from(HEADER_LEN).unwrap();
+    if file_buf.len() < header_len {
+        bail!(
+            "firmware file is too small: {} bytes, the header alone is {header_len}",
+            file_buf.len()
+        );
+    }
+
     let header = match header(&file_buf[..header_len]).finish() {
         Ok((_, hdr)) => hdr,
         Err(_) => bail!("failed to parse firmware header"),
