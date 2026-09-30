@@ -55,16 +55,23 @@ impl<
             queue: heapless::Deque::new(),
             fragment_chooser: chooser::HeaplessFragmentChooser::new(),
             message_description: None,
+            // The fixed capacities already bound every allocation here.
+            max_message_len: usize::MAX,
         }
     }
 }
+
+/// The default limit for the reassembled-message buffer, in bytes.
+///
+/// Far above any practical animated-QR payload, yet small enough that a
+/// single hostile fragment cannot demand a gigabyte buffer up front.
+pub const DEFAULT_MAX_MESSAGE_LEN: usize = 16 * 1024 * 1024;
 
 /// A decoder capable of receiving and recombining fountain-encoded transmissions.
 ///
 /// # Examples
 ///
 /// See the [`crate::fountain`] module documentation for an example.
-#[derive(Default)]
 pub struct BaseDecoder<T: Types> {
     message: T::Message,
     mixed_parts: T::MixedParts,
@@ -72,6 +79,21 @@ pub struct BaseDecoder<T: Types> {
     queue: T::Queue,
     fragment_chooser: BaseFragmentChooser<T::Chooser>,
     message_description: Option<MessageDescription>,
+    max_message_len: usize,
+}
+
+impl<T: Types> Default for BaseDecoder<T> {
+    fn default() -> Self {
+        Self {
+            message: Default::default(),
+            mixed_parts: Default::default(),
+            received: Default::default(),
+            queue: Default::default(),
+            fragment_chooser: Default::default(),
+            message_description: None,
+            max_message_len: DEFAULT_MAX_MESSAGE_LEN,
+        }
+    }
 }
 
 impl<T: Types> BaseDecoder<T> {
@@ -97,7 +119,18 @@ impl<T: Types> BaseDecoder<T> {
         }
 
         if self.is_empty() {
-            let message_len = part.data.len() * usize::try_from(part.sequence_count).unwrap();
+            // One valid byte of data can still declare u32::MAX fragments, so
+            // bound the buffer by policy before allocating, not after.
+            let message_len = part
+                .data
+                .len()
+                .saturating_mul(usize::try_from(part.sequence_count).unwrap());
+            if message_len > self.max_message_len {
+                return Err(Error::MessageTooLong {
+                    needed: message_len,
+                    limit: self.max_message_len,
+                });
+            }
             if self.message.try_resize(message_len, 0).is_err() {
                 return Err(Error::NotEnoughSpace {
                     needed: message_len,
@@ -138,6 +171,20 @@ impl<T: Types> BaseDecoder<T> {
             }
         }
         Ok(!self.is_complete())
+    }
+
+    /// Returns the reassembled-message buffer limit, in bytes.
+    #[must_use]
+    pub fn max_message_len(&self) -> usize {
+        self.max_message_len
+    }
+
+    /// Bounds the reassembled-message buffer to `len` bytes.
+    ///
+    /// Parts describing a longer message are rejected before allocation with
+    /// [`Error::MessageTooLong`].
+    pub fn set_max_message_len(&mut self, len: usize) {
+        self.max_message_len = len;
     }
 
     /// Checks whether a [`Part`] is receivable by the decoder.
@@ -420,6 +467,13 @@ pub enum Error {
     },
     /// Too many fragments.
     TooManyFragments,
+    /// The part describes a message longer than the decoder's limit.
+    MessageTooLong {
+        /// Buffer length the part demands.
+        needed: usize,
+        /// The configured limit.
+        limit: usize,
+    },
 }
 
 impl fmt::Display for Error {
@@ -466,6 +520,9 @@ impl fmt::Display for Error {
                 write!(f, "Not enough space: needed {needed}, capacity {capacity}")?
             }
             Error::TooManyFragments => write!(f, "Too many fragments for the current message")?,
+            Error::MessageTooLong { needed, limit } => {
+                write!(f, "Message too long: needed {needed}, limit {limit}")?
+            }
         };
         Ok(())
     }
@@ -625,5 +682,73 @@ pub mod tests {
 
         test(&mut heapless_decoder);
         test(&mut decoder);
+    }
+
+    #[test]
+    fn test_hostile_sequence_count_is_rejected_before_allocation() {
+        let mut decoder = Decoder::default();
+        assert_eq!(decoder.max_message_len(), DEFAULT_MAX_MESSAGE_LEN);
+
+        let data = [0u8; 100];
+        let part = Part {
+            sequence: 1,
+            sequence_count: u32::MAX,
+            message_length: 100 * (u32::MAX as usize),
+            checksum: 0,
+            data: &data,
+        };
+        assert!(matches!(
+            decoder.receive(&part),
+            Err(Error::MessageTooLong { .. })
+        ));
+        assert!(decoder.is_empty());
+
+        // The decoder is still usable for an honest message afterwards.
+        let message = message();
+        let mut encoder = Encoder::new();
+        encoder.start(&message, MAX_FRAGMENT_LEN);
+        while !decoder.is_complete() {
+            decoder.receive(&encoder.next_part()).unwrap();
+        }
+        assert_eq!(decoder.message().unwrap(), Some(message.as_slice()));
+    }
+
+    #[test]
+    fn test_the_configured_message_limit_applies() {
+        let message = message();
+        let mut encoder = Encoder::new();
+        encoder.start(&message, MAX_FRAGMENT_LEN);
+
+        let mut decoder = Decoder::default();
+        decoder.set_max_message_len(MESSAGE_SIZE / 2);
+        assert!(matches!(
+            decoder.receive(&encoder.next_part()),
+            Err(Error::MessageTooLong { .. })
+        ));
+
+        decoder.set_max_message_len(DEFAULT_MAX_MESSAGE_LEN);
+        while !decoder.is_complete() {
+            decoder.receive(&encoder.next_part()).unwrap();
+        }
+        assert_eq!(decoder.message().unwrap(), Some(message.as_slice()));
+    }
+
+    #[test]
+    fn test_a_message_length_beyond_its_fragments_is_rejected() {
+        // One fragment of ten bytes cannot carry a hundred-byte message, so
+        // the reassembled buffer could never hold the declared length.
+        let data = [0u8; 10];
+        let part = Part {
+            sequence: 1,
+            sequence_count: 1,
+            message_length: 100,
+            checksum: 0,
+            data: &data,
+        };
+        assert!(!part.is_valid());
+        assert!(matches!(
+            Decoder::default().receive(&part),
+            Err(Error::InvalidPart)
+        ));
     }
 }

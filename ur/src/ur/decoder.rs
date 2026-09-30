@@ -147,6 +147,19 @@ impl<T: Types> BaseDecoder<T> {
         Ok(())
     }
 
+    /// Returns the reassembled-message buffer limit, in bytes.
+    #[must_use]
+    pub fn max_message_len(&self) -> usize {
+        self.fountain.max_message_len()
+    }
+
+    /// Bounds the reassembled-message buffer to `len` bytes.
+    ///
+    /// Parts describing a longer message are rejected before allocation.
+    pub fn set_max_message_len(&mut self, len: usize) {
+        self.fountain.set_max_message_len(len);
+    }
+
     /// Returns whether the decoder is complete and hence the message available.
     ///
     /// # Examples
