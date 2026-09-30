@@ -61,12 +61,19 @@ impl<'a> Part<'a> {
     /// - `sequence`, `sequence_count` are positive values.
     /// - `message_length` is a positive value and is .
     /// - `data` contains data and is smaller or equal to `message_length`.
+    /// - `message_length` fits in `sequence_count` fragments of this size, so
+    ///   a reassembled buffer can actually hold the declared message.
     pub fn is_valid(&self) -> bool {
         self.sequence > 0
             && self.sequence_count > 0
             && self.message_length > 0
             && !self.data.is_empty()
             && self.data.len() <= self.message_length
+            && self.message_length
+                <= self
+                    .data
+                    .len()
+                    .saturating_mul(usize::try_from(self.sequence_count).unwrap_or(usize::MAX))
     }
 
     /// Calculate the indexes contained on this [`Part`].

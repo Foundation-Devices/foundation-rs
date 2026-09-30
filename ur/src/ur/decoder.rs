@@ -126,8 +126,38 @@ impl<T: Types> BaseDecoder<T> {
         };
 
         let part = part.as_ref().unwrap_or_else(|| ur.as_part().unwrap());
+
+        // A multipart UR carries its sequence number and count twice: in the URI
+        // path and again inside the CBOR part. Callers gate on the path values,
+        // and everything below sizes and stores from the inner ones, so the two
+        // have to agree before the fountain sees anything.
+        let outer = match (ur.sequence(), ur.sequence_count()) {
+            (Some(sequence), Some(sequence_count)) => (sequence, sequence_count),
+            // is_multi_part() was checked above, so this cannot happen. Refusing
+            // rather than assuming it.
+            _ => return Err(Error::NotMultiPart),
+        };
+        let inner = (part.sequence, part.sequence_count);
+
+        if outer != inner {
+            return Err(Error::InconsistentSequence { outer, inner });
+        }
+
         self.fountain.receive(part)?;
         Ok(())
+    }
+
+    /// Returns the reassembled-message buffer limit, in bytes.
+    #[must_use]
+    pub fn max_message_len(&self) -> usize {
+        self.fountain.max_message_len()
+    }
+
+    /// Bounds the reassembled-message buffer to `len` bytes.
+    ///
+    /// Parts describing a longer message are rejected before allocation.
+    pub fn set_max_message_len(&mut self, len: usize) {
+        self.fountain.set_max_message_len(len);
     }
 
     /// Returns whether the decoder is complete and hence the message available.
@@ -288,6 +318,14 @@ pub enum Error {
     },
     /// The UR type of this fragment is not consistent.
     InconsistentType,
+    /// The sequence number and count in the UR path do not match the ones in the
+    /// part it carries.
+    InconsistentSequence {
+        /// Sequence number and count taken from the UR path.
+        outer: (u32, u32),
+        /// Sequence number and count taken from the fountain part.
+        inner: (u32, u32),
+    },
 }
 
 #[cfg(feature = "std")]
@@ -311,6 +349,11 @@ impl fmt::Display for Error {
                 f,
                 "The received fragment is not consistent with the type of the previous fragments"
             ),
+            Error::InconsistentSequence { outer, inner } => write!(
+                f,
+                "The UR path describes part {}-{} but it carries part {}-{}",
+                outer.0, outer.1, inner.0, inner.1
+            ),
         }
     }
 }
@@ -330,5 +373,108 @@ impl From<bytewords::DecodeError> for Error {
 impl From<fountain::decoder::Error> for Error {
     fn from(e: fountain::decoder::Error) -> Self {
         Self::Fountain(e)
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "alloc")]
+mod tests {
+    use super::*;
+    use crate::ur::{tests::make_message_ur, Encoder};
+    use alloc::{format, string::String, string::ToString};
+
+    /// Rewrite the `<sequence>-<count>` path segment, leaving the fragment alone.
+    fn with_path(ur: &str, sequence: u32, sequence_count: u32) -> String {
+        let mut parts = ur.splitn(3, '/');
+        let head = parts.next().unwrap();
+        let _indices = parts.next().unwrap();
+        let fragment = parts.next().unwrap();
+
+        format!("{head}/{sequence}-{sequence_count}/{fragment}")
+    }
+
+    #[test]
+    fn test_path_hiding_a_larger_sequence_is_rejected() {
+        let message = make_message_ur(200, "Wolf");
+        let mut encoder = Encoder::new();
+        encoder.start("bytes", &message, 50);
+        assert!(encoder.sequence_count() > 1);
+
+        // Two different parts of a multipart message, both wearing a 1-1 path. A
+        // caller gating on the path sees two copies of one single part.
+        let first = with_path(&encoder.next_part().to_string(), 1, 1);
+        let second = with_path(&encoder.next_part().to_string(), 1, 1);
+
+        let mut decoder = Decoder::default();
+        for disguised in [first, second] {
+            assert!(matches!(
+                decoder.receive(UR::parse(&disguised).unwrap()),
+                Err(Error::InconsistentSequence { .. })
+            ));
+        }
+
+        assert!(!decoder.is_complete());
+        assert_eq!(decoder.message().unwrap(), None);
+    }
+
+    #[test]
+    fn test_inner_sequence_past_its_count_is_rejected() {
+        let message = make_message_ur(200, "Wolf");
+        let mut encoder = Encoder::new();
+        encoder.start("bytes", &message, 50);
+
+        // Parts past the sequence count are mixed parts, so this one's inner
+        // sequence is greater than its inner count.
+        let count = encoder.sequence_count();
+        let mut part = encoder.next_part();
+        for _ in 0..count {
+            part = encoder.next_part();
+        }
+        let part = part.to_string();
+        assert!(part.starts_with(&format!("ur:bytes/{}-{count}/", count + 1)));
+
+        let disguised = with_path(&part, 1, 1);
+
+        let mut decoder = Decoder::default();
+        assert!(matches!(
+            decoder.receive(UR::parse(&disguised).unwrap()),
+            Err(Error::InconsistentSequence { .. })
+        ));
+    }
+
+    #[test]
+    fn test_mismatched_count_alone_is_rejected() {
+        let message = make_message_ur(200, "Wolf");
+        let mut encoder = Encoder::new();
+        encoder.start("bytes", &message, 50);
+
+        let count = encoder.sequence_count();
+        let part = encoder.next_part().to_string();
+
+        // Right sequence number, wrong count.
+        let disguised = with_path(&part, 1, count + 1);
+
+        let mut decoder = Decoder::default();
+        assert!(matches!(
+            decoder.receive(UR::parse(&disguised).unwrap()),
+            Err(Error::InconsistentSequence { .. })
+        ));
+    }
+
+    #[test]
+    fn test_untouched_parts_still_decode() {
+        let message = make_message_ur(200, "Wolf");
+        let mut encoder = Encoder::new();
+        encoder.start("bytes", &message, 50);
+
+        // Through the string form, so this is the same UR::MultiPart path the
+        // checks above reject.
+        let mut decoder = Decoder::default();
+        while !decoder.is_complete() {
+            let part = encoder.next_part().to_string();
+            decoder.receive(UR::parse(&part).unwrap()).unwrap();
+        }
+
+        assert_eq!(decoder.message().unwrap(), Some(message.as_slice()));
     }
 }
