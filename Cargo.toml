@@ -53,7 +53,7 @@ serde-json-core = { version = "0.6.0" }
 uuid = { version = "1", default-features = false }
 
 # The crates in this workspace.
-foundation-arena = { version = "0.1.0", path = "arena" }
+foundation-arena = { version = "0.1.1", path = "arena" }
 foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-urtypes = { path = "urtypes" }
