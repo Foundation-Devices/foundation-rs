@@ -67,6 +67,15 @@ impl<
 /// single hostile fragment cannot demand a gigabyte buffer up front.
 pub const DEFAULT_MAX_MESSAGE_LEN: usize = 16 * 1024 * 1024;
 
+/// The default limit on a part's declared fragment count, for the allocating
+/// decoder.
+///
+/// Bounding the reassembled message does not bound the chooser: a mixed part
+/// makes it build index and sampler storage proportional to `sequence_count`,
+/// which is a separate budget from the message bytes. The heapless decoder takes
+/// this from its own `MAX_SEQUENCE_COUNT`.
+pub const DEFAULT_MAX_SEQUENCE_COUNT: usize = 16 * 1024;
+
 /// A decoder capable of receiving and recombining fountain-encoded transmissions.
 ///
 /// # Examples
@@ -116,6 +125,18 @@ impl<T: Types> BaseDecoder<T> {
 
         if !part.is_valid() {
             return Err(Error::InvalidPart);
+        }
+
+        // The message-byte bound below does not cover the chooser: a mixed part
+        // (sequence > sequence_count) makes it reserve sequence_count slots for
+        // its index and sampler storage, which for the heapless build panics
+        // rather than failing. Bound that here, before any state is touched.
+        let sequence_count = usize::try_from(part.sequence_count).unwrap_or(usize::MAX);
+        if sequence_count > T::SEQUENCE_COUNT_LIMIT {
+            return Err(Error::SequenceCountTooLarge {
+                count: part.sequence_count,
+                limit: T::SEQUENCE_COUNT_LIMIT,
+            });
         }
 
         if self.is_empty() {
@@ -183,6 +204,12 @@ impl<T: Types> BaseDecoder<T> {
     ///
     /// Parts describing a longer message are rejected before allocation with
     /// [`Error::MessageTooLong`].
+    ///
+    /// The limit is applied when a message *starts*, so lowering it part way
+    /// through a transmission does not abandon the message already in progress
+    /// — that one still completes at its original size, and the new limit takes
+    /// effect for the next message. Set it before the first part if a particular
+    /// transmission needs bounding.
     pub fn set_max_message_len(&mut self, len: usize) {
         self.max_message_len = len;
     }
@@ -380,6 +407,15 @@ pub trait Types: Default {
 
     /// Fragment chooser types.
     type Chooser: chooser::Types;
+
+    /// The largest `sequence_count` this decoder's chooser storage can service.
+    ///
+    /// For the heapless types this is the `MAX_SEQUENCE_COUNT` the storage was
+    /// sized with, so a part declaring more is refused instead of panicking
+    /// inside the chooser. Defaulted so that adding it does not break an outside
+    /// implementation of this trait; any implementation backed by fixed-capacity
+    /// storage should override it with that capacity.
+    const SEQUENCE_COUNT_LIMIT: usize = DEFAULT_MAX_SEQUENCE_COUNT;
 }
 
 /// [`alloc`] types for [`BaseDecoder`].
@@ -398,6 +434,8 @@ impl Types for Alloc {
         IndexedPart<alloc::vec::Vec<u8>, alloc::collections::BTreeSet<usize>>,
     >;
     type Chooser = chooser::Alloc;
+
+    const SEQUENCE_COUNT_LIMIT: usize = DEFAULT_MAX_SEQUENCE_COUNT;
 }
 
 /// [`heapless`] types for [`BaseDecoder`].
@@ -442,6 +480,8 @@ impl<
     >;
 
     type Chooser = chooser::Heapless<MAX_SEQUENCE_COUNT>;
+
+    const SEQUENCE_COUNT_LIMIT: usize = MAX_SEQUENCE_COUNT;
 }
 
 /// Errors that can happen during decoding.
@@ -472,6 +512,13 @@ pub enum Error {
         /// Buffer length the part demands.
         needed: usize,
         /// The configured limit.
+        limit: usize,
+    },
+    /// The part declares more fragments than the fragment chooser can service.
+    SequenceCountTooLarge {
+        /// Fragment count the part declares.
+        count: u32,
+        /// The largest count this decoder's storage supports.
         limit: usize,
     },
 }
@@ -520,6 +567,10 @@ impl fmt::Display for Error {
                 write!(f, "Not enough space: needed {needed}, capacity {capacity}")?
             }
             Error::TooManyFragments => write!(f, "Too many fragments for the current message")?,
+            Error::SequenceCountTooLarge { count, limit } => write!(
+                f,
+                "Part declares {count} fragments, this decoder supports at most {limit}"
+            )?,
             Error::MessageTooLong { needed, limit } => {
                 write!(f, "Message too long: needed {needed}, limit {limit}")?
             }
@@ -697,9 +748,16 @@ pub mod tests {
             checksum: 0,
             data: &data,
         };
+        // The fragment-count bound is the tighter of the two and catches this
+        // first: u32::MAX fragments exceed what the chooser can service, whatever
+        // the declared byte length works out to. The byte bound itself is covered
+        // by test_the_configured_message_limit_applies.
         assert!(matches!(
             decoder.receive(&part),
-            Err(Error::MessageTooLong { .. })
+            Err(Error::SequenceCountTooLarge {
+                count: u32::MAX,
+                limit: DEFAULT_MAX_SEQUENCE_COUNT
+            })
         ));
         assert!(decoder.is_empty());
 

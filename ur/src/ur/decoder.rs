@@ -98,13 +98,13 @@ impl<T: Types> BaseDecoder<T> {
             return Err(Error::NotMultiPart);
         }
 
-        if self.ur_type.is_empty() {
-            self.ur_type
-                .try_extend_from_slice(ur.as_type().as_bytes())
-                .map_err(|_| Error::URTypeTooBig {
-                    size: ur.as_type().as_bytes().len(),
-                })?;
-        } else if (&self.ur_type as &[_]) != ur.as_type().as_bytes() {
+        // Compared here, but not recorded until the part has been accepted. A
+        // fragment that fails validation below has to leave the decoder exactly
+        // as it found it: committing the type first means one rejected fragment
+        // makes every later fragment of a different type fail as inconsistent
+        // with a type this decoder never accepted.
+        let ur_type = ur.as_type().as_bytes();
+        if !self.ur_type.is_empty() && (&self.ur_type as &[_]) != ur_type {
             return Err(Error::InconsistentType);
         }
 
@@ -143,7 +143,25 @@ impl<T: Types> BaseDecoder<T> {
             return Err(Error::InconsistentSequence { outer, inner });
         }
 
-        self.fountain.receive(part)?;
+        // Past every check, so the type can be recorded. If the fountain still
+        // refuses the part — its own length and fragment-count limits live there
+        // — put the type back, so a refusal leaves nothing behind either.
+        let recorded_type = self.ur_type.is_empty();
+        if recorded_type {
+            self.ur_type
+                .try_extend_from_slice(ur_type)
+                .map_err(|_| Error::URTypeTooBig {
+                    size: ur_type.len(),
+                })?;
+        }
+
+        if let Err(error) = self.fountain.receive(part) {
+            if recorded_type {
+                self.ur_type.clear();
+            }
+            return Err(error.into());
+        }
+
         Ok(())
     }
 
@@ -391,6 +409,60 @@ mod tests {
         let fragment = parts.next().unwrap();
 
         format!("{head}/{sequence}-{sequence_count}/{fragment}")
+    }
+
+    #[test]
+    fn test_a_rejected_fragment_leaves_no_type_behind() {
+        let message = make_message_ur(200, "Wolf");
+        let mut encoder = Encoder::new();
+        encoder.start("bytes", &message, 50);
+        assert!(encoder.sequence_count() > 1);
+        let disguised = with_path(&encoder.next_part().to_string(), 1, 1);
+
+        let mut decoder = Decoder::default();
+        assert!(matches!(
+            decoder.receive(UR::parse(&disguised).unwrap()),
+            Err(Error::InconsistentSequence { .. })
+        ));
+
+        // The rejection must not have recorded "bytes", or the decoder is stuck
+        // on a type it never accepted until somebody clears it.
+        assert_eq!(decoder.ur_type(), None);
+
+        let mut other = Encoder::new();
+        other.start("crypto-psbt", &message, 50);
+        let valid = other.next_part().to_string();
+
+        decoder.receive(UR::parse(&valid).unwrap()).unwrap();
+        assert_eq!(decoder.ur_type(), Some("crypto-psbt"));
+    }
+
+    #[test]
+    fn test_a_part_declaring_more_fragments_than_capacity_is_refused() {
+        // Outer and inner metadata agree, and one byte over eight fragments is
+        // within the message limit, so only the chooser's own capacity stands in
+        // the way. It used to panic reserving index storage.
+        let serialized = UR::MultiPartDeserialized {
+            ur_type: "bytes",
+            fragment: crate::fountain::part::Part {
+                sequence: 9,
+                sequence_count: 8,
+                message_length: 8,
+                checksum: 0,
+                data: &[1],
+            },
+        }
+        .to_string();
+
+        // The fourth parameter is MAX_SEQUENCE_COUNT: 4, against a declared 8.
+        let mut decoder = HeaplessDecoder::<32, 4, 128, 4, 4, 16>::new();
+        assert!(matches!(
+            decoder.receive(UR::parse(&serialized).unwrap()),
+            Err(Error::Fountain(
+                fountain::decoder::Error::SequenceCountTooLarge { count: 8, limit: 4 }
+            ))
+        ));
+        assert_eq!(decoder.ur_type(), None);
     }
 
     #[test]
