@@ -98,13 +98,7 @@ impl<T: Types> BaseDecoder<T> {
             return Err(Error::NotMultiPart);
         }
 
-        // Compared here, but not recorded until the part has been accepted. A
-        // fragment that fails validation below has to leave the decoder exactly
-        // as it found it: committing the type first means one rejected fragment
-        // makes every later fragment of a different type fail as inconsistent
-        // with a type this decoder never accepted.
-        let ur_type = ur.as_type().as_bytes();
-        if !self.ur_type.is_empty() && (&self.ur_type as &[_]) != ur_type {
+        if !self.ur_type.is_empty() && (&self.ur_type as &[_]) != ur.as_type().as_bytes() {
             return Err(Error::InconsistentType);
         }
 
@@ -114,6 +108,28 @@ impl<T: Types> BaseDecoder<T> {
                 .expect("resource shouldn't be deserialized at this point");
 
             let size = bytewords::validate(bytewords, Style::Minimal)?;
+            // Three CBOR heads fit even when encoded with eight-byte arguments.
+            let mut prefix = [0; 27];
+            let (bytes, _) = bytewords::decoder(bytewords, Style::Minimal)?;
+            let mut prefix_len = 0;
+            for (index, byte) in bytes.take(prefix.len()).enumerate() {
+                prefix[index] = byte.ok_or(bytewords::DecodeError::InvalidWord {
+                    position: Some(index),
+                })?;
+                prefix_len += 1;
+            }
+            let inner = fountain::part::decode_sequence(&mut minicbor::Decoder::new(
+                &prefix[..prefix_len],
+            ))?;
+            let outer = (ur.sequence().unwrap(), ur.sequence_count().unwrap());
+            if outer != inner {
+                return Err(Error::InconsistentSequence { outer, inner });
+            }
+
+            // An array head, four integer heads and a byte-string head use at most 54 bytes.
+            if size > self.fountain.max_fragment_len().saturating_add(54) {
+                return Err(Error::FragmentTooBig { size });
+            }
             self.fragment.clear();
             self.fragment
                 .try_resize(size, 0)
@@ -127,41 +143,23 @@ impl<T: Types> BaseDecoder<T> {
 
         let part = part.as_ref().unwrap_or_else(|| ur.as_part().unwrap());
 
-        // A multipart UR carries its sequence number and count twice: in the URI
-        // path and again inside the CBOR part. Callers gate on the path values,
-        // and everything below sizes and stores from the inner ones, so the two
-        // have to agree before the fountain sees anything.
-        let outer = match (ur.sequence(), ur.sequence_count()) {
-            (Some(sequence), Some(sequence_count)) => (sequence, sequence_count),
-            // is_multi_part() was checked above, so this cannot happen. Refusing
-            // rather than assuming it.
-            _ => return Err(Error::NotMultiPart),
-        };
-        let inner = (part.sequence, part.sequence_count);
-
-        if outer != inner {
-            return Err(Error::InconsistentSequence { outer, inner });
-        }
-
-        // Past every check, so the type can be recorded. If the fountain still
-        // refuses the part — its own length and fragment-count limits live there
-        // — put the type back, so a refusal leaves nothing behind either.
-        let recorded_type = self.ur_type.is_empty();
-        if recorded_type {
-            self.ur_type
-                .try_extend_from_slice(ur_type)
+        let mut ur_type = T::URType::default();
+        if self.ur_type.is_empty() {
+            ur_type
+                .try_extend_from_slice(ur.as_type().as_bytes())
                 .map_err(|_| Error::URTypeTooBig {
-                    size: ur_type.len(),
+                    size: ur.as_type().len(),
                 })?;
         }
-
         if let Err(error) = self.fountain.receive(part) {
-            if recorded_type {
+            if self.fountain.is_empty() {
                 self.ur_type.clear();
             }
             return Err(error.into());
         }
-
+        if self.ur_type.is_empty() {
+            self.ur_type = ur_type;
+        }
         Ok(())
     }
 
@@ -173,9 +171,21 @@ impl<T: Types> BaseDecoder<T> {
 
     /// Bounds the reassembled-message buffer to `len` bytes.
     ///
+    /// Applies to the next message; call `clear` to discard an active message.
     /// Parts describing a longer message are rejected before allocation.
     pub fn set_max_message_len(&mut self, len: usize) {
         self.fountain.set_max_message_len(len);
+    }
+
+    /// Return the fragment, mixed-part and queue limits for new messages.
+    pub fn limits(&self) -> fountain::decoder::Limits {
+        self.fountain.limits()
+    }
+
+    /// Set resource limits and discard the active message.
+    pub fn set_limits(&mut self, limits: fountain::decoder::Limits) {
+        self.clear();
+        self.fountain.set_limits(limits);
     }
 
     /// Returns whether the decoder is complete and hence the message available.

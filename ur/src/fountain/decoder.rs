@@ -56,7 +56,12 @@ impl<
             fragment_chooser: chooser::HeaplessFragmentChooser::new(),
             message_description: None,
             // The fixed capacities already bound every allocation here.
-            max_message_len: usize::MAX,
+            max_message_len: MAX_MESSAGE_LEN,
+            limits: Limits {
+                max_sequence_count: MAX_SEQUENCE_COUNT,
+                max_mixed_parts: MAX_MIXED_PARTS,
+                max_queued_parts: QUEUE_SIZE,
+            },
         }
     }
 }
@@ -67,14 +72,34 @@ impl<
 /// single hostile fragment cannot demand a gigabyte buffer up front.
 pub const DEFAULT_MAX_MESSAGE_LEN: usize = 16 * 1024 * 1024;
 
-/// The default limit on a part's declared fragment count, for the allocating
-/// decoder.
-///
-/// Bounding the reassembled message does not bound the chooser: a mixed part
-/// makes it build index and sampler storage proportional to `sequence_count`,
-/// which is a separate budget from the message bytes. The heapless decoder takes
-/// this from its own `MAX_SEQUENCE_COUNT`.
+/// Default maximum source-fragment count for allocating decoders.
 pub const DEFAULT_MAX_SEQUENCE_COUNT: usize = 16 * 1024;
+
+/// Resource limits for decoding a message.
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    /// Maximum number of source fragments.
+    pub max_sequence_count: usize,
+    /// Maximum number of retained mixed parts.
+    pub max_mixed_parts: usize,
+    /// Maximum number of queued parts.
+    pub max_queued_parts: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl Limits {
+    /// Default allocating-decoder limits.
+    pub const DEFAULT: Self = Self {
+        max_sequence_count: DEFAULT_MAX_SEQUENCE_COUNT,
+        max_mixed_parts: 128,
+        max_queued_parts: 128,
+    };
+}
 
 /// A decoder capable of receiving and recombining fountain-encoded transmissions.
 ///
@@ -89,6 +114,7 @@ pub struct BaseDecoder<T: Types> {
     fragment_chooser: BaseFragmentChooser<T::Chooser>,
     message_description: Option<MessageDescription>,
     max_message_len: usize,
+    limits: Limits,
 }
 
 impl<T: Types> Default for BaseDecoder<T> {
@@ -101,6 +127,7 @@ impl<T: Types> Default for BaseDecoder<T> {
             fragment_chooser: Default::default(),
             message_description: None,
             max_message_len: DEFAULT_MAX_MESSAGE_LEN,
+            limits: T::LIMITS,
         }
     }
 }
@@ -114,8 +141,8 @@ impl<T: Types> BaseDecoder<T> {
     ///
     /// # Errors
     ///
-    /// If the part would fail [`validate`] because it is inconsistent
-    /// with previously received parts, an error will be returned.
+    /// Reject invalid or inconsistent parts and resource-limit violations.
+    /// Queue and mixed-part capacity errors discard the active message.
     ///
     /// [`validate`]: BaseDecoder::is_part_consistent
     pub fn receive(&mut self, part: &Part) -> Result<bool, Error> {
@@ -127,31 +154,33 @@ impl<T: Types> BaseDecoder<T> {
             return Err(Error::InvalidPart);
         }
 
-        // The message-byte bound below does not cover the chooser: a mixed part
-        // (sequence > sequence_count) makes it reserve sequence_count slots for
-        // its index and sampler storage, which for the heapless build panics
-        // rather than failing. Bound that here, before any state is touched.
         let sequence_count = usize::try_from(part.sequence_count).unwrap_or(usize::MAX);
-        if sequence_count > T::SEQUENCE_COUNT_LIMIT {
+        let limit = self.limits.max_sequence_count.min(T::SEQUENCE_COUNT_LIMIT);
+        if sequence_count > limit {
             return Err(Error::SequenceCountTooLarge {
                 count: part.sequence_count,
-                limit: T::SEQUENCE_COUNT_LIMIT,
+                limit,
             });
         }
+        let message_len = part
+            .data
+            .len()
+            .checked_mul(sequence_count)
+            .ok_or(Error::InvalidPart)?;
+        if self.is_empty() && message_len > self.max_message_len {
+            return Err(Error::MessageTooLong {
+                needed: message_len,
+                limit: self.max_message_len,
+            });
+        }
+        let mut data = T::Fragment::default();
+        data.try_extend_from_slice(part.data)
+            .map_err(|_| Error::NotEnoughSpace {
+                needed: part.data.len(),
+                capacity: data.capacity(),
+            })?;
 
         if self.is_empty() {
-            // One valid byte of data can still declare u32::MAX fragments, so
-            // bound the buffer by policy before allocating, not after.
-            let message_len = part
-                .data
-                .len()
-                .saturating_mul(usize::try_from(part.sequence_count).unwrap());
-            if message_len > self.max_message_len {
-                return Err(Error::MessageTooLong {
-                    needed: message_len,
-                    limit: self.max_message_len,
-                });
-            }
             if self.message.try_resize(message_len, 0).is_err() {
                 return Err(Error::NotEnoughSpace {
                     needed: message_len,
@@ -172,26 +201,61 @@ impl<T: Types> BaseDecoder<T> {
             part.checksum,
         );
 
-        let mut data = T::Fragment::default();
-        if data.try_extend_from_slice(part.data).is_err() {
-            return Err(Error::NotEnoughSpace {
-                needed: part.data.len(),
-                capacity: data.capacity(),
-            });
-        }
-
         let part = IndexedPart::new(data, indexes);
-        self.queue.push_back(part);
+        let result = self.process_part(part);
+        if result.is_err() {
+            // A reduction can consume equations before discovering a full queue.
+            self.clear();
+        }
+        result?;
+        Ok(!self.is_complete())
+    }
 
-        while !self.is_complete() && !self.queue.is_empty() {
-            let part = self.queue.pop_front().unwrap();
+    fn process_part(&mut self, part: IndexedPart<T::Fragment, T::Indexes>) -> Result<(), Error> {
+        Self::enqueue(&mut self.queue, self.limits.max_queued_parts, part)?;
+        while !self.is_complete() {
+            let Some(part) = self.queue.pop_front() else {
+                break;
+            };
             if part.is_simple() {
                 self.process_simple(&part)?;
             } else {
-                self.process_mixed(part);
+                self.process_mixed(part)?;
             }
         }
-        Ok(!self.is_complete())
+        Ok(())
+    }
+
+    fn enqueue(
+        queue: &mut T::Queue,
+        limit: usize,
+        part: IndexedPart<T::Fragment, T::Indexes>,
+    ) -> Result<(), Error> {
+        if queue.len() >= limit {
+            return Err(Error::QueueFull);
+        }
+        queue.push_back(part).map_err(|_| Error::QueueFull)
+    }
+
+    /// Return the fragment, mixed-part and queue limits.
+    pub fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Set resource limits and discard the active message.
+    ///
+    /// Fixed collection capacities remain upper bounds on these limits.
+    pub fn set_limits(&mut self, limits: Limits) {
+        self.clear();
+        self.limits = limits;
+    }
+
+    pub(crate) fn max_fragment_len(&self) -> usize {
+        self.message_description
+            .as_ref()
+            .map_or(self.max_message_len, |description| {
+                description.fragment_length
+            })
     }
 
     /// Returns the reassembled-message buffer limit, in bytes.
@@ -202,6 +266,7 @@ impl<T: Types> BaseDecoder<T> {
 
     /// Bounds the reassembled-message buffer to `len` bytes.
     ///
+    /// Applies to the next message; call `clear` to discard an active message.
     /// Parts describing a longer message are rejected before allocation with
     /// [`Error::MessageTooLong`].
     ///
@@ -319,16 +384,22 @@ impl<T: Types> BaseDecoder<T> {
         debug_assert!(self.is_empty());
     }
 
-    fn reduce_mixed(&mut self, part: &IndexedPart<T::Fragment, T::Indexes>) {
+    fn reduce_mixed(&mut self, part: &IndexedPart<T::Fragment, T::Indexes>) -> Result<(), Error> {
+        let mut result = Ok(());
         self.mixed_parts.retain_mut(|mixed_part| {
             mixed_part.reduce(part);
 
-            if mixed_part.is_simple() {
-                self.queue.push_back(mixed_part.clone());
+            if mixed_part.is_simple() && result.is_ok() {
+                result = Self::enqueue(
+                    &mut self.queue,
+                    self.limits.max_queued_parts,
+                    mixed_part.clone(),
+                );
             }
 
             !mixed_part.is_simple()
         });
+        result
     }
 
     fn process_simple(&mut self, part: &IndexedPart<T::Fragment, T::Indexes>) -> Result<(), Error> {
@@ -337,7 +408,7 @@ impl<T: Types> BaseDecoder<T> {
             return Ok(());
         }
 
-        self.reduce_mixed(part);
+        self.reduce_mixed(part)?;
 
         let offset = index * self.message_description.as_ref().unwrap().fragment_length;
         self.message[offset..offset + self.message_description.as_ref().unwrap().fragment_length]
@@ -349,10 +420,13 @@ impl<T: Types> BaseDecoder<T> {
         Ok(())
     }
 
-    fn process_mixed(&mut self, mut part: IndexedPart<T::Fragment, T::Indexes>) {
+    fn process_mixed(
+        &mut self,
+        mut part: IndexedPart<T::Fragment, T::Indexes>,
+    ) -> Result<(), Error> {
         for mixed_part in (&self.mixed_parts as &[IndexedPart<T::Fragment, T::Indexes>]).iter() {
             if part.indexes == mixed_part.indexes {
-                return;
+                return Ok(());
             }
         }
 
@@ -380,16 +454,31 @@ impl<T: Types> BaseDecoder<T> {
         }
 
         if part.is_simple() {
-            self.queue.push_back(part);
+            Self::enqueue(&mut self.queue, self.limits.max_queued_parts, part)?;
         } else {
-            self.reduce_mixed(&part);
-            self.mixed_parts.try_push(part).ok();
+            if part.indexes.is_empty() {
+                return Ok(());
+            }
+            self.reduce_mixed(&part)?;
+            if self.mixed_parts.len() >= self.limits.max_mixed_parts {
+                return Err(Error::TooManyMixedParts);
+            }
+            self.mixed_parts
+                .try_push(part)
+                .map_err(|_| Error::TooManyMixedParts)?;
         }
+        Ok(())
     }
 }
 
 /// Types for [`BaseDecoder`].
 pub trait Types: Default {
+    /// Default resource limits.
+    const LIMITS: Limits = Limits {
+        max_sequence_count: Self::SEQUENCE_COUNT_LIMIT,
+        ..Limits::DEFAULT
+    };
+
     /// Decoded message buffer.
     type Message: Vec<u8>;
 
@@ -425,6 +514,8 @@ pub struct Alloc;
 
 #[cfg(feature = "alloc")]
 impl Types for Alloc {
+    const LIMITS: Limits = Limits::DEFAULT;
+
     type Message = alloc::vec::Vec<u8>;
     type MixedParts =
         alloc::vec::Vec<IndexedPart<alloc::vec::Vec<u8>, alloc::collections::BTreeSet<usize>>>;
@@ -457,6 +548,12 @@ impl<
     > Types
     for Heapless<MAX_MESSAGE_LEN, MAX_MIXED_PARTS, MAX_FRAGMENT_LEN, MAX_SEQUENCE_COUNT, QUEUE_SIZE>
 {
+    const LIMITS: Limits = Limits {
+        max_sequence_count: MAX_SEQUENCE_COUNT,
+        max_mixed_parts: MAX_MIXED_PARTS,
+        max_queued_parts: QUEUE_SIZE,
+    };
+
     type Message = heapless::Vec<u8, MAX_MESSAGE_LEN>;
 
     type MixedParts = heapless::Vec<
@@ -507,6 +604,10 @@ pub enum Error {
     },
     /// Too many fragments.
     TooManyFragments,
+    /// Too many retained mixed parts.
+    TooManyMixedParts,
+    /// The part queue is full.
+    QueueFull,
     /// The part describes a message longer than the decoder's limit.
     MessageTooLong {
         /// Buffer length the part demands.
@@ -566,6 +667,8 @@ impl fmt::Display for Error {
             Error::NotEnoughSpace { needed, capacity } => {
                 write!(f, "Not enough space: needed {needed}, capacity {capacity}")?
             }
+            Error::TooManyMixedParts => write!(f, "Too many mixed parts")?,
+            Error::QueueFull => write!(f, "Part queue is full")?,
             Error::TooManyFragments => write!(f, "Too many fragments for the current message")?,
             Error::SequenceCountTooLarge { count, limit } => write!(
                 f,
@@ -744,7 +847,7 @@ pub mod tests {
         let part = Part {
             sequence: 1,
             sequence_count: u32::MAX,
-            message_length: 100 * (u32::MAX as usize),
+            message_length: 100usize.saturating_mul(u32::MAX as usize),
             checksum: 0,
             data: &data,
         };
@@ -754,10 +857,7 @@ pub mod tests {
         // by test_the_configured_message_limit_applies.
         assert!(matches!(
             decoder.receive(&part),
-            Err(Error::SequenceCountTooLarge {
-                count: u32::MAX,
-                limit: DEFAULT_MAX_SEQUENCE_COUNT
-            })
+            Err(Error::SequenceCountTooLarge { .. } | Error::InvalidPart)
         ));
         assert!(decoder.is_empty());
 

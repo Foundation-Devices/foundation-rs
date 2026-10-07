@@ -160,6 +160,7 @@ pub mod tests {
     use crate::xoshiro::test_utils::make_message;
     use crate::CRC32;
     use alloc::collections::BTreeSet;
+    use alloc::format;
 
     const EXPECTED_FRAGMENT_INDEXES: [&[usize]; 30] = [
         &[0],

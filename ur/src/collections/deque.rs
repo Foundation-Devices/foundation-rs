@@ -5,7 +5,10 @@
 /// A double-ended queue.
 pub trait Deque<T>: Default {
     /// Push an element on the back of the queue.
-    fn push_back(&mut self, item: T);
+    fn push_back(&mut self, item: T) -> Result<(), T>;
+
+    /// Number of queued elements.
+    fn len(&self) -> usize;
 
     /// Push an element on the front of the queue.
     fn pop_front(&mut self) -> Option<T>;
@@ -19,8 +22,16 @@ pub trait Deque<T>: Default {
 
 #[cfg(feature = "alloc")]
 impl<T> Deque<T> for alloc::collections::VecDeque<T> {
-    fn push_back(&mut self, value: T) {
+    fn push_back(&mut self, value: T) -> Result<(), T> {
+        if self.try_reserve(1).is_err() {
+            return Err(value);
+        }
         alloc::collections::VecDeque::push_back(self, value);
+        Ok(())
+    }
+
+    fn len(&self) -> usize {
+        alloc::collections::VecDeque::len(self)
     }
 
     fn pop_front(&mut self) -> Option<T> {
@@ -37,10 +48,12 @@ impl<T> Deque<T> for alloc::collections::VecDeque<T> {
 }
 
 impl<T, const N: usize> Deque<T> for heapless::Deque<T, N> {
-    fn push_back(&mut self, value: T) {
-        if heapless::Deque::push_back(self, value).is_err() {
-            panic!("push past allocated capacity")
-        }
+    fn push_back(&mut self, value: T) -> Result<(), T> {
+        heapless::Deque::push_back(self, value)
+    }
+
+    fn len(&self) -> usize {
+        heapless::Deque::len(self)
     }
 
     fn pop_front(&mut self) -> Option<T> {

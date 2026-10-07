@@ -121,6 +121,7 @@ impl<'a, 'b, T: fountain::encoder::Types> BaseEncoder<'a, 'b, T> {
 pub mod tests {
     use super::*;
     use crate::ur::tests::make_message_ur;
+    use alloc::string::ToString;
 
     #[test]
     fn test_ur_encoder() {

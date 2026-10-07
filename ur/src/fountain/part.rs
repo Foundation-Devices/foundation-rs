@@ -172,15 +172,10 @@ impl<'b, C> minicbor::Decode<'b, C> for Part<'b> {
         d: &mut minicbor::Decoder<'b>,
         _ctx: &mut C,
     ) -> Result<Self, minicbor::decode::Error> {
-        if !matches!(d.array()?, Some(5)) {
-            return Err(minicbor::decode::Error::message(
-                "invalid CBOR array length",
-            ));
-        }
-
+        let (sequence, sequence_count) = decode_sequence(d)?;
         Ok(Self {
-            sequence: d.u32()?,
-            sequence_count: d.u32()?,
+            sequence,
+            sequence_count,
             message_length: d
                 .u32()?
                 .try_into()
@@ -189,6 +184,17 @@ impl<'b, C> minicbor::Decode<'b, C> for Part<'b> {
             data: d.bytes()?,
         })
     }
+}
+
+pub(crate) fn decode_sequence(
+    decoder: &mut minicbor::Decoder<'_>,
+) -> Result<(u32, u32), minicbor::decode::Error> {
+    if decoder.array()? != Some(5) {
+        return Err(minicbor::decode::Error::message(
+            "invalid CBOR array length",
+        ));
+    }
+    Ok((decoder.u32()?, decoder.u32()?))
 }
 
 /// A part with the indexes of the simple parts mixed.
