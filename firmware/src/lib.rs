@@ -205,18 +205,25 @@ pub struct Signature {
 }
 
 impl Signature {
-    /// Return the first public key, or `None` if `public_key1` is out of range.
+    /// Return the first public key, or `None` if `public_key1` is not an index
+    /// into the Foundation keys.
     ///
-    /// [`Header::verify`] rejects an out of range index, so a verified header
-    /// always yields `Some`.
+    /// [`Header::verify`] rejects an out of range index on a Foundation signed
+    /// header, so a verified one of those always yields `Some`. That check is
+    /// deliberately skipped for a user signed header, where `public_key1` is
+    /// [`USER_KEY`] rather than an index, so such a header verifies and still
+    /// yields `None` here. Use the user public key in that case; do not treat a
+    /// successful [`Header::verify`] on its own as a guarantee of `Some`.
     pub fn public_key1(&self) -> Option<PublicKey> {
         Self::lookup(self.public_key1)
     }
 
-    /// Return the second public key, or `None` if `public_key2` is out of range.
+    /// Return the second public key, or `None` if `public_key2` is not an index
+    /// into the Foundation keys.
     ///
-    /// [`Header::verify`] rejects an out of range index, so a verified header
-    /// always yields `Some`.
+    /// The same caveat as [`Signature::public_key1`] applies: a user signed
+    /// header verifies without either index being checked, so this can be
+    /// `None` for a verified header.
     pub fn public_key2(&self) -> Option<PublicKey> {
         Self::lookup(self.public_key2)
     }
