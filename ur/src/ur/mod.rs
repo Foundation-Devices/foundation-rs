@@ -17,6 +17,8 @@ use crate::{
     bytewords::{Bytewords, Style},
     fountain::part::Part,
 };
+#[cfg(feature = "alloc")]
+use alloc::string::ToString;
 use core::{fmt, num::ParseIntError};
 
 /// An uniform resource.
@@ -257,6 +259,8 @@ pub fn to_string(ur_type: &str, message: &[u8]) -> alloc::string::String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
     use core::num::IntErrorKind;
 
     #[cfg(feature = "alloc")]

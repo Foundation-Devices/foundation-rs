@@ -680,7 +680,7 @@ dependencies = [
 
 [[package]]
 name = "foundation-ur"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "arbitrary",
  "bitcoin_hashes 0.15.0",

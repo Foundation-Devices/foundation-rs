@@ -235,7 +235,7 @@ pub fn decode_to_slice(
     Ok(n)
 }
 
-fn decoder(
+pub(crate) fn decoder(
     encoded: &str,
     style: Style,
 ) -> Result<(impl Iterator<Item = Option<u8>> + '_, [u8; 4]), DecodeError> {
@@ -416,6 +416,7 @@ impl<'a> fmt::Display for Bytewords<'a> {
 #[cfg(feature = "alloc")]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn test_bytewords() {

@@ -69,6 +69,7 @@ impl From<[u8; 32]> for Xoshiro256 {
 #[cfg(feature = "alloc")]
 pub mod test_utils {
     use super::*;
+    use alloc::vec::Vec;
 
     impl Xoshiro256 {
         #[allow(clippy::cast_possible_truncation)]
