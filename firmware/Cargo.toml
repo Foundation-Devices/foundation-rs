@@ -3,9 +3,6 @@
 
 [package]
 name = "foundation-firmware"
-# 0.3.0, not 0.2.1: `Signature::public_key1`/`public_key2` now return an Option
-# and `VerifySignatureError` gained a variant, so a `^0.2` dependant would not
-# compile against this.
 version = "0.3.0"
 description = """Foundation Devices, Inc. Passport Firmware image parser.
 
