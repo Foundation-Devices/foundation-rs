@@ -12,6 +12,21 @@ use crate::{
     fountain::{chooser, chooser::BaseFragmentChooser, util::xor_into},
 };
 
+const CBOR_INITIAL_BYTE_LEN: usize = 1;
+const MAX_CBOR_HEAD_LEN: usize = CBOR_INITIAL_BYTE_LEN + core::mem::size_of::<u64>();
+const CBOR_ARRAY_HEAD_COUNT: usize = 1;
+const SEQUENCE_FIELD_COUNT: usize = 2;
+const MESSAGE_LENGTH_FIELD_COUNT: usize = 1;
+const CHECKSUM_FIELD_COUNT: usize = 1;
+const INTEGER_FIELD_COUNT: usize =
+    SEQUENCE_FIELD_COUNT + MESSAGE_LENGTH_FIELD_COUNT + CHECKSUM_FIELD_COUNT;
+const BYTE_STRING_FIELD_COUNT: usize = 1;
+const PART_FIELD_COUNT: usize = INTEGER_FIELD_COUNT + BYTE_STRING_FIELD_COUNT;
+pub(crate) const MAX_SEQUENCE_PREFIX_LEN: usize =
+    (CBOR_ARRAY_HEAD_COUNT + SEQUENCE_FIELD_COUNT) * MAX_CBOR_HEAD_LEN;
+pub(crate) const MAX_PART_OVERHEAD_LEN: usize =
+    (CBOR_ARRAY_HEAD_COUNT + PART_FIELD_COUNT) * MAX_CBOR_HEAD_LEN;
+
 /// Description of how a message is split into parts.
 ///
 /// This structure is a subset of the information of a [`Part`].
@@ -189,7 +204,7 @@ impl<'b, C> minicbor::Decode<'b, C> for Part<'b> {
 pub(crate) fn decode_sequence(
     decoder: &mut minicbor::Decoder<'_>,
 ) -> Result<(u32, u32), minicbor::decode::Error> {
-    if decoder.array()? != Some(5) {
+    if decoder.array()? != Some(PART_FIELD_COUNT as u64) {
         return Err(minicbor::decode::Error::message(
             "invalid CBOR array length",
         ));

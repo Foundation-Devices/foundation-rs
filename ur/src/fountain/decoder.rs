@@ -16,6 +16,11 @@ use crate::{
     },
 };
 
+const BYTES_PER_KIBIBYTE: usize = 1024;
+const BYTES_PER_MEBIBYTE: usize = BYTES_PER_KIBIBYTE * BYTES_PER_KIBIBYTE;
+const DEFAULT_MAX_MIXED_PARTS: usize = 128;
+const DEFAULT_MAX_QUEUED_PARTS: usize = 128;
+
 /// A [`decoder`](BaseDecoder) that uses [`alloc`] collection types.
 #[cfg(feature = "alloc")]
 pub type Decoder = BaseDecoder<Alloc>;
@@ -70,7 +75,7 @@ impl<
 ///
 /// Far above any practical animated-QR payload, yet small enough that a
 /// single hostile fragment cannot demand a gigabyte buffer up front.
-pub const DEFAULT_MAX_MESSAGE_LEN: usize = 16 * 1024 * 1024;
+pub const DEFAULT_MAX_MESSAGE_LEN: usize = 16 * BYTES_PER_MEBIBYTE;
 
 /// Default maximum source-fragment count for allocating decoders.
 pub const DEFAULT_MAX_SEQUENCE_COUNT: usize = 16 * 1024;
@@ -96,8 +101,8 @@ impl Limits {
     /// Default allocating-decoder limits.
     pub const DEFAULT: Self = Self {
         max_sequence_count: DEFAULT_MAX_SEQUENCE_COUNT,
-        max_mixed_parts: 128,
-        max_queued_parts: 128,
+        max_mixed_parts: DEFAULT_MAX_MIXED_PARTS,
+        max_queued_parts: DEFAULT_MAX_QUEUED_PARTS,
     };
 }
 
@@ -843,11 +848,12 @@ pub mod tests {
         let mut decoder = Decoder::default();
         assert_eq!(decoder.max_message_len(), DEFAULT_MAX_MESSAGE_LEN);
 
-        let data = [0u8; 100];
+        const FRAGMENT_LEN: usize = 100;
+        let data = [0u8; FRAGMENT_LEN];
         let part = Part {
             sequence: 1,
             sequence_count: u32::MAX,
-            message_length: 100usize.saturating_mul(u32::MAX as usize),
+            message_length: FRAGMENT_LEN.saturating_mul(u32::MAX as usize),
             checksum: 0,
             data: &data,
         };
@@ -878,7 +884,9 @@ pub mod tests {
         encoder.start(&message, MAX_FRAGMENT_LEN);
 
         let mut decoder = Decoder::default();
-        decoder.set_max_message_len(MESSAGE_SIZE / 2);
+        const MESSAGE_LIMIT_DIVISOR: usize = 2;
+        const MESSAGE_LIMIT: usize = MESSAGE_SIZE / MESSAGE_LIMIT_DIVISOR;
+        decoder.set_max_message_len(MESSAGE_LIMIT);
         assert!(matches!(
             decoder.receive(&encoder.next_part()),
             Err(Error::MessageTooLong { .. })
@@ -893,13 +901,14 @@ pub mod tests {
 
     #[test]
     fn test_a_message_length_beyond_its_fragments_is_rejected() {
-        // One fragment of ten bytes cannot carry a hundred-byte message, so
-        // the reassembled buffer could never hold the declared length.
-        let data = [0u8; 10];
+        const FRAGMENT_LEN: usize = 10;
+        const DECLARED_MESSAGE_LEN: usize = 100;
+        const SINGLE_FRAGMENT_COUNT: u32 = 1;
+        let data = [0u8; FRAGMENT_LEN];
         let part = Part {
-            sequence: 1,
-            sequence_count: 1,
-            message_length: 100,
+            sequence: SINGLE_FRAGMENT_COUNT,
+            sequence_count: SINGLE_FRAGMENT_COUNT,
+            message_length: DECLARED_MESSAGE_LEN,
             checksum: 0,
             data: &data,
         };

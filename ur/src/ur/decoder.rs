@@ -7,7 +7,10 @@
 use crate::{
     bytewords::{self, Style},
     collections::Vec,
-    fountain,
+    fountain::{
+        self,
+        part::{MAX_PART_OVERHEAD_LEN, MAX_SEQUENCE_PREFIX_LEN},
+    },
     ur::UR,
 };
 use core::{fmt, str};
@@ -108,8 +111,7 @@ impl<T: Types> BaseDecoder<T> {
                 .expect("resource shouldn't be deserialized at this point");
 
             let size = bytewords::validate(bytewords, Style::Minimal)?;
-            // Three CBOR heads fit even when encoded with eight-byte arguments.
-            let mut prefix = [0; 27];
+            let mut prefix = [0; MAX_SEQUENCE_PREFIX_LEN];
             let (bytes, _) = bytewords::decoder(bytewords, Style::Minimal)?;
             let mut prefix_len = 0;
             for (index, byte) in bytes.take(prefix.len()).enumerate() {
@@ -126,8 +128,12 @@ impl<T: Types> BaseDecoder<T> {
                 return Err(Error::InconsistentSequence { outer, inner });
             }
 
-            // An array head, four integer heads and a byte-string head use at most 54 bytes.
-            if size > self.fountain.max_fragment_len().saturating_add(54) {
+            if size
+                > self
+                    .fountain
+                    .max_fragment_len()
+                    .saturating_add(MAX_PART_OVERHEAD_LEN)
+            {
                 return Err(Error::FragmentTooBig { size });
             }
             self.fragment.clear();
@@ -411,9 +417,15 @@ mod tests {
     use crate::ur::{tests::make_message_ur, Encoder};
     use alloc::{format, string::String, string::ToString};
 
+    const MESSAGE_LEN: usize = 200;
+    const MAX_FRAGMENT_LEN: usize = 50;
+    const FIRST_SEQUENCE: u32 = 1;
+    const CLAIMED_SEQUENCE_COUNT: u32 = 1;
+
     /// Rewrite the `<sequence>-<count>` path segment, leaving the fragment alone.
     fn with_path(ur: &str, sequence: u32, sequence_count: u32) -> String {
-        let mut parts = ur.splitn(3, '/');
+        const UR_PATH_COMPONENT_COUNT: usize = 3;
+        let mut parts = ur.splitn(UR_PATH_COMPONENT_COUNT, '/');
         let head = parts.next().unwrap();
         let _indices = parts.next().unwrap();
         let fragment = parts.next().unwrap();
@@ -423,11 +435,15 @@ mod tests {
 
     #[test]
     fn test_a_rejected_fragment_leaves_no_type_behind() {
-        let message = make_message_ur(200, "Wolf");
+        let message = make_message_ur(MESSAGE_LEN, "Wolf");
         let mut encoder = Encoder::new();
-        encoder.start("bytes", &message, 50);
-        assert!(encoder.sequence_count() > 1);
-        let disguised = with_path(&encoder.next_part().to_string(), 1, 1);
+        encoder.start("bytes", &message, MAX_FRAGMENT_LEN);
+        assert!(encoder.sequence_count() > CLAIMED_SEQUENCE_COUNT);
+        let disguised = with_path(
+            &encoder.next_part().to_string(),
+            FIRST_SEQUENCE,
+            CLAIMED_SEQUENCE_COUNT,
+        );
 
         let mut decoder = Decoder::default();
         assert!(matches!(
@@ -440,7 +456,7 @@ mod tests {
         assert_eq!(decoder.ur_type(), None);
 
         let mut other = Encoder::new();
-        other.start("crypto-psbt", &message, 50);
+        other.start("crypto-psbt", &message, MAX_FRAGMENT_LEN);
         let valid = other.next_part().to_string();
 
         decoder.receive(UR::parse(&valid).unwrap()).unwrap();
@@ -449,27 +465,44 @@ mod tests {
 
     #[test]
     fn test_a_part_declaring_more_fragments_than_capacity_is_refused() {
-        // Outer and inner metadata agree, and one byte over eight fragments is
-        // within the message limit, so only the chooser's own capacity stands in
-        // the way. It used to panic reserving index storage.
+        const MAX_MESSAGE_LEN: usize = 32;
+        const MAX_MIXED_PARTS: usize = 4;
+        const MAX_ENCODED_FRAGMENT_LEN: usize = 128;
+        const MAX_SEQUENCE_COUNT: usize = 4;
+        const QUEUE_SIZE: usize = 4;
+        const MAX_UR_TYPE_LEN: usize = 16;
+        const DECLARED_SEQUENCE_COUNT: u32 = (MAX_SEQUENCE_COUNT * 2) as u32;
+        const FRAGMENT_LEN: usize = 1;
+        const DECLARED_MESSAGE_LEN: usize = DECLARED_SEQUENCE_COUNT as usize * FRAGMENT_LEN;
+
+        // Matching metadata isolates the chooser capacity check.
         let serialized = UR::MultiPartDeserialized {
             ur_type: "bytes",
             fragment: crate::fountain::part::Part {
-                sequence: 9,
-                sequence_count: 8,
-                message_length: 8,
+                sequence: DECLARED_SEQUENCE_COUNT + FIRST_SEQUENCE,
+                sequence_count: DECLARED_SEQUENCE_COUNT,
+                message_length: DECLARED_MESSAGE_LEN,
                 checksum: 0,
-                data: &[1],
+                data: &[1; FRAGMENT_LEN],
             },
         }
         .to_string();
 
-        // The fourth parameter is MAX_SEQUENCE_COUNT: 4, against a declared 8.
-        let mut decoder = HeaplessDecoder::<32, 4, 128, 4, 4, 16>::new();
+        let mut decoder = HeaplessDecoder::<
+            MAX_MESSAGE_LEN,
+            MAX_MIXED_PARTS,
+            MAX_ENCODED_FRAGMENT_LEN,
+            MAX_SEQUENCE_COUNT,
+            QUEUE_SIZE,
+            MAX_UR_TYPE_LEN,
+        >::new();
         assert!(matches!(
             decoder.receive(UR::parse(&serialized).unwrap()),
             Err(Error::Fountain(
-                fountain::decoder::Error::SequenceCountTooLarge { count: 8, limit: 4 }
+                fountain::decoder::Error::SequenceCountTooLarge {
+                    count: DECLARED_SEQUENCE_COUNT,
+                    limit: MAX_SEQUENCE_COUNT
+                }
             ))
         ));
         assert_eq!(decoder.ur_type(), None);
@@ -477,15 +510,23 @@ mod tests {
 
     #[test]
     fn test_path_hiding_a_larger_sequence_is_rejected() {
-        let message = make_message_ur(200, "Wolf");
+        let message = make_message_ur(MESSAGE_LEN, "Wolf");
         let mut encoder = Encoder::new();
-        encoder.start("bytes", &message, 50);
-        assert!(encoder.sequence_count() > 1);
+        encoder.start("bytes", &message, MAX_FRAGMENT_LEN);
+        assert!(encoder.sequence_count() > CLAIMED_SEQUENCE_COUNT);
 
         // Two different parts of a multipart message, both wearing a 1-1 path. A
         // caller gating on the path sees two copies of one single part.
-        let first = with_path(&encoder.next_part().to_string(), 1, 1);
-        let second = with_path(&encoder.next_part().to_string(), 1, 1);
+        let first = with_path(
+            &encoder.next_part().to_string(),
+            FIRST_SEQUENCE,
+            CLAIMED_SEQUENCE_COUNT,
+        );
+        let second = with_path(
+            &encoder.next_part().to_string(),
+            FIRST_SEQUENCE,
+            CLAIMED_SEQUENCE_COUNT,
+        );
 
         let mut decoder = Decoder::default();
         for disguised in [first, second] {
@@ -501,9 +542,9 @@ mod tests {
 
     #[test]
     fn test_inner_sequence_past_its_count_is_rejected() {
-        let message = make_message_ur(200, "Wolf");
+        let message = make_message_ur(MESSAGE_LEN, "Wolf");
         let mut encoder = Encoder::new();
-        encoder.start("bytes", &message, 50);
+        encoder.start("bytes", &message, MAX_FRAGMENT_LEN);
 
         // Parts past the sequence count are mixed parts, so this one's inner
         // sequence is greater than its inner count.
@@ -513,9 +554,9 @@ mod tests {
             part = encoder.next_part();
         }
         let part = part.to_string();
-        assert!(part.starts_with(&format!("ur:bytes/{}-{count}/", count + 1)));
+        assert!(part.starts_with(&format!("ur:bytes/{}-{count}/", count + FIRST_SEQUENCE)));
 
-        let disguised = with_path(&part, 1, 1);
+        let disguised = with_path(&part, FIRST_SEQUENCE, CLAIMED_SEQUENCE_COUNT);
 
         let mut decoder = Decoder::default();
         assert!(matches!(
@@ -526,15 +567,15 @@ mod tests {
 
     #[test]
     fn test_mismatched_count_alone_is_rejected() {
-        let message = make_message_ur(200, "Wolf");
+        let message = make_message_ur(MESSAGE_LEN, "Wolf");
         let mut encoder = Encoder::new();
-        encoder.start("bytes", &message, 50);
+        encoder.start("bytes", &message, MAX_FRAGMENT_LEN);
 
         let count = encoder.sequence_count();
         let part = encoder.next_part().to_string();
 
         // Right sequence number, wrong count.
-        let disguised = with_path(&part, 1, count + 1);
+        let disguised = with_path(&part, FIRST_SEQUENCE, count + FIRST_SEQUENCE);
 
         let mut decoder = Decoder::default();
         assert!(matches!(
@@ -545,9 +586,9 @@ mod tests {
 
     #[test]
     fn test_untouched_parts_still_decode() {
-        let message = make_message_ur(200, "Wolf");
+        let message = make_message_ur(MESSAGE_LEN, "Wolf");
         let mut encoder = Encoder::new();
-        encoder.start("bytes", &message, 50);
+        encoder.start("bytes", &message, MAX_FRAGMENT_LEN);
 
         // Through the string form, so this is the same UR::MultiPart path the
         // checks above reject.
