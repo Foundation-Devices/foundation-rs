@@ -66,8 +66,9 @@ const FOUNDATION_PUBLIC_KEYS: [[u8; 65]; 4] = [
     ],
 ];
 
-/// Maximum index in the [`Signature::public_key1`] and
-/// [`Signature::public_key2`] fields if it isn't an user key ([`USER_KEY`]).
+/// Number of Foundation public keys, so a valid [`Signature::public_key1`] or
+/// [`Signature::public_key2`] index is strictly less than this, unless it is the
+/// user key ([`USER_KEY`]).
 pub const MAX_PUBLIC_KEYS: u32 = FOUNDATION_PUBLIC_KEYS.len() as u32;
 
 /// The header of the firmware.
@@ -100,13 +101,13 @@ impl Header {
         }
 
         if !self.is_signed_by_user() {
-            if self.signature.public_key1 > MAX_PUBLIC_KEYS {
+            if self.signature.public_key1 >= MAX_PUBLIC_KEYS {
                 return Err(VerifyHeaderError::InvalidPublicKey1Index(
                     self.signature.public_key1,
                 ));
             }
 
-            if self.signature.public_key2 > MAX_PUBLIC_KEYS {
+            if self.signature.public_key2 >= MAX_PUBLIC_KEYS {
                 return Err(VerifyHeaderError::InvalidPublicKey2Index(
                     self.signature.public_key2,
                 ));
@@ -204,26 +205,32 @@ pub struct Signature {
 }
 
 impl Signature {
-    /// Return the first public key.
+    /// Return the first public key, or `None` if `public_key1` is not an index
+    /// into the Foundation keys.
     ///
-    /// # Panics
-    ///
-    /// This function can panic if `public_key1` is out of range.  The header
-    /// should have been verified before with [`Header::verify`].
-    pub fn public_key1(&self) -> PublicKey {
-        let public_keys = foundation_public_keys();
-        public_keys[usize::try_from(self.public_key1).unwrap()]
+    /// [`Header::verify`] rejects an out of range index on a Foundation signed
+    /// header, so a verified one of those always yields `Some`. That check is
+    /// deliberately skipped for a user signed header, where `public_key1` is
+    /// [`USER_KEY`] rather than an index, so such a header verifies and still
+    /// yields `None` here. Use the user public key in that case; do not treat a
+    /// successful [`Header::verify`] on its own as a guarantee of `Some`.
+    pub fn public_key1(&self) -> Option<PublicKey> {
+        Self::lookup(self.public_key1)
     }
 
-    /// Return the second public key.
+    /// Return the second public key, or `None` if `public_key2` is not an index
+    /// into the Foundation keys.
     ///
-    /// # Panics
-    ///
-    /// This function can panic if `public_key2` is out of range.  The header
-    /// should have been verified before with [`Header::verify`].
-    pub fn public_key2(&self) -> PublicKey {
-        let public_keys = foundation_public_keys();
-        public_keys[usize::try_from(self.public_key2).unwrap()]
+    /// The same caveat as [`Signature::public_key1`] applies: a user signed
+    /// header verifies without either index being checked, so this can be
+    /// `None` for a verified header.
+    pub fn public_key2(&self) -> Option<PublicKey> {
+        Self::lookup(self.public_key2)
+    }
+
+    fn lookup(index: u32) -> Option<PublicKey> {
+        let index = usize::try_from(index).ok()?;
+        foundation_public_keys().get(index).copied()
     }
 }
 
@@ -410,7 +417,11 @@ pub fn verify_signature<C: Verification>(
     firmware_hash: &sha256d::Hash,
     user_public_key: Option<&PublicKey>,
 ) -> Result<(), VerifySignatureError> {
-    assert!(header.verify().is_ok());
+    // Verifying here rather than asserting on it, so this path fails closed for a
+    // caller that did not verify first.
+    header
+        .verify()
+        .map_err(VerifySignatureError::InvalidHeader)?;
 
     let message = Message::from_digest(firmware_hash.to_byte_array());
 
@@ -443,18 +454,28 @@ pub fn verify_signature<C: Verification>(
             signature1.normalize_s();
             signature2.normalize_s();
 
-            header
-                .signature
-                .public_key1()
+            // verify() above rejects an out of range index, so these are Some. The
+            // checked lookup keeps that a local fact rather than an assumption.
+            let public_key1 = header.signature.public_key1().ok_or({
+                VerifySignatureError::InvalidHeader(VerifyHeaderError::InvalidPublicKey1Index(
+                    header.signature.public_key1,
+                ))
+            })?;
+
+            let public_key2 = header.signature.public_key2().ok_or({
+                VerifySignatureError::InvalidHeader(VerifyHeaderError::InvalidPublicKey2Index(
+                    header.signature.public_key2,
+                ))
+            })?;
+
+            public_key1
                 .verify(secp, &message, &signature1)
                 .map_err(|error| VerifySignatureError::FailedSignature1 {
                     index: header.signature.public_key1,
                     error,
                 })?;
 
-            header
-                .signature
-                .public_key2()
+            public_key2
                 .verify(secp, &message, &signature2)
                 .map_err(|error| VerifySignatureError::FailedSignature2 {
                     index: header.signature.public_key2,
@@ -492,6 +513,9 @@ pub enum VerifySignatureError {
     },
     /// The firmware was signed by the user but no user public key was found.
     MissingUserPublicKey,
+    /// The header did not verify, so there was nothing to check a signature
+    /// against.
+    InvalidHeader(VerifyHeaderError),
 }
 
 impl core::fmt::Display for VerifySignatureError {
@@ -505,6 +529,9 @@ impl core::fmt::Display for VerifySignatureError {
             VerifySignatureError::MissingUserPublicKey => {
                 write!(f, "firmware is user signed but user public key is missing")
             }
+            VerifySignatureError::InvalidHeader(error) => {
+                write!(f, "header verification failed: {error}")
+            }
         }
     }
 }
@@ -516,6 +543,7 @@ impl std::error::Error for VerifySignatureError {
             VerifySignatureError::InvalidUserSignature { error, .. } => Some(error),
             VerifySignatureError::FailedSignature1 { error, .. } => Some(error),
             VerifySignatureError::FailedSignature2 { error, .. } => Some(error),
+            VerifySignatureError::InvalidHeader(error) => Some(error),
             _ => None,
         }
     }
