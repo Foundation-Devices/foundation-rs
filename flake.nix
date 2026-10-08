@@ -131,10 +131,16 @@
                     let
                       relPath = pkgs.lib.removePrefix (builtins.toString ./. + "/") (builtins.toString path);
                     in
-                    # REUSE needs all source files plus license metadata
+                    # REUSE needs all source files plus license metadata.
+                    # The excluded paths mirror .gitignore: they are build or
+                    # fuzzing outputs that are never committed, and a developer
+                    # who has run contrib/fuzz.sh would otherwise fail this
+                    # check on their own local corpus.
                     !(pkgs.lib.hasPrefix "target/" relPath)
                     && !(pkgs.lib.hasPrefix ".git/" relPath)
-                    && !(pkgs.lib.hasPrefix "result" relPath);
+                    && !(pkgs.lib.hasPrefix "result" relPath)
+                    && !(pkgs.lib.hasInfix "/corpus/" relPath)
+                    && !(pkgs.lib.hasInfix "/artifacts/" relPath);
                 };
               }
               ''
@@ -209,6 +215,21 @@
             // {
               inherit cargoArtifacts;
               cargoTestExtraArgs = "--all-features --workspace --exclude stratum-v1";
+            }
+          );
+
+          # --- Cargo test (stratum-v1 with `alloc`) ---
+          #
+          # The `all-features` checks have to exclude stratum-v1, because
+          # several of its features are mutually exclusive. That left the
+          # allocating build of the Stratum client — which has its own
+          # bounds-checking code paths — completely untested, so cover it
+          # explicitly.
+          cargo-test-stratum-v1-alloc = craneLib.cargoTest (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              cargoTestExtraArgs = "-p stratum-v1 --features alloc";
             }
           );
 
