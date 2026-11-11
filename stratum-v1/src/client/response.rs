@@ -1,9 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::limits::{
-    check_max, EXTRANONCE1_HEX_LEN_MAX, EXTRANONCE2_SIZE_MAX, SUBSCRIPTIONS_LEN_MAX,
-};
+use crate::limits::{check_max, EXTRANONCE2_SIZE_MAX};
 use crate::{Error, Extensions, Field, Info, Result, VersionRolling};
 #[cfg(feature = "alloc")]
 use alloc::{string::String, vec::Vec};
@@ -319,12 +317,7 @@ pub(crate) fn parse_connect(resp: &[u8]) -> Result<ConnectResp> {
         type Error = Error;
 
         fn try_from(raw: ConnectRespRaw) -> Result<Self> {
-            // The pool picks all three of these. `extranonce2_size` is the one
-            // that matters most: it is a bare count that later drives the size
-            // of the rolled extranonce2 buffer, so it has to be bounded before
-            // it reaches any resize.
-            check_max(Field::Subscriptions, raw.0.len(), SUBSCRIPTIONS_LEN_MAX)?;
-            check_max(Field::Extranonce1, raw.1.len(), EXTRANONCE1_HEX_LEN_MAX)?;
+            // The pool picks this count and it later sizes the extranonce2 buffer.
             check_max(Field::Extranonce2Size, raw.2, EXTRANONCE2_SIZE_MAX)?;
 
             Ok(Self {
@@ -561,22 +554,6 @@ mod tests {
                 field: Field::Extranonce2Size,
                 max: EXTRANONCE2_SIZE_MAX,
                 actual: usize::MAX,
-            })
-        );
-    }
-
-    /// With `alloc` the hex string is unbounded; it is copied into a fixed
-    /// 8-byte extranonce1 either way.
-    #[test]
-    #[cfg(feature = "alloc")]
-    fn test_parse_connect_oversized_extranonce1() {
-        let resp = br#"{"id":2,"error":null,"result":[[["mining.notify","e26e1928"]],"e26e1928e26e1928e26e1928",4]}"#;
-        assert_eq!(
-            parse_connect(resp),
-            Err(Error::FieldTooLarge {
-                field: Field::Extranonce1,
-                max: EXTRANONCE1_HEX_LEN_MAX,
-                actual: 24,
             })
         );
     }

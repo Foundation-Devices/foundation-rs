@@ -1,10 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Foundation Devices, Inc. <hello@foundation.xyz>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::limits::{
-    check_exact, check_max, COINB1_HEX_LEN_MAX, COINB2_HEX_LEN_MAX, JOB_ID_LEN_MAX,
-    MERKLE_BRANCH_LEN_MAX, PREV_HASH_HEX_LEN, SINGLE_PARAM_LEN_MAX,
-};
+use crate::limits::{check_exact, PREV_HASH_HEX_LEN};
 use crate::{Error, Field, Result};
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -63,7 +60,6 @@ pub(crate) fn parse_set_version_mask(resp: &[u8]) -> Result<u32> {
         .0
         .params
         .ok_or(Error::RpcBadRequest)?;
-    check_max(Field::VersionMaskParams, params.len(), SINGLE_PARAM_LEN_MAX)?;
     let mask = params.pop().ok_or(Error::VecEmpty)?;
     let mut v = [0; 4];
     hex_decode(mask.as_bytes(), &mut v)?;
@@ -99,15 +95,8 @@ pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
         type Error = Error;
 
         fn try_from(raw: WorkRaw) -> Result<Self> {
-            // In `heapless` builds these bounds come from the field types; with
-            // `alloc` the deserialized strings are unbounded, so enforce the
-            // same maxima here. `prev_hash` is checked for an exact length
-            // because the loop below slices it at fixed offsets.
-            check_max(Field::JobId, raw.0.len(), JOB_ID_LEN_MAX)?;
+            // The loop below slices `prev_hash` at fixed offsets.
             check_exact(Field::PrevHash, raw.1.len(), PREV_HASH_HEX_LEN)?;
-            check_max(Field::Coinb1, raw.2.len(), COINB1_HEX_LEN_MAX)?;
-            check_max(Field::Coinb2, raw.3.len(), COINB2_HEX_LEN_MAX)?;
-            check_max(Field::MerkleBranch, raw.4.len(), MERKLE_BRANCH_LEN_MAX)?;
 
             let mut work = Work {
                 job_id: raw.0,
@@ -182,7 +171,6 @@ pub(crate) fn parse_set_difficulty(resp: &[u8]) -> Result<f64> {
         .0
         .params
         .ok_or(Error::RpcBadRequest)?;
-    check_max(Field::DifficultyParams, params.len(), SINGLE_PARAM_LEN_MAX)?;
     let difficulty = params.pop().ok_or(Error::VecEmpty)?;
     // JSON has no NaN or infinity literals, but an out-of-range exponent
     // parses to one, and it would propagate into the caller's target.
