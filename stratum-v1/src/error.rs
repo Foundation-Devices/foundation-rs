@@ -48,14 +48,8 @@ pub enum Error {
 
     /// Pool reported an error
     ///
-    /// # Logging
-    ///
-    /// `message` and `detail` are free text chosen by the pool, and pools do
-    /// echo the submitted user back in them — Public-Pool answers a failed
-    /// authorization with `[20, "Authorization validation error", ", <user>"]`.
-    /// The client never writes them to its own log for that reason; a caller
-    /// that logs this variant should treat both fields as it would the
-    /// credentials themselves. `code` is a number and always safe to log.
+    /// `message` and `detail` are pool text that can echo the user back, so log
+    /// them as you would the credentials.
     Pool {
         code: isize,
         message: tstring!(32),

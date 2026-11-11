@@ -125,12 +125,8 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 "Received Message [{}..{}], free pos: {}",
                 start, stop, self.rx_free_pos
             );
-            // Classify before logging. Pools echo the submitted user back in
-            // the error detail of an authorization or share response, so a
-            // reply matched to one of those requests is as revealing as the
-            // request itself. Anything we cannot match stays loggable: it
-            // carries no credential of ours, and suppressing it would leave
-            // malformed frames undiagnosable.
+            // Replies to authorize and submit can echo the user back, so they are
+            // classified like the requests before anything is logged.
             let parsed_id = response::parse_id(line);
             let inbound = match &parsed_id {
                 Ok(Some(id)) => match self.reqs.get(id) {
@@ -257,10 +253,7 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 .read(self.rx_buf[self.rx_free_pos..].as_mut())
                 .await
                 .map_err(|_| Error::Network)?;
-            // Only the size. A freshly read chunk spans an arbitrary number of
-            // frames, so there is no way to tell here whether one of them is a
-            // reply that echoes our credentials back; each frame is logged
-            // individually, and classified, once it has been framed above.
+            // A chunk can span several frames, so only its size is logged here.
             debug!("read {} bytes @{}", n, self.rx_free_pos);
             self.rx_free_pos += n;
         }
@@ -281,13 +274,8 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         Ok(())
     }
 
-    /// Terminate and write the serialized request sitting in the transmit
-    /// buffer.
-    ///
-    /// `sensitivity` decides what reaches the log. It is a required argument
-    /// rather than something inferred here so that a new secret-bearing
-    /// request cannot be added without the author choosing a classification;
-    /// see [`Sensitivity`].
+    /// Terminate and write the serialized request sitting in the transmit buffer.
+    /// `sensitivity` is required so that every new request has to choose one.
     async fn send(&mut self, len: usize, sensitivity: Sensitivity) -> Result<()> {
         self.tx_buf[len] = 0x0a;
         debug!(">> {}", sensitivity.loggable(&self.tx_buf[..len + 1]));
