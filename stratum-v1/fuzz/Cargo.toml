@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: © 2026 Foundation Devices, Inc. <hello@foundation.xyz>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "stratum-v1-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { workspace = true }
+embedded-io-async = { workspace = true }
+heapless = { workspace = true }
+libfuzzer-sys = { workspace = true }
+stratum-v1 = { workspace = true }
+
+[[bin]]
+name = "client_poll"
+path = "fuzz_targets/client_poll.rs"
+test = false
+doc = false
