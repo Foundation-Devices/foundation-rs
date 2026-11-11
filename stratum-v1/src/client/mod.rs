@@ -199,10 +199,10 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
             debug!("unresponded reqs: {:?}", self.reqs);
             if let Some(id) = consume!(response::parse_id(line)) {
                 // it's a Response
-                match self.reqs.get(&id) {
+                // Settled even if the reply fails to parse, so a bad one can't hold its slot.
+                match self.reqs.remove(&id) {
                     Some(ReqKind::Configure) => {
                         self.configuration = Some(consume!(response::parse_configure(line)));
-                        self.reqs.remove(&id);
                         info!("Stratum v1 Client Configured");
                         msg = Some(Message::Configured);
                     }
@@ -213,22 +213,18 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                             .set_extranonces(conn.extranonce1, conn.extranonce2_size));
                         self.subscriptions = conn.subscriptions;
                         self.connected = true;
-                        self.reqs.remove(&id);
                         info!("Stratum v1 Client Connected");
                         msg = Some(Message::Connected);
                     }
                     Some(ReqKind::Authorize) => {
                         if consume!(response::parse_authorize(line)) {
                             self.authorized = true;
-                            self.reqs.remove(&id);
                             info!("Stratum v1 Client Authorized");
                             msg = Some(Message::Authorized);
                         }
                     }
                     #[cfg(feature = "suggest-difficulty-request")]
                     Some(ReqKind::SuggestDifficulty(diff)) => {
-                        let diff = *diff;
-                        self.reqs.remove(&id);
                         info!("Suggested Difficulty Accepted");
                         warn!("This should never happen !!! Server should send a set_difficulty notification instead.");
                         msg = Some(Message::Difficulty(diff as f64));
@@ -255,7 +251,6 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                             }
                             Err(e) => fail!(e),
                         }
-                        self.reqs.remove(&id);
                         msg = Some(Message::Share {
                             accepted: self.shares_accepted,
                             rejected: self.shares_rejected,
