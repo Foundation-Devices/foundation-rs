@@ -72,18 +72,42 @@ fn oom() -> Error {
     Error::message("descriptor does not fit in memory")
 }
 
+/// Real descriptors wrap at most twice, as `sh(wsh(..))`; deeper nesting is rejected.
+const MAX_WRAPPERS: usize = 4;
+
 impl<'a, 'b, const N: usize> Decode<'b, &'a TerminalContext<'a, 'b, N>> for Terminal<'a, 'b> {
     fn decode(
         d: &mut Decoder<'b>,
         ctx: &mut &'a TerminalContext<'a, 'b, N>,
     ) -> Result<Self, Error> {
+        Self::decode_nested(d, ctx, 0)
+    }
+}
+
+impl<'a, 'b> Terminal<'a, 'b> {
+    fn decode_wrapped<const N: usize>(
+        d: &mut Decoder<'b>,
+        ctx: &mut &'a TerminalContext<'a, 'b, N>,
+        wrappers: usize,
+    ) -> Result<Box<'a, Self>, Error> {
+        if wrappers >= MAX_WRAPPERS {
+            return Err(Error::message("descriptor nests too deeply"));
+        }
+        Box::new_in(Self::decode_nested(d, ctx, wrappers + 1)?, ctx).map_err(|_| oom())
+    }
+
+    fn decode_nested<const N: usize>(
+        d: &mut Decoder<'b>,
+        ctx: &mut &'a TerminalContext<'a, 'b, N>,
+        wrappers: usize,
+    ) -> Result<Self, Error> {
         match d.tag()? {
-            Self::TAG_SCRIPT_HASH => Box::new_in(Terminal::decode(d, ctx)?, ctx)
-                .map_err(|_| oom())
-                .map(Terminal::ScriptHash),
-            Self::TAG_WITNESS_SCRIPT_HASH => Box::new_in(Terminal::decode(d, ctx)?, ctx)
-                .map_err(|_| oom())
-                .map(Terminal::WitnessScriptHash),
+            Self::TAG_SCRIPT_HASH => {
+                Self::decode_wrapped(d, ctx, wrappers).map(Terminal::ScriptHash)
+            }
+            Self::TAG_WITNESS_SCRIPT_HASH => {
+                Self::decode_wrapped(d, ctx, wrappers).map(Terminal::WitnessScriptHash)
+            }
             Self::TAG_PUBLIC_KEY => Key::decode(d, ctx).map(Terminal::PublicKey),
             Self::TAG_PUBLIC_KEY_HASH => Key::decode(d, ctx).map(Terminal::PublicKeyHash),
             Self::TAG_WITNESS_PUBLIC_KEY_HASH => {
@@ -94,9 +118,7 @@ impl<'a, 'b, const N: usize> Decode<'b, &'a TerminalContext<'a, 'b, N>> for Term
             Self::TAG_SORTED_MULTISIG => Multikey::decode(d, ctx).map(Terminal::SortedMultisig),
             Address::TAG => Address::decode(d, ctx).map(Terminal::Address),
             Self::TAG_RAW_SCRIPT => d.bytes().map(Terminal::RawScript),
-            Self::TAG_TAPROOT => Box::new_in(Terminal::decode(d, ctx)?, ctx)
-                .map_err(|_| oom())
-                .map(Terminal::Taproot),
+            Self::TAG_TAPROOT => Self::decode_wrapped(d, ctx, wrappers).map(Terminal::Taproot),
             Self::TAG_COSIGNER => Key::decode(d, ctx).map(Terminal::Cosigner),
             _ => Err(Error::message("invalid tag")),
         }
@@ -360,6 +382,41 @@ pub struct Multikey<'a> {
 pub mod tests {
     use super::*;
     use crate::registry::ECKey;
+
+    #[test]
+    fn deep_wrapper_nesting_is_rejected() {
+        let mut payload = [0u8; 3 * 2000];
+        for wsh in payload.chunks_mut(3) {
+            wsh.copy_from_slice(&[0xd9, 0x01, 0x91]);
+        }
+
+        let a: TerminalContext<32> = TerminalContext::new();
+        let err = minicbor::decode_with::<_, Terminal>(&payload, &mut &a).unwrap_err();
+
+        assert!(err.is_message() && !err.is_end_of_input(), "{err:?}");
+    }
+
+    #[test]
+    fn nested_script_hash_still_decodes() {
+        // sh(wsh(wpkh(key))), the deepest wrapping a real descriptor uses.
+        const PAYLOAD: &[u8] = &[
+            0xd9, 0x01, 0x90, 0xd9, 0x01, 0x91, 0xd9, 0x01, 0x94, 0xd9, 0x01, 0x32, 0xa1, 0x03,
+            0x58, 0x21, 0x03, 0xff, 0xf9, 0x7b, 0xd5, 0x75, 0x5e, 0xee, 0xa4, 0x20, 0x45, 0x3a,
+            0x14, 0x35, 0x52, 0x35, 0xd3, 0x82, 0xf6, 0x47, 0x2f, 0x85, 0x68, 0xa1, 0x8b, 0x2f,
+            0x05, 0x7a, 0x14, 0x60, 0x29, 0x75, 0x56,
+        ];
+
+        let a: TerminalContext<8> = TerminalContext::new();
+        let decoded: Terminal = minicbor::decode_with(PAYLOAD, &mut &a).unwrap();
+
+        let Terminal::ScriptHash(sh) = &decoded else {
+            panic!("expected sh, got {decoded:?}");
+        };
+        assert!(
+            matches!(**sh, Terminal::WitnessScriptHash(_)),
+            "{decoded:?}"
+        );
+    }
 
     #[test]
     fn test_example_1() {

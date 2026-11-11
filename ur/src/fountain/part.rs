@@ -12,6 +12,21 @@ use crate::{
     fountain::{chooser, chooser::BaseFragmentChooser, util::xor_into},
 };
 
+const CBOR_INITIAL_BYTE_LEN: usize = 1;
+const MAX_CBOR_HEAD_LEN: usize = CBOR_INITIAL_BYTE_LEN + core::mem::size_of::<u64>();
+const CBOR_ARRAY_HEAD_COUNT: usize = 1;
+const SEQUENCE_FIELD_COUNT: usize = 2;
+const MESSAGE_LENGTH_FIELD_COUNT: usize = 1;
+const CHECKSUM_FIELD_COUNT: usize = 1;
+const INTEGER_FIELD_COUNT: usize =
+    SEQUENCE_FIELD_COUNT + MESSAGE_LENGTH_FIELD_COUNT + CHECKSUM_FIELD_COUNT;
+const BYTE_STRING_FIELD_COUNT: usize = 1;
+const PART_FIELD_COUNT: usize = INTEGER_FIELD_COUNT + BYTE_STRING_FIELD_COUNT;
+pub(crate) const MAX_SEQUENCE_PREFIX_LEN: usize =
+    (CBOR_ARRAY_HEAD_COUNT + SEQUENCE_FIELD_COUNT) * MAX_CBOR_HEAD_LEN;
+pub(crate) const MAX_PART_OVERHEAD_LEN: usize =
+    (CBOR_ARRAY_HEAD_COUNT + PART_FIELD_COUNT) * MAX_CBOR_HEAD_LEN;
+
 /// Description of how a message is split into parts.
 ///
 /// This structure is a subset of the information of a [`Part`].
@@ -61,12 +76,19 @@ impl<'a> Part<'a> {
     /// - `sequence`, `sequence_count` are positive values.
     /// - `message_length` is a positive value and is .
     /// - `data` contains data and is smaller or equal to `message_length`.
+    /// - `message_length` fits in `sequence_count` fragments of this size, so
+    ///   a reassembled buffer can actually hold the declared message.
     pub fn is_valid(&self) -> bool {
         self.sequence > 0
             && self.sequence_count > 0
             && self.message_length > 0
             && !self.data.is_empty()
             && self.data.len() <= self.message_length
+            && self.message_length
+                <= self
+                    .data
+                    .len()
+                    .saturating_mul(usize::try_from(self.sequence_count).unwrap_or(usize::MAX))
     }
 
     /// Calculate the indexes contained on this [`Part`].
@@ -165,15 +187,10 @@ impl<'b, C> minicbor::Decode<'b, C> for Part<'b> {
         d: &mut minicbor::Decoder<'b>,
         _ctx: &mut C,
     ) -> Result<Self, minicbor::decode::Error> {
-        if !matches!(d.array()?, Some(5)) {
-            return Err(minicbor::decode::Error::message(
-                "invalid CBOR array length",
-            ));
-        }
-
+        let (sequence, sequence_count) = decode_sequence(d)?;
         Ok(Self {
-            sequence: d.u32()?,
-            sequence_count: d.u32()?,
+            sequence,
+            sequence_count,
             message_length: d
                 .u32()?
                 .try_into()
@@ -182,6 +199,17 @@ impl<'b, C> minicbor::Decode<'b, C> for Part<'b> {
             data: d.bytes()?,
         })
     }
+}
+
+pub(crate) fn decode_sequence(
+    decoder: &mut minicbor::Decoder<'_>,
+) -> Result<(u32, u32), minicbor::decode::Error> {
+    if decoder.array()? != Some(PART_FIELD_COUNT as u64) {
+        return Err(minicbor::decode::Error::message(
+            "invalid CBOR array length",
+        ));
+    }
+    Ok((decoder.u32()?, decoder.u32()?))
 }
 
 /// A part with the indexes of the simple parts mixed.

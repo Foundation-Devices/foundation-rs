@@ -208,6 +208,7 @@ impl<const MAX_FRAGMENT_LEN: usize, const MAX_SEQUENCE_COUNT: usize> Types
 pub mod tests {
     use super::*;
     use crate::xoshiro::test_utils::make_message;
+    use alloc::vec;
 
     #[test]
     fn test_encoder_fragment_split() {
