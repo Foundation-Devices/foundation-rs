@@ -410,6 +410,32 @@ fn serialized_boundary_inputs_do_not_panic() {
 }
 
 #[test]
+fn default_limits_decode_a_long_stream_joined_after_its_simple_fragments() {
+    const FRAGMENT_COUNT: usize = 512;
+    const PART_BUDGET: usize = 8 * FRAGMENT_COUNT;
+    const BYTE_STEP: usize = 7;
+
+    let message: Vec<u8> = (0..FRAGMENT_COUNT)
+        .map(|index| (index * BYTE_STEP) as u8)
+        .collect();
+    let mut encoder = Encoder::new();
+    encoder.start("bytes", &message, SINGLE_BYTE_FRAGMENT_LEN);
+    assert_eq!(encoder.sequence_count(), FRAGMENT_COUNT as u32);
+    // A scanner that joins late only ever sees mixed parts.
+    for _ in 0..FRAGMENT_COUNT {
+        encoder.next_part();
+    }
+    let mut decoder = Decoder::default();
+    for _ in 0..PART_BUDGET {
+        if decoder.is_complete() {
+            break;
+        }
+        decoder.receive(encoder.next_part()).unwrap();
+    }
+    assert_eq!(decoder.message().unwrap(), Some(&message[..]));
+}
+
+#[test]
 fn active_ur_message_keeps_its_original_limit() {
     const FRAGMENT_LEN: usize = 100;
     const MESSAGE_LEN: usize = TWO_PART_COUNT * FRAGMENT_LEN;
@@ -427,4 +453,32 @@ fn active_ur_message_keeps_its_original_limit() {
     assert_eq!(decoder.message().unwrap(), Some(&message[..]));
     decoder.clear();
     assert!(decoder.receive(UR::parse(&first).unwrap()).is_err());
+}
+
+#[test]
+fn raising_only_the_sequence_limit_admits_a_longer_message() {
+    use fountain::decoder::{Error, Limits, DEFAULT_MAX_SEQUENCE_COUNT};
+
+    let fragment_count = DEFAULT_MAX_SEQUENCE_COUNT + 1;
+    let message: Vec<u8> = (0..fragment_count).map(|index| index as u8).collect();
+    let mut encoder = Encoder::new();
+    encoder.start("bytes", &message, SINGLE_BYTE_FRAGMENT_LEN);
+
+    let mut decoder = Decoder::default();
+    assert!(matches!(
+        decoder.receive(encoder.next_part()),
+        Err(foundation_ur::decoder::Error::Fountain(
+            Error::SequenceCountTooLarge { .. }
+        ))
+    ));
+
+    // The mixed-part and queue budgets scale with the message, so they need no change.
+    decoder.set_limits(Limits {
+        max_sequence_count: fragment_count,
+        ..Limits::default()
+    });
+    while !decoder.is_complete() {
+        decoder.receive(encoder.next_part()).unwrap();
+    }
+    assert_eq!(decoder.message().unwrap(), Some(&message[..]));
 }

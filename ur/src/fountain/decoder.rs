@@ -18,8 +18,15 @@ use crate::{
 
 const BYTES_PER_KIBIBYTE: usize = 1024;
 const BYTES_PER_MEBIBYTE: usize = BYTES_PER_KIBIBYTE * BYTES_PER_KIBIBYTE;
-const DEFAULT_MAX_MIXED_PARTS: usize = 128;
-const DEFAULT_MAX_QUEUED_PARTS: usize = 128;
+const DEFAULT_MAX_MIXED_PARTS: usize = PARTS_PER_FRAGMENT * MAX_ALLOC_SEQUENCE_COUNT;
+const DEFAULT_MAX_QUEUED_PARTS: usize = PARTS_PER_FRAGMENT * MAX_ALLOC_SEQUENCE_COUNT;
+
+/// Retained mixed parts, and queued parts, allowed per source fragment of the
+/// message being decoded, on top of the absolute [`Limits`].
+///
+/// Joining a stream after its simple fragments needs about 3.1 per fragment
+/// at [`MAX_ALLOC_SEQUENCE_COUNT`] fragments.
+pub const PARTS_PER_FRAGMENT: usize = 4;
 
 /// A [`decoder`](BaseDecoder) that uses [`alloc`] collection types.
 #[cfg(feature = "alloc")]
@@ -78,16 +85,24 @@ impl<
 pub const DEFAULT_MAX_MESSAGE_LEN: usize = 16 * BYTES_PER_MEBIBYTE;
 
 /// Default maximum source-fragment count for allocating decoders.
-pub const DEFAULT_MAX_SEQUENCE_COUNT: usize = 16 * 1024;
+///
+/// An animated QR code this long already takes minutes to scan. Callers can
+/// raise it with [`Limits`] up to [`MAX_ALLOC_SEQUENCE_COUNT`].
+pub const DEFAULT_MAX_SEQUENCE_COUNT: usize = 1024;
+
+/// The largest source-fragment count an allocating decoder can be configured for.
+pub const MAX_ALLOC_SEQUENCE_COUNT: usize = 16 * 1024;
 
 /// Resource limits for decoding a message.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
     /// Maximum number of source fragments.
     pub max_sequence_count: usize,
-    /// Maximum number of retained mixed parts.
+    /// Maximum number of retained mixed parts, further bounded to
+    /// [`PARTS_PER_FRAGMENT`] per fragment of the active message.
     pub max_mixed_parts: usize,
-    /// Maximum number of queued parts.
+    /// Maximum number of queued parts, further bounded to
+    /// [`PARTS_PER_FRAGMENT`] per fragment of the active message.
     pub max_queued_parts: usize,
 }
 
@@ -217,7 +232,8 @@ impl<T: Types> BaseDecoder<T> {
     }
 
     fn process_part(&mut self, part: IndexedPart<T::Fragment, T::Indexes>) -> Result<(), Error> {
-        Self::enqueue(&mut self.queue, self.limits.max_queued_parts, part)?;
+        let max_queued_parts = self.max_queued_parts();
+        Self::enqueue(&mut self.queue, max_queued_parts, part)?;
         while !self.is_complete() {
             let Some(part) = self.queue.pop_front() else {
                 break;
@@ -240,6 +256,26 @@ impl<T: Types> BaseDecoder<T> {
             return Err(Error::QueueFull);
         }
         queue.push_back(part).map_err(|_| Error::QueueFull)
+    }
+
+    /// Scales part limits with the active message, so a long message is not
+    /// held to a short one's budget and memory stays proportional to it.
+    fn per_fragment_limit(&self, limit: usize) -> usize {
+        self.message_description
+            .as_ref()
+            .map_or(limit, |description| {
+                let sequence_count =
+                    usize::try_from(description.sequence_count).unwrap_or(usize::MAX);
+                limit.min(sequence_count.saturating_mul(PARTS_PER_FRAGMENT))
+            })
+    }
+
+    fn max_mixed_parts(&self) -> usize {
+        self.per_fragment_limit(self.limits.max_mixed_parts)
+    }
+
+    fn max_queued_parts(&self) -> usize {
+        self.per_fragment_limit(self.limits.max_queued_parts)
     }
 
     /// Return the fragment, mixed-part and queue limits.
@@ -390,16 +426,13 @@ impl<T: Types> BaseDecoder<T> {
     }
 
     fn reduce_mixed(&mut self, part: &IndexedPart<T::Fragment, T::Indexes>) -> Result<(), Error> {
+        let max_queued_parts = self.max_queued_parts();
         let mut result = Ok(());
         self.mixed_parts.retain_mut(|mixed_part| {
             mixed_part.reduce(part);
 
             if mixed_part.is_simple() && result.is_ok() {
-                result = Self::enqueue(
-                    &mut self.queue,
-                    self.limits.max_queued_parts,
-                    mixed_part.clone(),
-                );
+                result = Self::enqueue(&mut self.queue, max_queued_parts, mixed_part.clone());
             }
 
             !mixed_part.is_simple()
@@ -459,13 +492,14 @@ impl<T: Types> BaseDecoder<T> {
         }
 
         if part.is_simple() {
-            Self::enqueue(&mut self.queue, self.limits.max_queued_parts, part)?;
+            let max_queued_parts = self.max_queued_parts();
+            Self::enqueue(&mut self.queue, max_queued_parts, part)?;
         } else {
             if part.indexes.is_empty() {
                 return Ok(());
             }
             self.reduce_mixed(&part)?;
-            if self.mixed_parts.len() >= self.limits.max_mixed_parts {
+            if self.mixed_parts.len() >= self.max_mixed_parts() {
                 return Err(Error::TooManyMixedParts);
             }
             self.mixed_parts
@@ -509,7 +543,7 @@ pub trait Types: Default {
     /// inside the chooser. Defaulted so that adding it does not break an outside
     /// implementation of this trait; any implementation backed by fixed-capacity
     /// storage should override it with that capacity.
-    const SEQUENCE_COUNT_LIMIT: usize = DEFAULT_MAX_SEQUENCE_COUNT;
+    const SEQUENCE_COUNT_LIMIT: usize = MAX_ALLOC_SEQUENCE_COUNT;
 }
 
 /// [`alloc`] types for [`BaseDecoder`].
@@ -531,7 +565,7 @@ impl Types for Alloc {
     >;
     type Chooser = chooser::Alloc;
 
-    const SEQUENCE_COUNT_LIMIT: usize = DEFAULT_MAX_SEQUENCE_COUNT;
+    const SEQUENCE_COUNT_LIMIT: usize = MAX_ALLOC_SEQUENCE_COUNT;
 }
 
 /// [`heapless`] types for [`BaseDecoder`].
