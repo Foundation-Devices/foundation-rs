@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::notification::Work;
-use crate::{Error, Result};
+use crate::limits::{check_max, EXTRANONCE2_SIZE_MAX};
+use crate::{Error, Field, Result};
 
 use bitcoin_hashes::sha256d::Hash as DHash;
 
@@ -61,37 +62,36 @@ impl JobCreator {
         self.version_mask = mask as i32;
     }
 
-    #[cfg(feature = "alloc")]
-    pub(crate) fn set_extranonces(&mut self, extranonce1: tvec!(u8, 8), extranonce2_size: usize) {
-        self.extranonce1 = extranonce1;
-        self.extranonce2_size = extranonce2_size;
-        self.extranonce2.resize(extranonce2_size, 0);
-    }
-    #[cfg(not(feature = "alloc"))]
     pub(crate) fn set_extranonces(
         &mut self,
         extranonce1: tvec!(u8, 8),
         extranonce2_size: usize,
     ) -> Result<()> {
+        // Validate before touching any state. Assigning `extranonce2_size` and
+        // only then failing to grow `extranonce2` would leave the two out of
+        // sync, and `roll` walks the buffer by that size.
+        check_max(
+            Field::Extranonce2Size,
+            extranonce2_size,
+            EXTRANONCE2_SIZE_MAX,
+        )?;
         self.extranonce1 = extranonce1;
         self.extranonce2_size = extranonce2_size;
+        #[cfg(feature = "alloc")]
+        self.extranonce2.resize(extranonce2_size, 0);
+        #[cfg(not(feature = "alloc"))]
         self.extranonce2
             .resize_default(extranonce2_size)
-            .map_err(|_| Error::VecFull)
+            .map_err(|_| Error::VecFull)?;
+        Ok(())
     }
 
-    #[cfg(feature = "alloc")]
-    pub(crate) fn set_work(&mut self, work: Work) {
-        self.last_work = Some(work);
-        self.version_bits = 0;
-        self.extranonce2.resize(self.extranonce2_size, 0);
-        self.extranonce2.fill(0);
-        self.ntime_bits = 0;
-    }
-    #[cfg(not(feature = "alloc"))]
     pub(crate) fn set_work(&mut self, work: Work) -> Result<()> {
         self.last_work = Some(work);
         self.version_bits = 0;
+        #[cfg(feature = "alloc")]
+        self.extranonce2.resize(self.extranonce2_size, 0);
+        #[cfg(not(feature = "alloc"))]
         self.extranonce2
             .resize_default(self.extranonce2_size)
             .map_err(|_| Error::VecFull)?;
@@ -142,7 +142,10 @@ impl JobCreator {
 
     pub(crate) fn roll(&mut self) -> Result<Job> {
         let work = self.last_work.as_ref().ok_or(Error::NoWork)?;
-        let rolled_version = if self.version_rolling {
+        // A zero mask means the pool grants no rollable bits. Taking the
+        // rolling branch would shift by `0i32.trailing_zeros()`, i.e. 32, which
+        // is an overflowing shift.
+        let rolled_version = if self.version_rolling && self.version_mask != 0 {
             self.version_bits = self.version_bits.wrapping_add(1);
             (work.version & !self.version_mask)
                 | (((self.version_bits as i32) << self.version_mask.trailing_zeros())
@@ -151,7 +154,9 @@ impl JobCreator {
             work.version
         };
         if self.extranonce2_rolling {
-            for i in (0..self.extranonce2_size).rev() {
+            // Walk the buffer itself rather than `extranonce2_size`, so this
+            // cannot index out of bounds even if the two ever diverge.
+            for i in (0..self.extranonce2.len()).rev() {
                 match self.extranonce2[i].checked_add(1) {
                     Some(v) => {
                         self.extranonce2[i] = v;
@@ -163,7 +168,8 @@ impl JobCreator {
         }
         let rolled_ntime = if self.ntime_rolling {
             self.ntime_bits = self.ntime_bits.wrapping_add(1);
-            work.ntime + self.ntime_bits
+            // `ntime` comes from the pool, so the sum can overflow.
+            work.ntime.wrapping_add(self.ntime_bits)
         } else {
             work.ntime
         };
@@ -198,19 +204,6 @@ mod tests {
         let mut job_creator = JobCreator::default();
         assert_eq!(job_creator.roll(), Err(Error::NoWork));
         let job_id = hstring!(32, "1234");
-        #[cfg(feature = "alloc")]
-        job_creator.set_work(Work {
-            job_id: job_id.clone(),
-            prev_hash: [0; 32],
-            coinb1: Vec::new(),
-            coinb2: Vec::new(),
-            merkle_branch: Vec::new(),
-            version: 0x2000_0000,
-            nbits: 0x1234_5678,
-            ntime: 0,
-            clean_jobs: false,
-        });
-        #[cfg(not(feature = "alloc"))]
         job_creator
             .set_work(Work {
                 job_id: job_id.clone(),
@@ -225,9 +218,6 @@ mod tests {
             })
             .unwrap();
         job_creator.set_version_mask(0x1fff_e000);
-        #[cfg(feature = "alloc")]
-        job_creator.set_extranonces(Vec::new(), 1);
-        #[cfg(not(feature = "alloc"))]
         job_creator.set_extranonces(Vec::new(), 1).unwrap();
         assert_eq!(
             job_creator.roll(),
@@ -308,19 +298,6 @@ mod tests {
                 }
             })
         );
-        #[cfg(feature = "alloc")]
-        job_creator.set_work(Work {
-            job_id: job_id.clone(),
-            prev_hash: [0; 32],
-            coinb1: Vec::new(),
-            coinb2: Vec::new(),
-            merkle_branch: Vec::new(),
-            version: 0x2000_0000,
-            nbits: 0x1234_5678,
-            ntime: 0,
-            clean_jobs: false,
-        });
-        #[cfg(not(feature = "alloc"))]
         job_creator
             .set_work(Work {
                 job_id: job_id.clone(),
@@ -355,13 +332,74 @@ mod tests {
         );
     }
 
+    fn work_with(version: i32, ntime: u32) -> Work {
+        Work {
+            job_id: hstring!(32, "1234"),
+            prev_hash: [0; 32],
+            coinb1: Vec::new(),
+            coinb2: Vec::new(),
+            merkle_branch: Vec::new(),
+            version,
+            nbits: 0x1234_5678,
+            ntime,
+            clean_jobs: false,
+        }
+    }
+
+    /// `mining.set_version_mask` with a zero mask grants no rollable bits.
+    /// Rolling anyway would shift by `0i32.trailing_zeros()`, i.e. 32.
+    #[test]
+    fn test_roll_zero_version_mask() {
+        let mut job_creator = JobCreator::default();
+        job_creator.set_work(work_with(0x2000_0000, 0)).unwrap();
+        job_creator.set_extranonces(Vec::new(), 1).unwrap();
+        job_creator.set_version_mask(0);
+        job_creator.version_rolling = true;
+
+        let job = job_creator.roll().unwrap();
+        assert_eq!(job.header.version, 0x2000_0000);
+    }
+
+    /// `ntime` is pool-supplied, so the rolled sum can wrap.
+    #[test]
+    fn test_roll_ntime_overflow() {
+        let mut job_creator = JobCreator::default();
+        job_creator
+            .set_work(work_with(0x2000_0000, u32::MAX))
+            .unwrap();
+        job_creator.set_extranonces(Vec::new(), 1).unwrap();
+        job_creator.ntime_rolling = true;
+
+        let job = job_creator.roll().unwrap();
+        assert_eq!(job.header.ntime, 0);
+    }
+
+    /// A rejected `extranonce2_size` must not leave the size and the buffer out
+    /// of sync, or the extranonce2 rolling loop indexes past the buffer.
+    #[test]
+    fn test_set_extranonces_rejects_oversized_and_keeps_state() {
+        let mut job_creator = JobCreator::default();
+        job_creator.set_extranonces(Vec::new(), 4).unwrap();
+        assert_eq!(
+            job_creator.set_extranonces(Vec::new(), 9),
+            Err(Error::FieldTooLarge {
+                field: Field::Extranonce2Size,
+                max: EXTRANONCE2_SIZE_MAX,
+                actual: 9,
+            })
+        );
+        assert_eq!(job_creator.extranonce2_size, 4);
+        assert_eq!(job_creator.extranonce2.len(), 4);
+
+        job_creator.set_work(work_with(0x2000_0000, 0)).unwrap();
+        job_creator.extranonce2_rolling = true;
+        assert!(job_creator.roll().is_ok());
+    }
+
     #[test]
     fn test_merkle_root() {
         // example from https://github.com/stratum-mining/stratum/pull/305/files
         let mut job_creator = JobCreator::default();
-        #[cfg(feature = "alloc")]
-        job_creator.set_extranonces(hvec!(u8, 8, [120, 55, 179, 37]), 4);
-        #[cfg(not(feature = "alloc"))]
         job_creator
             .set_extranonces(hvec!(u8, 8, [120, 55, 179, 37]), 4)
             .unwrap();

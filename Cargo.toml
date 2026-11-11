@@ -10,6 +10,7 @@ members = [
     "ffi",
     "firmware",
     "stratum-v1",
+    "stratum-v1/fuzz",
     "test-vectors",
     "ur",
     "urtypes",
@@ -57,6 +58,7 @@ foundation-arena = { version = "0.1.0", path = "arena" }
 foundation-codecs = { path = "codecs" }
 foundation-test-vectors = { path = "test-vectors" }
 foundation-urtypes = { path = "urtypes" }
+stratum-v1 = { path = "stratum-v1" }
 
 [profile.release]
 debug = 1
