@@ -15,9 +15,4 @@ bech32 = { workspace = true }
 heapless = { workspace = true }
 
 [dev-dependencies]
-criterion = { workspace = true }
 foundation-test-vectors = { workspace = true, features = ["nostr"] }
-
-[[bench]]
-name = "bench"
-harness = false
