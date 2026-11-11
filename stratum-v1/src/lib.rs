@@ -9,15 +9,10 @@
 //!
 //! The pool is not trusted. Every length and domain coming off the wire is
 //! validated before it is used to slice, shift or resize anything, so arbitrary
-//! peer bytes produce an [`Error`] rather than a panic. The maxima are listed
-//! in [`limits`] and are identical for both builds:
-//!
-//! - In the default `heapless` build they are the capacities of the fixed-size
-//!   buffers the fields are decoded into.
-//! - With `alloc`, the deserialized strings and vectors are unbounded, so the
-//!   same maxima are enforced explicitly. Parsing always runs over a single
-//!   frame taken from the fixed-size receive buffer, which bounds allocation to
-//!   `RX_BUF_SIZE` regardless.
+//! peer bytes produce an [`Error`] rather than a panic; see [`limits`]. Other
+//! fields are bounded by their types in the default `heapless` build. With
+//! `alloc` they are bounded only by the frame, which parsing always takes from
+//! the fixed-size receive buffer, so allocation stays within `RX_BUF_SIZE`.
 //!
 //! A frame that fails validation is consumed before its error is returned, so
 //! it cannot poison the frames behind it, and client state is left untouched.

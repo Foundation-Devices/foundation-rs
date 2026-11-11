@@ -9,26 +9,10 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
 pub enum Field {
-    /// `mining.notify` job identifier.
-    JobId,
     /// `mining.notify` previous block hash.
     PrevHash,
-    /// `mining.notify` first part of the coinbase transaction.
-    Coinb1,
-    /// `mining.notify` second part of the coinbase transaction.
-    Coinb2,
-    /// `mining.notify` merkle branch list.
-    MerkleBranch,
-    /// `mining.subscribe` response extranonce1.
-    Extranonce1,
     /// `mining.subscribe` response extranonce2 size.
     Extranonce2Size,
-    /// `mining.subscribe` response subscription list.
-    Subscriptions,
-    /// `mining.set_version_mask` parameter list.
-    VersionMaskParams,
-    /// `mining.set_difficulty` parameter list.
-    DifficultyParams,
 }
 
 #[derive(Debug, Clone, From, PartialEq)]
