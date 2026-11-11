@@ -85,6 +85,9 @@ pub enum Error {
     NoWork,
 
     /// Pool reported an error
+    ///
+    /// `message` and `detail` are pool text that can echo the user back, so log
+    /// them as you would the credentials.
     Pool {
         code: isize,
         message: tstring!(32),

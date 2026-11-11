@@ -5,6 +5,9 @@
 //!
 //! This library provides client side functions to create requests and parse responses for Stratum v1 protocol.
 //!
+//! Frames that carry pool credentials (`mining.authorize`, `mining.submit` and
+//! the replies to them) are never logged in full, under either backend.
+//!
 //! # Handling of malformed peer input
 //!
 //! The pool is not trusted. Every length and domain coming off the wire is
