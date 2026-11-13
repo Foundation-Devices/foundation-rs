@@ -14,6 +14,7 @@ use crate::{
         chooser::BaseFragmentChooser,
         part::{IndexedPart, Part},
     },
+    CRC32,
 };
 
 const BYTES_PER_KIBIBYTE: usize = 1024;
@@ -340,6 +341,9 @@ impl<T: Types> BaseDecoder<T> {
     ///
     /// If an inconsistent internal state is detected, an error will be returned.
     ///
+    /// Returns [`Error::InvalidChecksum`] if the message doesn't match the CRC32
+    /// its parts declare. That catches corruption, not a sender who recomputes it.
+    ///
     /// # Examples
     ///
     /// See the [`crate::fountain`] module documentation for an example.
@@ -347,16 +351,21 @@ impl<T: Types> BaseDecoder<T> {
     /// [`complete`]: BaseDecoder::is_complete
     pub fn message(&self) -> Result<Option<&[u8]>, Error> {
         if self.is_complete() {
-            if self.message[self.message_description.as_ref().unwrap().message_length..]
-                .iter()
-                .any(|&b| b != 0)
-            {
+            let description = self.message_description.as_ref().unwrap();
+            let (message, padding) = self.message.split_at(description.message_length);
+            if padding.iter().any(|&b| b != 0) {
                 return Err(Error::InvalidPadding);
             }
 
-            Ok(Some(
-                &self.message[..self.message_description.as_ref().unwrap().message_length],
-            ))
+            let calculated = CRC32.checksum(message);
+            if calculated != description.checksum {
+                return Err(Error::InvalidChecksum {
+                    calculated,
+                    expected: description.checksum,
+                });
+            }
+
+            Ok(Some(message))
         } else {
             Ok(None)
         }
@@ -625,6 +634,13 @@ impl<
 pub enum Error {
     /// The padding is invalid.
     InvalidPadding,
+    /// The reassembled message doesn't match the checksum its parts declare.
+    InvalidChecksum {
+        /// CRC32 of the reassembled message.
+        calculated: u32,
+        /// CRC32 the parts declare.
+        expected: u32,
+    },
     /// The received part is inconsistent with the previously received ones.
     InconsistentPart {
         /// The description of the message from the received part.
@@ -667,6 +683,13 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::InvalidPadding => write!(f, "Invalid padding")?,
+            Error::InvalidChecksum {
+                calculated,
+                expected,
+            } => write!(
+                f,
+                "Message checksum mismatch (calculated {calculated:X}, expected {expected:X})"
+            )?,
             Error::InconsistentPart { received, expected } => {
                 write!(f, "Inconsistent part: ")?;
 
@@ -951,5 +974,44 @@ pub mod tests {
             Decoder::default().receive(&part),
             Err(Error::InvalidPart)
         ));
+    }
+
+    #[test]
+    fn test_decoder_rejects_a_message_that_fails_its_checksum() {
+        // Alters fragment `index` in its simple part, or in all mixed parts once that part is withheld.
+        fn decode(index: u32, mixed: bool) -> Result<Option<alloc::vec::Vec<u8>>, Error> {
+            let message = message();
+            let mut encoder = Encoder::new();
+            encoder.start(&message, MAX_FRAGMENT_LEN);
+            let target = index + 1;
+            let mut decoder = Decoder::default();
+            while !decoder.is_complete() {
+                let mut part = encoder.next_part();
+                let is_mixed = part.sequence > part.sequence_count;
+                if mixed && part.sequence == target {
+                    continue;
+                }
+                let mut data = part.data.to_vec();
+                if (mixed && is_mixed) || (!mixed && part.sequence == target) {
+                    data[0] ^= 1;
+                }
+                part.data = &data;
+                decoder.receive(&part)?;
+            }
+            decoder.message().map(|message| message.map(<[u8]>::to_vec))
+        }
+
+        let message = message();
+        let mut encoder = Encoder::new();
+        encoder.start(&message, MAX_FRAGMENT_LEN);
+        let last = encoder.sequence_count() - 1;
+        for index in [0, last / 2, last] {
+            for mixed in [false, true] {
+                assert!(
+                    matches!(decode(index, mixed), Err(Error::InvalidChecksum { .. })),
+                    "fragment {index}, mixed: {mixed}"
+                );
+            }
+        }
     }
 }
