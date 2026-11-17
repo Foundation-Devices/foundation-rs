@@ -147,7 +147,8 @@ impl<T: Types> BaseDecoder<T> {
     /// # Errors
     ///
     /// Reject invalid or inconsistent parts and resource-limit violations.
-    /// Queue and mixed-part capacity errors discard the active message.
+    /// A full queue discards the active message. A full mixed-part store is
+    /// not an error: the part is dropped and the message is kept.
     ///
     /// [`validate`]: BaseDecoder::is_part_consistent
     pub fn receive(&mut self, part: &Part) -> Result<bool, Error> {
@@ -465,12 +466,15 @@ impl<T: Types> BaseDecoder<T> {
                 return Ok(());
             }
             self.reduce_mixed(&part)?;
-            if self.mixed_parts.len() >= self.limits.max_mixed_parts {
-                return Err(Error::TooManyMixedParts);
+            // A full store drops this part, not the message. The parts it
+            // holds are still valid, and later parts can still complete the
+            // message. A scan that joins an animated UR after its simple parts
+            // sees only mixed parts, and would never finish if each full store
+            // discarded it.
+            if self.mixed_parts.len() < self.limits.max_mixed_parts {
+                // A fixed-capacity store can be smaller than a raised limit.
+                self.mixed_parts.try_push(part).ok();
             }
-            self.mixed_parts
-                .try_push(part)
-                .map_err(|_| Error::TooManyMixedParts)?;
         }
         Ok(())
     }
@@ -610,6 +614,9 @@ pub enum Error {
     /// Too many fragments.
     TooManyFragments,
     /// Too many retained mixed parts.
+    ///
+    /// No longer returned: since 0.5.1 a full mixed-part store drops the
+    /// part instead. Kept so that matching on it still compiles.
     TooManyMixedParts,
     /// The part queue is full.
     QueueFull,

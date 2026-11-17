@@ -182,8 +182,63 @@ fn fragment_count_limits_cover_simple_and_mixed_parts() {
     ));
 }
 
+/// A four-fragment part of zeros.
+fn four_fragment_part(sequence: u32) -> fountain::part::Part<'static> {
+    fountain::part::Part {
+        sequence,
+        sequence_count: SEQUENCE_CAPACITY as u32,
+        message_length: FOUR_PART_MESSAGE_LEN,
+        checksum: 0,
+        data: &[0],
+    }
+}
+
+/// A four-fragment part that mixes fragments other than the first, so that
+/// receiving the first fragment doesn't reduce it to a simple part.
+fn mixed_part_without_first_fragment() -> fountain::part::Part<'static> {
+    use std::collections::BTreeSet;
+    const FIRST_FRAGMENT: usize = 0;
+    (SEQUENCE_CAPACITY as u32 + FIRST_SEQUENCE..MIXED_SEQUENCE_SEARCH_END)
+        .map(four_fragment_part)
+        .find(|part| {
+            let indexes: BTreeSet<usize> = part.indexes::<fountain::chooser::Alloc, _>();
+            indexes.len() > 1 && !indexes.contains(&FIRST_FRAGMENT)
+        })
+        .unwrap()
+}
+
+/// Receives the first fragment, then a mixed part the decoder has no room
+/// for, then the remaining fragments.
+fn receive_around_a_full_mixed_part_store<T: fountain::decoder::Types>(
+    decoder: &mut fountain::decoder::BaseDecoder<T>,
+) {
+    decoder
+        .receive(&four_fragment_part(FIRST_SEQUENCE))
+        .unwrap();
+    // The mixed part is dropped. The first fragment stays, so the remaining
+    // ones complete the message.
+    assert!(decoder
+        .receive(&mixed_part_without_first_fragment())
+        .unwrap());
+    for sequence in FIRST_SEQUENCE + 1..=SEQUENCE_CAPACITY as u32 {
+        decoder.receive(&four_fragment_part(sequence)).unwrap();
+    }
+    assert!(decoder.is_complete());
+}
+
 #[test]
-fn mixed_and_queue_limits_return_errors_and_allow_reuse() {
+fn full_mixed_part_store_drops_the_part_and_keeps_the_message() {
+    use fountain::decoder::Limits;
+    let mut decoder = fountain::Decoder::default();
+    decoder.set_limits(Limits {
+        max_mixed_parts: NO_CAPACITY,
+        ..Limits::default()
+    });
+    receive_around_a_full_mixed_part_store(&mut decoder);
+}
+
+#[test]
+fn queue_limit_returns_error_and_allows_reuse() {
     use fountain::{
         decoder::{Error, Limits},
         part::Part,
@@ -202,21 +257,6 @@ fn mixed_and_queue_limits_return_errors_and_allow_reuse() {
     };
     assert!(matches!(decoder.receive(&part), Err(Error::QueueFull)));
     assert!(decoder.is_empty());
-    decoder.set_limits(Limits {
-        max_mixed_parts: NO_CAPACITY,
-        ..Limits::default()
-    });
-    let mut hit_limit = false;
-    for sequence in SEQUENCE_CAPACITY as u32 + FIRST_SEQUENCE..MIXED_SEQUENCE_SEARCH_END {
-        decoder.clear();
-        part.sequence = sequence;
-        if matches!(decoder.receive(&part), Err(Error::TooManyMixedParts)) {
-            hit_limit = true;
-            assert!(decoder.is_empty());
-            break;
-        }
-    }
-    assert!(hit_limit);
     decoder.set_limits(Limits::default());
     for sequence in FIRST_SEQUENCE..=SEQUENCE_CAPACITY as u32 {
         part.sequence = sequence;
@@ -323,11 +363,7 @@ fn heapless_queue_overflow_returns_error_after_reduction() {
 }
 
 #[test]
-fn heapless_mixed_part_capacity_returns_error() {
-    use fountain::{
-        decoder::{Error, Limits},
-        part::Part,
-    };
+fn heapless_full_mixed_part_store_drops_the_part_and_keeps_the_message() {
     let mut decoder = fountain::HeaplessDecoder::<
         FOUR_PART_MESSAGE_LEN,
         NO_CAPACITY,
@@ -335,24 +371,46 @@ fn heapless_mixed_part_capacity_returns_error() {
         SEQUENCE_CAPACITY,
         SINGLE_ENTRY_QUEUE_CAPACITY,
     >::new();
-    decoder.set_limits(Limits::default());
-    let mut hit_limit = false;
-    for sequence in SEQUENCE_CAPACITY as u32 + FIRST_SEQUENCE..MIXED_SEQUENCE_SEARCH_END {
-        decoder.clear();
-        let result = decoder.receive(&Part {
-            sequence,
-            sequence_count: SEQUENCE_CAPACITY as u32,
-            message_length: FOUR_PART_MESSAGE_LEN,
-            checksum: 0,
-            data: &[0],
-        });
-        if matches!(result, Err(Error::TooManyMixedParts)) {
-            hit_limit = true;
-            assert!(decoder.is_empty());
+    // A limit above the fixed capacity reaches the store's own bound.
+    decoder.set_limits(fountain::decoder::Limits::default());
+    receive_around_a_full_mixed_part_store(&mut decoder);
+}
+
+#[test]
+fn small_heapless_decoder_completes_a_stream_joined_after_its_simple_fragments() {
+    // Passport Core retains 8 mixed parts and queues 8.
+    const FRAGMENT_COUNT: usize = MESSAGE_CAPACITY;
+    const RETAINED_MIXED_PARTS: usize = 8;
+    const QUEUED_PARTS: usize = 8;
+    const PART_BUDGET: usize = 64 * FRAGMENT_COUNT;
+    const BYTE_STEP: usize = 7;
+
+    let message: Vec<u8> = (0..FRAGMENT_COUNT)
+        .map(|index| (index * BYTE_STEP) as u8)
+        .collect();
+    let mut encoder = Encoder::new();
+    encoder.start("bytes", &message, SINGLE_BYTE_FRAGMENT_LEN);
+    assert_eq!(encoder.sequence_count(), FRAGMENT_COUNT as u32);
+    // A scanner that joins late only ever sees mixed parts, and soon holds
+    // more unresolved ones than it has room for.
+    for _ in 0..FRAGMENT_COUNT {
+        encoder.next_part();
+    }
+    let mut decoder = foundation_ur::HeaplessDecoder::<
+        MESSAGE_CAPACITY,
+        RETAINED_MIXED_PARTS,
+        ENCODED_FRAGMENT_CAPACITY,
+        FRAGMENT_COUNT,
+        QUEUED_PARTS,
+        UR_TYPE_CAPACITY,
+    >::new();
+    for _ in 0..PART_BUDGET {
+        if decoder.is_complete() {
             break;
         }
+        decoder.receive(encoder.next_part()).unwrap();
     }
-    assert!(hit_limit);
+    assert_eq!(decoder.message().unwrap(), Some(&message[..]));
 }
 
 #[test]
