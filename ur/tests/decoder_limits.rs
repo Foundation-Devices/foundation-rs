@@ -470,7 +470,9 @@ fn serialized_boundary_inputs_do_not_panic() {
 #[test]
 fn default_limits_decode_a_long_stream_joined_after_its_simple_fragments() {
     const FRAGMENT_COUNT: usize = 512;
-    const PART_BUDGET: usize = 8 * FRAGMENT_COUNT;
+    // This join completes in about 2.5 parts per fragment. A store fixed at
+    // 128 mixed parts drops most of them and needs more than 5.
+    const PART_BUDGET: usize = 4 * FRAGMENT_COUNT;
     const BYTE_STEP: usize = 7;
 
     let message: Vec<u8> = (0..FRAGMENT_COUNT)

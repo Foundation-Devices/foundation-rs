@@ -25,8 +25,9 @@ const DEFAULT_MAX_QUEUED_PARTS: usize = PARTS_PER_FRAGMENT * MAX_ALLOC_SEQUENCE_
 /// Retained mixed parts, and queued parts, allowed per source fragment of the
 /// message being decoded, on top of the absolute [`Limits`].
 ///
-/// Joining a stream after its simple fragments needs about 3.1 per fragment
-/// at [`MAX_ALLOC_SEQUENCE_COUNT`] fragments.
+/// A stream joined after its simple fragments retains up to about 3.1 mixed
+/// parts per fragment at [`MAX_ALLOC_SEQUENCE_COUNT`] fragments. A smaller
+/// store still completes it, but drops parts and needs more of them.
 pub const PARTS_PER_FRAGMENT: usize = 4;
 
 /// A [`decoder`](BaseDecoder) that uses [`alloc`] collection types.
@@ -663,11 +664,6 @@ pub enum Error {
     },
     /// Too many fragments.
     TooManyFragments,
-    /// Too many retained mixed parts.
-    ///
-    /// No longer returned: since 0.5.1 a full mixed-part store drops the
-    /// part instead. Kept so that matching on it still compiles.
-    TooManyMixedParts,
     /// The part queue is full.
     QueueFull,
     /// The part describes a message longer than the decoder's limit.
@@ -736,7 +732,6 @@ impl fmt::Display for Error {
             Error::NotEnoughSpace { needed, capacity } => {
                 write!(f, "Not enough space: needed {needed}, capacity {capacity}")?
             }
-            Error::TooManyMixedParts => write!(f, "Too many mixed parts")?,
             Error::QueueFull => write!(f, "Part queue is full")?,
             Error::TooManyFragments => write!(f, "Too many fragments for the current message")?,
             Error::SequenceCountTooLarge { count, limit } => write!(
