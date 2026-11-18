@@ -86,7 +86,7 @@ fn message_limit_changes_apply_after_clear() {
         sequence: FIRST_SEQUENCE,
         sequence_count: TWO_PART_COUNT as u32,
         message_length: TWO_PART_MESSAGE_LEN,
-        checksum: 0,
+        checksum: crc::Crc::<u32>::new(&crc::CRC_32_ISO_HDLC).checksum(&[1; TWO_PART_MESSAGE_LEN]),
         data: &[1; TWO_PART_FRAGMENT_LEN],
     };
     decoder.receive(&part).unwrap();
