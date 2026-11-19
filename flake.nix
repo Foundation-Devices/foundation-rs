@@ -233,6 +233,28 @@
             }
           );
 
+          # --- Cargo check (stratum-v1 with `defmt-03`) ---
+          #
+          # Also excluded from the `all-features` checks. `DEFMT_LOG=trace` is
+          # what makes this check useful: defmt compiles out the statements
+          # below the enabled level without requiring `Format` on their
+          # arguments, so at the default level a `debug!` or `trace!` of a
+          # non-`Format` type goes unnoticed. `alloc` is a separate code path
+          # and is checked too.
+          cargo-check-stratum-v1-defmt = craneLib.mkCargoDerivation (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              pnameSuffix = "-stratum-v1-defmt";
+              doInstallCargoArtifacts = false;
+              DEFMT_LOG = "trace";
+              buildPhaseCargoCommand = ''
+                cargo check --locked -p stratum-v1 --features defmt-03
+                cargo check --locked -p stratum-v1 --features defmt-03,alloc
+              '';
+            }
+          );
+
           # --- cbindgen header verification ---
           cbindgen-verify =
             let

@@ -230,7 +230,10 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 _ => Sensitivity::Public,
             };
             debug!("<< {}", inbound.loggable(line));
-            debug!("unresponded reqs: {:?}", self.reqs);
+            // One line per request: the map itself has no `defmt::Format` impl.
+            for (id, kind) in &self.reqs {
+                debug!("unresponded req #{}: {:?}", id, kind);
+            }
             if let Some(id) = consume!(parsed_id) {
                 // it's a Response
                 // Settled even if the reply fails to parse, so a bad one can't hold its slot.
