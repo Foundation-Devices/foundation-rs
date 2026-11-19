@@ -253,6 +253,10 @@ impl Write for FuzzPool {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         Ok(buf.len())
     }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 /// The mock transport never yields, so a future is always ready on first poll.

@@ -33,5 +33,5 @@ mod client;
 mod error;
 pub mod limits;
 
-pub use client::{Client, Extensions, Info, Job, Message, Share, VersionRolling};
+pub use client::{Client, Extensions, Info, Job, Message, Share, VersionRolling, Work};
 pub use error::{Error, Field, Result};

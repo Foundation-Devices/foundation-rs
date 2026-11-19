@@ -11,6 +11,7 @@ use crate::{Error, Result};
 pub use job::Job;
 use job::JobCreator;
 use notification::Notification;
+pub use notification::Work;
 use redact::Sensitivity;
 use request::ReqKind;
 pub use request::{Extensions, Info, Share, VersionRolling};
@@ -20,7 +21,7 @@ use response::Subscription;
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use embedded_io_async::{Read, ReadReady, Write};
 #[cfg(not(feature = "alloc"))]
-use heapless::{FnvIndexMap, String, Vec};
+use heapless::{index_map::FnvIndexMap, String, Vec};
 
 #[cfg(all(
     feature = "suggest-difficulty-notification",
@@ -29,7 +30,7 @@ use heapless::{FnvIndexMap, String, Vec};
 compile_error!("You have to choose if mining.suggest_difficulty is sent as a notification or as a request. Can't be both!");
 
 #[derive(Debug)]
-// #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Client<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize> {
     network_conn: C,
     rx_buf: [u8; RX_BUF_SIZE],
@@ -60,15 +61,24 @@ pub struct Client<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const T
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Message {
     Configured,
     Connected,
     Authorized,
-    Share { accepted: u64, rejected: u64 },
+    Share {
+        accepted: u64,
+        rejected: u64,
+    },
     VersionMask(u32),
     Difficulty(f64),
-    CleanJobs,
+    /// A `mining.notify` was received; [`Client::work`] now returns it.
+    ///
+    /// With `clean_jobs` set, the pool asks for every job built from earlier
+    /// work to be dropped.
+    Work {
+        clean_jobs: bool,
+    },
 }
 
 impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize>
@@ -115,6 +125,28 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
         self.job_creator.roll()
     }
 
+    /// The work from the latest `mining.notify`, or `None` before the first one.
+    ///
+    /// This is what [`Client::roll_job`] builds jobs from. It gives access to
+    /// the parts a [`Job`] does not carry, such as the coinbase halves.
+    pub fn work(&self) -> Option<&Work> {
+        self.job_creator.work()
+    }
+
+    /// The extranonce1 assigned by the pool in the `mining.subscribe` response.
+    ///
+    /// Empty until [`Message::Connected`] has been reported.
+    pub fn extranonce1(&self) -> &[u8] {
+        self.job_creator.extranonce1()
+    }
+
+    /// The extranonce2 size, in bytes, from the `mining.subscribe` response.
+    ///
+    /// Zero until [`Message::Connected`] has been reported.
+    pub fn extranonce2_size(&self) -> usize {
+        self.job_creator.extranonce2_size()
+    }
+
     /// # Poll for a Message from the Pool
     ///
     /// Parses at most one message out of the receive buffer, then tops the
@@ -134,6 +166,10 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
     ///
     /// Client state is only updated once a frame has been fully validated, so
     /// a rejected frame leaves the session as it was.
+    ///
+    /// A connection closed by the pool, seen as a ready transport that reads
+    /// zero bytes, is reported as [`Error::Network`] once every frame already
+    /// received has been returned.
     pub async fn poll_message(&mut self) -> Result<Option<Message>> {
         if self.rx_resync {
             match self.rx_buf[..self.rx_free_pos]
@@ -198,11 +234,19 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 _ => Sensitivity::Public,
             };
             debug!("<< {}", inbound.loggable(line));
-            debug!("unresponded reqs: {:?}", self.reqs);
+            // One line per request: the map itself has no `defmt::Format` impl.
+            for (id, kind) in &self.reqs {
+                debug!("unresponded req #{}: {:?}", id, kind);
+            }
             if let Some(id) = consume!(parsed_id) {
                 // it's a Response
                 // Settled even if the reply fails to parse, so a bad one can't hold its slot.
-                match self.reqs.remove(&id) {
+                #[cfg(feature = "alloc")]
+                let req = self.reqs.remove(&id);
+                // Order is irrelevant: requests are only ever looked up by id.
+                #[cfg(not(feature = "alloc"))]
+                let req = self.reqs.swap_remove(&id);
+                match req {
                     Some(ReqKind::Configure) => {
                         self.configuration = Some(consume!(response::parse_configure(line)));
                         info!("Stratum v1 Client Configured");
@@ -276,11 +320,10 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                     }
                     Ok(Notification::Notify) => {
                         let work = consume!(notification::parse_notify(line));
-                        if work.clean_jobs {
-                            msg = Some(Message::CleanJobs);
-                        }
+                        let clean_jobs = work.clean_jobs;
                         info!("New Work: {:?}", work);
                         consume!(self.job_creator.set_work(work));
+                        msg = Some(Message::Work { clean_jobs });
                     }
                     Err(e) => error!("Failed to parse notification: {:?}", e),
                 }
@@ -320,6 +363,12 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 .map_err(|_| Error::Network)?;
             // A chunk can span several frames, so only its size is logged here.
             debug!("read {} bytes @{}", n, self.rx_free_pos);
+            // The slice is never empty here, so reading nothing means the pool
+            // closed the connection. A message parsed above is still handed
+            // over; the close is reported once the buffered frames are drained.
+            if n == 0 && msg.is_none() {
+                return Err(Error::Network);
+            }
             self.rx_free_pos += n;
         }
         Ok(msg)

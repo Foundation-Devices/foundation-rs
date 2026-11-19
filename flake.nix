@@ -50,7 +50,7 @@
           overlays = [ (import rust-overlay) ];
         };
 
-        rustStable = pkgs.rust-bin.stable."1.93.1".default.override {
+        rustStable = pkgs.rust-bin.stable."1.95.0".default.override {
           extensions = [
             "rust-src"
             "rustfmt"
@@ -107,11 +107,6 @@
         commonArgs = {
           inherit src;
           strictDeps = true;
-
-          # The faster-hex git dependency requires an output hash for vendoring.
-          outputHashes = {
-            "faster-hex-0.10.0" = "sha256-RDqdms4swqXhG/+MOfaeFniCBGMEFqOxCsPQng6KyI0=";
-          };
         };
 
         # Build workspace dependencies once and share across checks.
@@ -233,12 +228,33 @@
             }
           );
 
+          # --- Cargo check (stratum-v1 with `defmt`) ---
+          #
+          # Also excluded from the `all-features` checks. `DEFMT_LOG=trace` is
+          # what makes this check useful: defmt compiles out the statements
+          # below the enabled level without requiring `Format` on their
+          # arguments, so at the default level a `debug!` or `trace!` of a
+          # non-`Format` type goes unnoticed. `alloc` is a separate code path
+          # and is checked too.
+          cargo-check-stratum-v1-defmt = craneLib.mkCargoDerivation (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              pnameSuffix = "-stratum-v1-defmt";
+              doInstallCargoArtifacts = false;
+              DEFMT_LOG = "trace";
+              buildPhaseCargoCommand = ''
+                cargo check --locked -p stratum-v1 --features defmt
+                cargo check --locked -p stratum-v1 --features defmt,alloc
+              '';
+            }
+          );
+
           # --- cbindgen header verification ---
           cbindgen-verify =
             let
               vendoredCargoDeps = craneLib.vendorCargoDeps {
                 inherit src;
-                outputHashes = commonArgs.outputHashes;
               };
             in
             pkgs.runCommand "cbindgen-verify"
@@ -290,7 +306,6 @@
               # Vendor cargo dependencies so Corrosion can invoke cargo in the sandbox.
               vendoredCargoDeps = craneLib.vendorCargoDeps {
                 inherit src;
-                outputHashes = commonArgs.outputHashes;
               };
             in
             pkgs.stdenv.mkDerivation {

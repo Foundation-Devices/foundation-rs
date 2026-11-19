@@ -24,7 +24,7 @@ pub struct Job {
     pub header: Header,
 }
 
-#[cfg(feature = "defmt-03")]
+#[cfg(feature = "defmt")]
 impl defmt::Format for Job {
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
@@ -43,7 +43,7 @@ impl defmt::Format for Job {
 }
 
 #[derive(Debug, Default)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct JobCreator {
     last_work: Option<Work>,
     version_mask: i32,
@@ -98,6 +98,18 @@ impl JobCreator {
         self.extranonce2.fill(0);
         self.ntime_bits = 0;
         Ok(())
+    }
+
+    pub(crate) fn work(&self) -> Option<&Work> {
+        self.last_work.as_ref()
+    }
+
+    pub(crate) fn extranonce1(&self) -> &[u8] {
+        self.extranonce1.as_slice()
+    }
+
+    pub(crate) fn extranonce2_size(&self) -> usize {
+        self.extranonce2_size
     }
 
     fn merkle_root(&self, work: &Work) -> Result<[u8; 32]> {

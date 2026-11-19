@@ -3,6 +3,6 @@
 
 # Keep this in sync. with the CI (flake.nix).
 [toolchain]
-channel = "1.93.1"
+channel = "1.95.0"
 profile = "default"
 targets = ["thumbv7em-none-eabihf"]

@@ -7,62 +7,13 @@
 //! way a pool would, and assert that arbitrary peer bytes turn into errors
 //! rather than panics, stalls or poisoned buffers.
 
-use embedded_io_async::{ErrorType, Read, ReadReady, Write};
+mod common;
+
+use common::{stream, MockPool};
 use stratum_v1::{Client, Error, Extensions, Field, Message, VersionRolling};
 
 const TX: usize = 512;
 const RX: usize = 512;
-
-/// A transport that replays a scripted byte stream, optionally in fragments.
-struct MockPool {
-    rx: Vec<u8>,
-    rx_pos: usize,
-    /// Maximum number of bytes handed over per `read`, to model a peer that
-    /// dribbles frames out across packets.
-    chunk: usize,
-    tx: Vec<u8>,
-}
-
-impl MockPool {
-    fn new(rx: &[u8]) -> Self {
-        Self::fragmented(rx, usize::MAX)
-    }
-
-    fn fragmented(rx: &[u8], chunk: usize) -> Self {
-        Self {
-            rx: rx.to_vec(),
-            rx_pos: 0,
-            chunk,
-            tx: Vec::new(),
-        }
-    }
-}
-
-impl ErrorType for MockPool {
-    type Error = embedded_io_async::ErrorKind;
-}
-
-impl Read for MockPool {
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        let n = (self.rx.len() - self.rx_pos).min(buf.len()).min(self.chunk);
-        buf[..n].copy_from_slice(&self.rx[self.rx_pos..self.rx_pos + n]);
-        self.rx_pos += n;
-        Ok(n)
-    }
-}
-
-impl ReadReady for MockPool {
-    fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.rx_pos < self.rx.len())
-    }
-}
-
-impl Write for MockPool {
-    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        self.tx.extend_from_slice(buf);
-        Ok(buf.len())
-    }
-}
 
 type Outcome = Result<Option<Message>, Error>;
 
@@ -83,15 +34,6 @@ const SET_DIFFICULTY: &[u8] = br#"{"params":[2.5],"id":null,"method":"mining.set
 /// A `mining.notify` whose previous-hash field is 8 characters instead of 64.
 /// The parser used to slice it at fixed offsets regardless.
 const SHORT_PREV_HASH: &[u8] = br#"{"id":null,"method":"mining.notify","params":["bf","4d16b6f8","01000000","072f736c7573682f",[],"00000002","1c2ac4af","504e86b9",false]}"#;
-
-fn stream(lines: &[&[u8]]) -> Vec<u8> {
-    let mut out = Vec::new();
-    for line in lines {
-        out.extend_from_slice(line);
-        out.push(b'\n');
-    }
-    out
-}
 
 #[tokio::test]
 async fn short_prev_hash_is_reported_not_panicked() {
@@ -272,4 +214,24 @@ async fn zero_version_mask_does_not_panic_when_rolling() {
 
     let job = client.roll_job().await.unwrap();
     assert_eq!(job.header.version, 0x2000_0000);
+}
+
+/// A closed connection reads zero bytes while staying ready. It has to surface
+/// as an error, after the frames already received, rather than as an endless
+/// run of empty polls.
+#[tokio::test]
+async fn closed_connection_is_reported_after_the_buffered_frames() {
+    let bytes = stream(&[SET_VERSION_MASK, SET_DIFFICULTY]);
+    let mut client: Client<_, RX, TX> = Client::new(MockPool::closing(&bytes));
+
+    assert_eq!(
+        poll_n(&mut client, 5).await,
+        vec![
+            Ok(None),
+            Ok(Some(Message::VersionMask(0x1fff_e000))),
+            Ok(Some(Message::Difficulty(2.5))),
+            Err(Error::Network),
+            Err(Error::Network),
+        ]
+    );
 }

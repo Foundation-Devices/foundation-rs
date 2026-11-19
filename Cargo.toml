@@ -29,10 +29,10 @@ bitcoin_hashes = { version = "0.15", default-features = false }
 bs58 = "0.5"
 clap = { version = "4", features = ["cargo"] }
 crc = "3"
-defmt = "0.3"
-derive_more = { version = "1.0", default-features = false }
-embedded-io = "0.6"
-embedded-io-async = "0.6"
+defmt = "1"
+derive_more = { version = "2.1", default-features = false }
+embedded-io = "0.7"
+embedded-io-async = "0.7"
 faster-hex = { version = "0.9", default-features = false }
 heapless = { version = "0.8", default-features = false }
 itertools = { version = "0.10", default-features = false }
@@ -46,7 +46,7 @@ rustversion = "1.0"
 secp256k1 = { version = "0.30", default-features = false }
 serde = { version = "1.0.156", features = ["derive"], default-features = false }
 serde_json = "1"
-serde-json-core = { version = "0.6.0" }
+serde-json-core = { version = "0.7", default-features = false }
 uuid = { version = "1", default-features = false }
 
 # The crates in this workspace.

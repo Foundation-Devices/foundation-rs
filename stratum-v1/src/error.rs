@@ -7,7 +7,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 /// Identifies the peer-supplied field a length error refers to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Field {
     /// `mining.notify` previous block hash.
     PrevHash,
@@ -16,7 +16,7 @@ pub enum Field {
 }
 
 #[derive(Debug, Clone, From, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Client is already configured against the Pool
     AlreadyConfigured,
@@ -94,7 +94,7 @@ pub enum Error {
         detail: Option<tstring!(32)>,
     },
 
-    /// Network error
+    /// The transport failed, or the pool closed the connection.
     // #[from]
     // Network(embedded_io::ErrorKind),
     Network,

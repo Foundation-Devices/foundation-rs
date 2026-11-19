@@ -8,13 +8,25 @@ use alloc::{
     vec,
     vec::Vec,
 };
+#[cfg(feature = "alloc")]
 use faster_hex::hex_string;
 #[cfg(not(feature = "alloc"))]
 use heapless::{String, Vec};
 use serde::{Deserialize, Serialize};
 
+/// Lowercase hex of `src` as a fixed-capacity string.
+///
+/// `faster-hex` only provides this for `alloc` and for `heapless` 0.8.
+#[cfg(not(feature = "alloc"))]
+fn hex_string<const N: usize>(src: &[u8]) -> Result<String<N>> {
+    let mut buf = [0u8; N];
+    let dst = buf.get_mut(..src.len() * 2).ok_or(Error::VecFull)?;
+    let hex = faster_hex::hex_encode(src, dst)?;
+    String::try_from(&*hex).map_err(|_| Error::VecFull)
+}
+
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum ReqKind {
     Configure,
     Connect,
@@ -36,7 +48,7 @@ pub(crate) enum ReqKind {
 ///- `T` - specifies textual type. By default it uses static buffer of 32 bytes, which is more than enough in normal cases.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Request<P> {
     #[serde(skip_serializing_if = "Option::is_none")]
     ///An identifier established by the Client.
@@ -57,7 +69,7 @@ pub struct Request<P> {
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct VersionRolling {
     /// Bits set to 1 can be changed by the miner.
     /// If a miner changes bits with mask value 0, the server will reject the submit.
@@ -67,7 +79,7 @@ pub struct VersionRolling {
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Info {
     /// Exact URL used by the mining software to connect to the stratum server.
     pub connection_url: Option<tstring!(32)>,
@@ -80,7 +92,7 @@ pub struct Info {
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Extensions {
     /// This extension allows the miner to change the value of some bits in the version field
     /// in the block header. Currently there are no standard bits used for version rolling
@@ -109,7 +121,7 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
     type ExtList = Vec<tstring!(32), 4>;
 
     #[derive(Debug, Serialize)]
-    #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     struct ExtParams {
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "version-rolling.mask")]
@@ -141,7 +153,7 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
     }
 
     #[derive(Debug, Serialize)]
-    #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     struct ConfigureParams(ExtList, ExtParams);
 
     let mut ext_list = Vec::new();
@@ -167,7 +179,7 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
         }
         #[cfg(not(feature = "alloc"))]
         if let Some(mask) = version_rolling.mask {
-            ext_params.version_rolling_mask = Some(hex_string::<8>(&mask.to_be_bytes()));
+            ext_params.version_rolling_mask = Some(hex_string::<8>(&mask.to_be_bytes())?);
         }
         #[cfg(feature = "alloc")]
         if let Some(min_bit_count) = version_rolling.min_bit_count {
@@ -179,7 +191,7 @@ pub(crate) fn configure(id: u64, exts: Extensions, buf: &mut [u8]) -> Result<usi
         if let Some(min_bit_count) = version_rolling.min_bit_count {
             let min_bit_count = min_bit_count as u32;
             ext_params.version_rolling_min_bit_count =
-                Some(hex_string::<8>(&min_bit_count.to_be_bytes()));
+                Some(hex_string::<8>(&min_bit_count.to_be_bytes())?);
         }
     }
     if let Some(minimum_difficulty) = &exts.minimum_difficulty {
@@ -305,7 +317,7 @@ pub(crate) fn suggest_difficulty(
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Share {
     pub job_id: tstring!(64),
     pub extranonce2: tvec!(u8, 8),
@@ -333,13 +345,13 @@ pub(crate) fn submit(id: u64, user: tstring!(64), share: Share, buf: &mut [u8]) 
         params.push(user).map_err(|_| Error::VecFull)?;
         params.push(share.job_id).map_err(|_| Error::VecFull)?;
         params
-            .push(hex_string::<64>(share.extranonce2.as_slice()))
+            .push(hex_string::<64>(share.extranonce2.as_slice())?)
             .map_err(|_| Error::VecFull)?;
         params
-            .push(hex_string::<64>(&share.ntime.to_be_bytes()))
+            .push(hex_string::<64>(&share.ntime.to_be_bytes())?)
             .map_err(|_| Error::VecFull)?;
         params
-            .push(hex_string::<64>(&share.nonce.to_be_bytes()))
+            .push(hex_string::<64>(&share.nonce.to_be_bytes())?)
             .map_err(|_| Error::VecFull)?;
         params
     };
@@ -348,7 +360,7 @@ pub(crate) fn submit(id: u64, user: tstring!(64), share: Share, buf: &mut [u8]) 
         params.push(hex_string(&v.to_be_bytes()));
         #[cfg(not(feature = "alloc"))]
         params
-            .push(hex_string::<64>(&v.to_be_bytes()))
+            .push(hex_string::<64>(&v.to_be_bytes())?)
             .map_err(|_| Error::VecFull)?;
     }
     let params = Some(params);
