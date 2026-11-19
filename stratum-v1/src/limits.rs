@@ -13,7 +13,7 @@ use crate::{Error, Field, Result};
 /// [`Work::prev_hash`] is decoded by slicing the field at fixed offsets, so
 /// anything but 32 hex-encoded bytes is rejected.
 ///
-/// [`Work::prev_hash`]: crate::Job
+/// [`Work::prev_hash`]: crate::Work::prev_hash
 pub const PREV_HASH_HEX_LEN: usize = 64;
 
 /// Maximum extranonce2 size accepted from the pool, in bytes.
