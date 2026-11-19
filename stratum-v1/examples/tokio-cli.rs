@@ -146,8 +146,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Some(Message::Difficulty(_diff)) => {
                         // TODO use diff to filter ASIC reported hits
                     }
-                    Some(Message::CleanJobs) => {
-                        // TODO clean the job queue and immediately start hashing a new job
+                    Some(Message::Work { clean_jobs: _ }) => {
+                        // TODO on clean_jobs, clean the job queue and immediately start hashing a new job
                     }
                     None => {}
                 },

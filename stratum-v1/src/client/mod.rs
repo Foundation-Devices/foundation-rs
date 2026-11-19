@@ -11,6 +11,7 @@ use crate::{Error, Result};
 pub use job::Job;
 use job::JobCreator;
 use notification::Notification;
+pub use notification::Work;
 use redact::Sensitivity;
 use request::ReqKind;
 pub use request::{Extensions, Info, Share, VersionRolling};
@@ -65,10 +66,19 @@ pub enum Message {
     Configured,
     Connected,
     Authorized,
-    Share { accepted: u64, rejected: u64 },
+    Share {
+        accepted: u64,
+        rejected: u64,
+    },
     VersionMask(u32),
     Difficulty(f64),
-    CleanJobs,
+    /// A `mining.notify` was received; [`Client::work`] now returns it.
+    ///
+    /// With `clean_jobs` set, the pool asks for every job built from earlier
+    /// work to be dropped.
+    Work {
+        clean_jobs: bool,
+    },
 }
 
 impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize>
@@ -113,6 +123,28 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
 
     pub async fn roll_job(&mut self) -> Result<Job> {
         self.job_creator.roll()
+    }
+
+    /// The work from the latest `mining.notify`, or `None` before the first one.
+    ///
+    /// This is what [`Client::roll_job`] builds jobs from. It gives access to
+    /// the parts a [`Job`] does not carry, such as the coinbase halves.
+    pub fn work(&self) -> Option<&Work> {
+        self.job_creator.work()
+    }
+
+    /// The extranonce1 assigned by the pool in the `mining.subscribe` response.
+    ///
+    /// Empty until [`Message::Connected`] has been reported.
+    pub fn extranonce1(&self) -> &[u8] {
+        self.job_creator.extranonce1()
+    }
+
+    /// The extranonce2 size, in bytes, from the `mining.subscribe` response.
+    ///
+    /// Zero until [`Message::Connected`] has been reported.
+    pub fn extranonce2_size(&self) -> usize {
+        self.job_creator.extranonce2_size()
     }
 
     /// # Poll for a Message from the Pool
@@ -276,11 +308,10 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                     }
                     Ok(Notification::Notify) => {
                         let work = consume!(notification::parse_notify(line));
-                        if work.clean_jobs {
-                            msg = Some(Message::CleanJobs);
-                        }
+                        let clean_jobs = work.clean_jobs;
                         info!("New Work: {:?}", work);
                         consume!(self.job_creator.set_work(work));
+                        msg = Some(Message::Work { clean_jobs });
                     }
                     Err(e) => error!("Failed to parse notification: {:?}", e),
                 }

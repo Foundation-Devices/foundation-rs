@@ -100,6 +100,18 @@ impl JobCreator {
         Ok(())
     }
 
+    pub(crate) fn work(&self) -> Option<&Work> {
+        self.last_work.as_ref()
+    }
+
+    pub(crate) fn extranonce1(&self) -> &[u8] {
+        self.extranonce1.as_slice()
+    }
+
+    pub(crate) fn extranonce2_size(&self) -> usize {
+        self.extranonce2_size
+    }
+
     fn merkle_root(&self, work: &Work) -> Result<[u8; 32]> {
         #[cfg(feature = "alloc")]
         let mut coinbase = alloc::vec::Vec::<u8>::new();
