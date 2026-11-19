@@ -30,7 +30,7 @@ use heapless::{index_map::FnvIndexMap, String, Vec};
 compile_error!("You have to choose if mining.suggest_difficulty is sent as a notification or as a request. Can't be both!");
 
 #[derive(Debug)]
-// #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Client<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: usize> {
     network_conn: C,
     rx_buf: [u8; RX_BUF_SIZE],
@@ -61,7 +61,7 @@ pub struct Client<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const T
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Message {
     Configured,
     Connected,

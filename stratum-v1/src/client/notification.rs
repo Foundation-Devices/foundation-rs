@@ -13,7 +13,7 @@ use serde::Deserialize;
 use super::request::Request;
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Work {
     pub job_id: tstring!(32),
     pub prev_hash: [u8; 32],
@@ -30,7 +30,7 @@ pub struct Work {
 }
 
 #[derive(Debug, PartialEq)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Notification {
     SetVersionMask,
     Notify,
@@ -39,7 +39,7 @@ pub enum Notification {
 
 pub(crate) fn parse_method(resp: &[u8]) -> Result<Notification> {
     #[derive(Debug, Deserialize)]
-    #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     struct MethodOnly {
         method: tstring!(32),
     }
@@ -68,7 +68,7 @@ pub(crate) fn parse_set_version_mask(resp: &[u8]) -> Result<u32> {
 
 pub(crate) fn parse_notify(resp: &[u8]) -> Result<Work> {
     #[derive(Debug, Deserialize)]
-    #[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     struct WorkRaw(
         // Job ID. This is included when miners submit a results so work can be matched with proper transactions.
         tstring!(32),

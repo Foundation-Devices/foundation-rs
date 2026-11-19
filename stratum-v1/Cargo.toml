@@ -39,7 +39,7 @@ alloc = [
     "faster-hex/alloc",
     "serde/alloc",
 ]
-defmt-03 = [
+defmt = [
     "dep:defmt",
     "embedded-io-async/defmt",
     "faster-hex/defmt-03",

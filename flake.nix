@@ -228,7 +228,7 @@
             }
           );
 
-          # --- Cargo check (stratum-v1 with `defmt-03`) ---
+          # --- Cargo check (stratum-v1 with `defmt`) ---
           #
           # Also excluded from the `all-features` checks. `DEFMT_LOG=trace` is
           # what makes this check useful: defmt compiles out the statements
@@ -244,8 +244,8 @@
               doInstallCargoArtifacts = false;
               DEFMT_LOG = "trace";
               buildPhaseCargoCommand = ''
-                cargo check --locked -p stratum-v1 --features defmt-03
-                cargo check --locked -p stratum-v1 --features defmt-03,alloc
+                cargo check --locked -p stratum-v1 --features defmt
+                cargo check --locked -p stratum-v1 --features defmt,alloc
               '';
             }
           );

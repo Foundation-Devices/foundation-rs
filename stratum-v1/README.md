@@ -116,8 +116,8 @@ The client is fuzzed; see [`fuzz/`](fuzz).
 | --- | --- |
 | *(none)* | `heapless` strings and vectors with fixed capacities, no allocator needed. |
 | `alloc` | `alloc::string::String` and `alloc::vec::Vec` in place of the `heapless` types. |
-| `defmt-03` | Logging and `defmt::Format` implementations through [`defmt`]. |
-| `log` | Logging through [`log`]. Cannot be combined with `defmt-03`. |
+| `defmt` | Logging and `defmt::Format` implementations through [`defmt`]. |
+| `log` | Logging through [`log`]. Cannot be combined with `defmt`. |
 | `suggest-difficulty-notification` | `Client::send_suggest_difficulty`, sent as a notification. |
 | `suggest-difficulty-request` | The same, sent as a request. Cannot be combined with the previous one. |
 

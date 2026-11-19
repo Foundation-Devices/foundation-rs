@@ -24,7 +24,7 @@ pub struct Job {
     pub header: Header,
 }
 
-#[cfg(feature = "defmt-03")]
+#[cfg(feature = "defmt")]
 impl defmt::Format for Job {
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
@@ -43,7 +43,7 @@ impl defmt::Format for Job {
 }
 
 #[derive(Debug, Default)]
-#[cfg_attr(feature = "defmt-03", derive(defmt::Format))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct JobCreator {
     last_work: Option<Work>,
     version_mask: i32,
