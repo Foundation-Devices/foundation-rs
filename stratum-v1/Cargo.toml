@@ -13,11 +13,11 @@ name = "stratum-v1"
 version = "0.5.0"
 
 [dependencies]
-bitcoin_hashes = { workspace = true }
+bitcoin_hashes = { version = "1.2", default-features = false }
 defmt = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["from"] }
 embedded-io-async = { workspace = true }
-faster-hex = { version = "0.10", default-features = false, git = "https://github.com/nervosnetwork/faster-hex.git", rev = "4acf38e2404d87cce6f91526c15600af89ef7e72" } # use git waiting for 0.11 publish
+faster-hex = { version = "1.0", default-features = false }
 log = { workspace = true, optional = true }
 rustversion = { workspace = true }
 serde = { workspace = true }
@@ -29,7 +29,7 @@ serde = { workspace = true }
 serde-json-core = { workspace = true }
 
 [target.'cfg(not(features = "alloc"))'.dependencies]
-heapless = { workspace = true, features = ["serde"] }
+heapless = { version = "0.9", default-features = false, features = ["serde"] }
 
 [features]
 alloc = [
@@ -41,9 +41,9 @@ alloc = [
 ]
 defmt-03 = [
     "dep:defmt",
-    "embedded-io-async/defmt-03",
+    "embedded-io-async/defmt",
     "faster-hex/defmt-03",
-    "heapless/defmt-03",
+    "heapless/defmt",
     "serde-json-core/defmt",
 ]
 
@@ -53,7 +53,7 @@ suggest-difficulty-request = []
 [dev-dependencies]
 embedded-io = { workspace = true, features = ["std"] }
 env_logger = "0.11"
-inquire = "0.7"
+inquire = "0.9"
 log = { workspace = true, features = ["std"] }
 tokio = { version = "1", features = ["full"] }
 

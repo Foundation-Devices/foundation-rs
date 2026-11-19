@@ -56,6 +56,10 @@ impl Write for MockPool {
         self.tx.extend_from_slice(buf);
         Ok(buf.len())
     }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 /// Join frames into one newline-terminated byte stream.

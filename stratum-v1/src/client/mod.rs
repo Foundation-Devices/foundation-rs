@@ -21,7 +21,7 @@ use response::Subscription;
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use embedded_io_async::{Read, ReadReady, Write};
 #[cfg(not(feature = "alloc"))]
-use heapless::{FnvIndexMap, String, Vec};
+use heapless::{index_map::FnvIndexMap, String, Vec};
 
 #[cfg(all(
     feature = "suggest-difficulty-notification",
@@ -237,7 +237,12 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
             if let Some(id) = consume!(parsed_id) {
                 // it's a Response
                 // Settled even if the reply fails to parse, so a bad one can't hold its slot.
-                match self.reqs.remove(&id) {
+                #[cfg(feature = "alloc")]
+                let req = self.reqs.remove(&id);
+                // Order is irrelevant: requests are only ever looked up by id.
+                #[cfg(not(feature = "alloc"))]
+                let req = self.reqs.swap_remove(&id);
+                match req {
                     Some(ReqKind::Configure) => {
                         self.configuration = Some(consume!(response::parse_configure(line)));
                         info!("Stratum v1 Client Configured");

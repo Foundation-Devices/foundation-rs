@@ -197,10 +197,14 @@ mod tests {
         assert_eq!(parse_set_version_mask(resp), Ok(0x1fff_e000));
 
         let resp = br#"{"params":["1fffe00z"], "id":null, "method": "mining.set_version_mask"}"#;
-        assert_eq!(
+        assert!(matches!(
             parse_set_version_mask(resp),
-            Err(Error::HexError(faster_hex::Error::InvalidChar))
-        );
+            Err(Error::HexError(faster_hex::Error::InvalidChar {
+                index: 7,
+                byte: b'z',
+                ..
+            }))
+        ));
 
         let resp = br#"{"params":["1fffe0000"], "id":null, "method": "mining.set_version_mask"}"#;
         #[cfg(not(feature = "alloc"))]
@@ -211,13 +215,13 @@ mod tests {
         #[cfg(feature = "alloc")]
         assert_eq!(
             parse_set_version_mask(resp),
-            Err(Error::HexError(faster_hex::Error::InvalidLength(8)))
+            Err(Error::HexError(faster_hex::Error::OddLength))
         );
 
         let resp = br#"{"params":["1fffe00"], "id":null, "method": "mining.set_version_mask"}"#;
         assert_eq!(
             parse_set_version_mask(resp),
-            Err(Error::HexError(faster_hex::Error::InvalidLength(8)))
+            Err(Error::HexError(faster_hex::Error::OddLength))
         );
     }
 

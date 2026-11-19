@@ -107,11 +107,6 @@
         commonArgs = {
           inherit src;
           strictDeps = true;
-
-          # The faster-hex git dependency requires an output hash for vendoring.
-          outputHashes = {
-            "faster-hex-0.10.0" = "sha256-RDqdms4swqXhG/+MOfaeFniCBGMEFqOxCsPQng6KyI0=";
-          };
         };
 
         # Build workspace dependencies once and share across checks.
@@ -260,7 +255,6 @@
             let
               vendoredCargoDeps = craneLib.vendorCargoDeps {
                 inherit src;
-                outputHashes = commonArgs.outputHashes;
               };
             in
             pkgs.runCommand "cbindgen-verify"
@@ -312,7 +306,6 @@
               # Vendor cargo dependencies so Corrosion can invoke cargo in the sandbox.
               vendoredCargoDeps = craneLib.vendorCargoDeps {
                 inherit src;
-                outputHashes = commonArgs.outputHashes;
               };
             in
             pkgs.stdenv.mkDerivation {
