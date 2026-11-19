@@ -94,7 +94,7 @@ pub enum Error {
         detail: Option<tstring!(32)>,
     },
 
-    /// Network error
+    /// The transport failed, or the pool closed the connection.
     // #[from]
     // Network(embedded_io::ErrorKind),
     Network,

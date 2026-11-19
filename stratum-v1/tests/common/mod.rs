@@ -14,6 +14,9 @@ pub struct MockPool {
     /// Maximum number of bytes handed over per `read`, to model a peer that
     /// dribbles frames out across packets.
     chunk: usize,
+    /// Whether the peer closes the stream after `rx`: the transport then stays
+    /// ready and reads zero bytes, as a closed TCP socket does.
+    closes: bool,
     tx: Vec<u8>,
 }
 
@@ -27,7 +30,16 @@ impl MockPool {
             rx: rx.to_vec(),
             rx_pos: 0,
             chunk,
+            closes: false,
             tx: Vec::new(),
+        }
+    }
+
+    /// A pool that sends `rx` and then closes the connection.
+    pub fn closing(rx: &[u8]) -> Self {
+        Self {
+            closes: true,
+            ..Self::new(rx)
         }
     }
 }
@@ -47,7 +59,7 @@ impl Read for MockPool {
 
 impl ReadReady for MockPool {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.rx_pos < self.rx.len())
+        Ok(self.closes || self.rx_pos < self.rx.len())
     }
 }
 

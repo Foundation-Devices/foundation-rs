@@ -166,6 +166,10 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
     ///
     /// Client state is only updated once a frame has been fully validated, so
     /// a rejected frame leaves the session as it was.
+    ///
+    /// A connection closed by the pool, seen as a ready transport that reads
+    /// zero bytes, is reported as [`Error::Network`] once every frame already
+    /// received has been returned.
     pub async fn poll_message(&mut self) -> Result<Option<Message>> {
         if self.rx_resync {
             match self.rx_buf[..self.rx_free_pos]
@@ -359,6 +363,12 @@ impl<C: Read + ReadReady + Write, const RX_BUF_SIZE: usize, const TX_BUF_SIZE: u
                 .map_err(|_| Error::Network)?;
             // A chunk can span several frames, so only its size is logged here.
             debug!("read {} bytes @{}", n, self.rx_free_pos);
+            // The slice is never empty here, so reading nothing means the pool
+            // closed the connection. A message parsed above is still handed
+            // over; the close is reported once the buffered frames are drained.
+            if n == 0 && msg.is_none() {
+                return Err(Error::Network);
+            }
             self.rx_free_pos += n;
         }
         Ok(msg)

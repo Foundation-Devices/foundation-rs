@@ -215,3 +215,23 @@ async fn zero_version_mask_does_not_panic_when_rolling() {
     let job = client.roll_job().await.unwrap();
     assert_eq!(job.header.version, 0x2000_0000);
 }
+
+/// A closed connection reads zero bytes while staying ready. It has to surface
+/// as an error, after the frames already received, rather than as an endless
+/// run of empty polls.
+#[tokio::test]
+async fn closed_connection_is_reported_after_the_buffered_frames() {
+    let bytes = stream(&[SET_VERSION_MASK, SET_DIFFICULTY]);
+    let mut client: Client<_, RX, TX> = Client::new(MockPool::closing(&bytes));
+
+    assert_eq!(
+        poll_n(&mut client, 5).await,
+        vec![
+            Ok(None),
+            Ok(Some(Message::VersionMask(0x1fff_e000))),
+            Ok(Some(Message::Difficulty(2.5))),
+            Err(Error::Network),
+            Err(Error::Network),
+        ]
+    );
+}
